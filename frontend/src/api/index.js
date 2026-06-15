@@ -107,6 +107,19 @@ export const quizAPI = {
     a.click();
     URL.revokeObjectURL(url);
   },
+  uploadMedia: async (file) => {
+    const formData = new FormData();
+    formData.append('media', file);
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/upload`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+    return data;
+  },
 };
 
 // Scores

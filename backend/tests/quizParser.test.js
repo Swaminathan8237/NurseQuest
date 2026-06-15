@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('fs');
+const path = require('path');
 const { parseQuizText, quizToText, FORMAT } = require('../utils/quizParser');
 
 test('Quiz Parser — Empty input', () => {
@@ -210,4 +212,12 @@ test('Quiz Parser — Enforce question limit (Max 200)', () => {
   assert.strictEqual(result.questions.length, 200);
   assert.strictEqual(result.warnings.length, 1);
   assert.ok(result.warnings[0].includes('maximum of 200 questions'));
+});
+
+test('Quiz Parser — Parses quiz_template.txt with no warnings', () => {
+  const templatePath = path.join(__dirname, '..', '..', 'quiz_template.txt');
+  const text = fs.readFileSync(templatePath, 'utf8');
+  const result = parseQuizText(text);
+  assert.ok(result.questions.length >= 9, 'should parse at least 9 questions');
+  assert.strictEqual(result.warnings.length, 0, 'should have no warnings');
 });

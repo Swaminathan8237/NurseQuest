@@ -8,6 +8,7 @@ const { Document, Packer, Paragraph, TextRun, HeadingLevel } = require('docx');
 const sampleQuestions = [
   {
     type: 'mcq',
+    expectedType: 'mcq',
     questionText: 'What is the standard adult body temperature?',
     options: ['36.5-37.5 °C', '38.0-39.0 °C', '35.0-36.0 °C', '39.5-40.0 °C'],
     correctAnswer: '36.5-37.5 °C',
@@ -15,6 +16,7 @@ const sampleQuestions = [
   },
   {
     type: 'mcq', // Stored as MCQ but represents True/False
+    expectedType: 'mcq',
     questionText: 'A sterile field can be touched with clean hands.',
     options: ['True', 'False'],
     correctAnswer: 'False',
@@ -22,6 +24,7 @@ const sampleQuestions = [
   },
   {
     type: 'matching',
+    expectedType: 'matching',
     questionText: 'Match the nurse role with the clinical focus:',
     options: ['Triage Nurse', 'ICU Nurse', 'OR Nurse'],
     matchingPairs: ['Urgency assessment', 'Critical care', 'Surgical assistance'],
@@ -34,6 +37,7 @@ const sampleQuestions = [
   },
   {
     type: 'jumbled_sequence',
+    expectedType: 'jumbled_sequence',
     questionText: 'Place the handwashing steps in order:',
     options: ['Wet hands', 'Apply soap', 'Rub palms', 'Rinse and dry'],
     correctAnswer: JSON.stringify(['Wet hands', 'Apply soap', 'Rub palms', 'Rinse and dry']),
@@ -41,6 +45,7 @@ const sampleQuestions = [
   },
   {
     type: 'jumbled_letters',
+    expectedType: 'jumbled_letters',
     questionText: 'Unscramble the term for slow heart rate:',
     options: ['B', 'R', 'A', 'D', 'Y', 'C', 'A', 'R', 'D', 'I', 'A'],
     correctAnswer: 'BRADYCARDIA',
@@ -48,6 +53,7 @@ const sampleQuestions = [
   },
   {
     type: 'slider',
+    expectedType: 'slider',
     questionText: 'Set the target oxygen saturation percentage for a healthy adult:',
     options: [],
     correctAnswer: '95',
@@ -59,6 +65,7 @@ const sampleQuestions = [
   },
   {
     type: 'image',
+    expectedType: 'image',
     questionText: 'Identify the chest leads placement:',
     options: ['V1', 'V2', 'V3', 'V4'],
     correctAnswer: 'V1',
@@ -67,6 +74,7 @@ const sampleQuestions = [
   },
   {
     type: 'captcha',
+    expectedType: 'captcha',
     questionText: 'Click the injection site on the thigh:',
     options: [],
     correctAnswer: JSON.stringify({ x: 0.35, y: 0.55, w: 0.15, h: 0.15 }),
@@ -117,7 +125,7 @@ test('Quiz Round-Trip — Text Level (quizToText -> parseQuizText)', () => {
     const original = sampleQuestions[i];
     const parsed = result.questions[i];
 
-    assert.strictEqual(parsed.type, original.type === 'mcq' && original.options.length === 2 && normalize(original.options[0]) === 'TRUE' ? 'mcq' : original.type);
+    assert.strictEqual(parsed.type, original.expectedType);
     assert.strictEqual(parsed.questionText, original.questionText);
     
     if (original.type === 'mcq') {
@@ -173,7 +181,7 @@ test('Quiz Round-Trip — Real DOCX Buffer (quizToText -> docx -> mammoth -> par
     const original = sampleQuestions[i];
     const parsed = result.questions[i];
 
-    assert.strictEqual(parsed.type, original.type);
+    assert.strictEqual(parsed.type, original.expectedType);
     assert.strictEqual(parsed.questionText, original.questionText);
     assert.strictEqual(parsed.explanation, original.explanation);
 

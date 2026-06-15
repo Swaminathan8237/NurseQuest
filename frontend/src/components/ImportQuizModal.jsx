@@ -313,16 +313,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
   const handleMediaUpload = async (qIndex, fileObj) => {
     setUploadingMedia(true);
     try {
-      const formData = new FormData();
-      formData.append('media', fileObj);
-      const token = sessionStorage.getItem('nursequest_token');
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      const data = await quizAPI.uploadMedia(fileObj);
       
       setQuestions(prev => prev.map((q, idx) => {
         if (idx !== qIndex) return q;

@@ -315,7 +315,7 @@ router.post('/import/confirm', authenticateToken, requireRole('teacher'), (req, 
             errors.push(`${qLabel}: Captcha requires an image. Please attach one.`);
           }
           // Box is always editable in preview, but warn if empty
-          if (!q.correctAnswer || q.correctAnswer === '{}') {
+          if (!q.correctAnswer || q.correctAnswer === '' || q.correctAnswer === '{}') {
             errors.push(`${qLabel}: Captcha requires a correct region (box). Please draw one.`);
           }
           break;

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { userAPI, quizAPI, moduleAPI } from '../api';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
+import ImportQuizModal from '../components/ImportQuizModal';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -13,6 +14,16 @@ export default function TeacherDashboard() {
   const [students, setStudents] = useState([]);
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [activeExportQuizId, setActiveExportQuizId] = useState(null);
+
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      setActiveExportQuizId(null);
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
 
   useEffect(() => {
     Promise.all([userAPI.getDashboardStats(), quizAPI.getMyQuizzes(), userAPI.getStudents(), moduleAPI.getAll()])
@@ -63,6 +74,14 @@ export default function TeacherDashboard() {
             >
               <span className="material-symbols-outlined text-xl">view_module</span>
               Manage Modules
+            </button>
+            <button 
+              className="w-full md:w-auto px-6 py-4 bg-surface-variant/50 backdrop-blur-md border border-outline-variant/30 text-tertiary rounded-xl font-headline font-bold uppercase tracking-widest hover:bg-surface-variant transition-all flex items-center justify-center gap-2 active:scale-95"
+              onClick={() => setShowImportModal(true)}
+              id="import-quiz-btn"
+            >
+              <span className="material-symbols-outlined text-xl">upload_file</span>
+              Import Quiz
             </button>
             <button 
               className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-primary-container to-primary text-on-primary-container rounded-xl font-headline font-bold uppercase tracking-widest shadow-[0_4px_20px_rgba(183,109,255,0.4)] hover:shadow-[0_4px_25px_rgba(183,109,255,0.6)] hover:scale-105 transition-all flex items-center justify-center gap-2 active:scale-95"
@@ -184,6 +203,46 @@ export default function TeacherDashboard() {
                     >
                       <span className="material-symbols-outlined text-[16px]">edit</span> Edit
                     </button>
+                    <div className="relative flex-1">
+                      <button 
+                        className="w-full py-2 bg-surface-container-high hover:bg-surface-container-highest text-slate-300 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveExportQuizId(activeExportQuizId === quiz.id ? null : quiz.id);
+                        }}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">download</span> Export
+                      </button>
+                      {activeExportQuizId === quiz.id && (
+                        <div className="absolute bottom-full left-0 mb-2 w-48 bg-surface-container-highest border border-outline-variant/30 rounded-lg shadow-2xl py-1 z-20 animate-fadeInUp">
+                          <div className="px-3 py-1 text-[9px] font-black uppercase tracking-wider text-slate-500 border-b border-white/5 mb-1">Export Format</div>
+                          {[
+                            { format: 'docx', label: 'Word (.docx)', icon: 'description' },
+                            { format: 'json', label: 'JSON (.json)', icon: 'code' },
+                            { format: 'zip', label: 'ZIP Bundle (.zip)', icon: 'folder_zip' },
+                          ].map(opt => (
+                            <button
+                              key={opt.format}
+                              type="button"
+                              className="w-full px-3 py-2 text-xs font-bold text-left hover:bg-surface-variant text-on-surface-variant flex items-center gap-2 transition-colors"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                setActiveExportQuizId(null);
+                                try {
+                                  await quizAPI.exportQuiz(quiz.id, opt.format);
+                                } catch (err) {
+                                  console.error(err);
+                                  alert(`Export failed: ${err.message}`);
+                                }
+                              }}
+                            >
+                              <span className="material-symbols-outlined text-sm">{opt.icon}</span>
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <button 
                       className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${quiz.is_published ? 'bg-surface-container-high hover:bg-surface-container-highest text-slate-300' : 'bg-primary/20 text-primary hover:bg-primary/30'}`}
                       onClick={() => togglePublish(quiz)}
@@ -275,6 +334,15 @@ export default function TeacherDashboard() {
           </div>
         </div>
       </main>
+      {showImportModal && (
+        <ImportQuizModal 
+          onClose={() => setShowImportModal(false)} 
+          onImportSuccess={(newQuiz) => {
+            setQuizzes(prev => [newQuiz, ...prev]);
+            setShowImportModal(false);
+          }} 
+        />
+      )}
     </div>
   );
 }

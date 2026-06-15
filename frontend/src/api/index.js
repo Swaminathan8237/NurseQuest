@@ -53,6 +53,60 @@ export const quizAPI = {
   create: (data) => request('/quizzes', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => request(`/quizzes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id) => request(`/quizzes/${id}`, { method: 'DELETE' }),
+  importFile: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/quizzes/import`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: formData,
+    });
+    const text = await res.text();
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (e) {
+      console.error("Failed to parse JSON:", text);
+      if (!res.ok) throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+    }
+    if (!res.ok) {
+      throw new Error(data.error || `Request failed with status ${res.status}`);
+    }
+    return data;
+  },
+  confirmImport: (data) => request('/quizzes/import/confirm', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  exportQuiz: async (id, format = 'docx') => {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/quizzes/${id}/export?format=${format}`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let errorMsg = 'Export failed';
+      try {
+        const data = JSON.parse(text);
+        errorMsg = data.error || errorMsg;
+      } catch {}
+      throw new Error(errorMsg);
+    }
+    const blob = await res.blob();
+    const contentDisposition = res.headers.get('Content-Disposition');
+    let filename = `quiz-export.${format === 'json' ? 'json' : format === 'zip' ? 'zip' : 'docx'}`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="(.+?)"/);
+      if (filenameMatch) filename = filenameMatch[1];
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 };
 
 // Scores

@@ -1,0 +1,95 @@
+NurseQuest Quiz Template
+=======================
+Use this template to create questions in a TXT or Word document.
+Each question starts with a number (e.g. 1.) or a type tag (e.g. [Matching]).
+Leave a blank line between questions. 
+
+1. Multiple Choice (MCQ) — Default Format (No type tag required)
+----------------------------------------------------------------
+1. What is the normal resting heart rate range for an adult?
+A) 40-60 bpm
+B) 60-100 bpm
+C) 100-120 bpm
+D) 120-150 bpm
+Answer: B
+Explanation: The normal resting heart rate for adults ranges from 60 to 100 beats per minute.
+
+2. True / False Question
+------------------------
+[TrueFalse]
+2. Hand hygiene is the single most important practice in reducing infection transmission.
+Answer: True
+Explanation: Hand hygiene is the cornerstone of clinical infection prevention.
+
+3. Matching Pairs Question
+--------------------------
+[Matching]
+3. Match the medical condition with its primary diagnostic indicator:
+Diabetes = Polyuria
+Hypertension = Elevated blood pressure
+Hypothyroidism = Elevated TSH levels
+Explanation: Polyuria is common in diabetes; elevated BP in hypertension; elevated TSH in hypothyroidism.
+
+4. Sequence / Procedure Ordering
+--------------------------------
+[Sequence]
+4. Order the steps for clean dressing change:
+1) Perform hand hygiene
+2) Apply clean gloves
+3) Remove old dressing
+4) Clean wound site
+Explanation: Hand hygiene must always be done first, followed by glove application, removal, and cleaning.
+
+5. Jumbled Letters (Vocabulary Unscramble)
+------------------------------------------
+[Jumble]
+5. Unscramble the term representing slow heart rate:
+Word: BRADYCARDIA
+Explanation: Bradycardia refers to a heart rate below 60 beats per minute.
+
+6. Slider (Numeric Range Question)
+----------------------------------
+[Slider]
+6. What temperature defines a fever in Celsius?
+Min: 35  Max: 41  Step: 0.1  Answer: 38
+Unit: °C
+Explanation: A body temperature of 38°C (100.4°F) or above is clinically considered a fever.
+
+7. Media MCQ (Image/Video/Audio)
+--------------------------------
+Specify the exact filename. If importing via ZIP, place files inside a folder named "media".
+[Image]
+7. Identify the anatomical structure indicated:
+Media: heart_diagram.png
+A) Aorta
+B) Left Ventricle
+C) Right Atrium
+Answer: A
+Explanation: The aorta is the main artery carrying oxygenated blood from the left ventricle.
+
+[Video]
+8. Assess the clinical scenario shown in the video:
+Media: patient_assessment.mp4
+A) Patient is stable
+B) Patient shows respiratory distress
+C) Patient is asleep
+Answer: B
+Explanation: Retractions and nasal flaring indicate respiratory distress.
+
+[Audio]
+9. Identify the lung sound heard in the recording:
+Media: wheezing.mp3
+A) Clear vesicular
+B) Coarse crackles
+C) High-pitched wheezing
+Answer: C
+Explanation: High-pitched whistling sounds on expiration represent wheezing.
+
+8. Image CAPTCHA (Visual Target Selection)
+------------------------------------------
+Define the coordinates of the correct bounding box (x, y, width, height as percentages from 0.0 to 1.0).
+[Captcha]
+10. Click on the injection site in the image:
+Media: arm_deltoid.jpg
+Box: 0.25, 0.45, 0.10, 0.10
+Explanation: The deltoid muscle is located in the upper arm, about 2-3 fingerbreadths below the acromion process.

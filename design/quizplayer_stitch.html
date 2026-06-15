@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NurseQuest - Quiz Player</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#71d7cd",
+                        "secondary-fixed-dim": "#ddb7ff",
+                        "on-tertiary-fixed": "#00201d",
+                        "primary": "#ddb7ff",
+                        "background": "#0b1326",
+                        "on-primary-container": "#400071",
+                        "on-secondary-fixed": "#2a0848",
+                        "on-primary": "#490080",
+                        "on-secondary-container": "#cba6ed",
+                        "surface-tint": "#ddb7ff",
+                        "surface-bright": "#31394e",
+                        "on-surface": "#dbe2fd",
+                        "on-primary-fixed-variant": "#670dae",
+                        "outline": "#988d9e",
+                        "on-background": "#dbe2fd",
+                        "surface-container-highest": "#2d3449",
+                        "surface-container-low": "#131b2e",
+                        "on-tertiary-fixed-variant": "#00504a",
+                        "on-error": "#690005",
+                        "on-primary-fixed": "#2c0051",
+                        "secondary-container": "#583876",
+                        "secondary": "#ddb7ff",
+                        "on-surface-variant": "#cfc2d5",
+                        "error": "#ffb4ab",
+                        "surface-container-high": "#222a3e",
+                        "error-container": "#93000a",
+                        "primary-fixed-dim": "#ddb7ff",
+                        "inverse-primary": "#8134c7",
+                        "surface-variant": "#2d3449",
+                        "secondary-fixed": "#f0dbff",
+                        "outline-variant": "#4c4353",
+                        "primary-fixed": "#f0dbff",
+                        "primary-container": "#b76dff",
+                        "surface": "#0b1326",
+                        "on-error-container": "#ffdad6",
+                        "tertiary-fixed-dim": "#71d7cd",
+                        "surface-container": "#171f33",
+                        "on-secondary-fixed-variant": "#583876",
+                        "surface-container-lowest": "#060d20",
+                        "inverse-on-surface": "#283044",
+                        "surface-dim": "#0b1326",
+                        "inverse-surface": "#dbe2fd",
+                        "on-tertiary-container": "#00302c",
+                        "tertiary-container": "#32a097",
+                        "on-secondary": "#40215e",
+                        "on-tertiary": "#003733",
+                        "tertiary-fixed": "#8ef4e9"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "display": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, h4, h5, h6, .font-headline, .font-display { font-family: 'Manrope', sans-serif; }
+        .glass-panel {
+            background: rgba(49, 57, 78, 0.4);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col relative overflow-hidden">
+<!-- Ambient Glow Background Effects -->
+<div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary-container opacity-20 blur-[120px] pointer-events-none"></div>
+<div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-tertiary opacity-10 blur-[100px] pointer-events-none"></div>
+<!-- Main Content Container (No TopAppBar/BottomNavBar as this is a focused linear flow) -->
+<main class="flex-1 flex flex-col relative z-10 p-6 pt-10 md:p-12 md:pt-16 max-w-7xl mx-auto w-full">
+<!-- Top HUD -->
+<header class="flex justify-between items-center mb-16">
+<!-- Progress -->
+<div class="flex flex-col gap-2 w-1/4 max-w-[200px]">
+<span class="font-headline font-bold text-on-surface text-lg">3/10</span>
+<div class="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-tertiary to-primary-container rounded-full" style="width: 30%;"></div>
+</div>
+</div>
+<!-- Timer -->
+<div class="relative flex items-center justify-center w-24 h-24">
+<svg class="absolute inset-0 w-full h-full transform -rotate-90" viewbox="0 0 100 100">
+<circle class="text-surface-container-highest" cx="50" cy="50" fill="none" r="45" stroke="currentColor" stroke-width="6"></circle>
+<circle class="text-primary-container" cx="50" cy="50" fill="none" r="45" stroke="url(#timer-gradient)" stroke-dasharray="283" stroke-dashoffset="65" stroke-width="6"></circle>
+<defs>
+<lineargradient id="timer-gradient" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#ddb7ff"></stop>
+<stop offset="100%" stop-color="#b76dff"></stop>
+</lineargradient>
+</defs>
+</svg>
+<span class="font-display font-extrabold text-4xl tracking-tighter text-surface-tint drop-shadow-[0_0_15px_rgba(183,109,255,0.6)]">23</span>
+</div>
+<!-- Score -->
+<div class="flex flex-col items-end gap-1 w-1/4">
+<span class="font-headline font-extrabold text-2xl text-on-surface">2,450 pts</span>
+<div class="glass-panel px-3 py-1 rounded-full flex items-center gap-1 border border-outline-variant/30">
+<span class="font-headline font-bold text-sm text-tertiary">3</span>
+<span class="text-sm">🔥</span>
+</div>
+</div>
+</header>
+<!-- Question Area -->
+<div class="flex flex-col items-center text-center mb-16 flex-1 justify-center">
+<div class="bg-surface-container-low px-4 py-2 rounded-full flex items-center gap-2 mb-8 shadow-[0_8px_32px_0_rgba(11,19,38,0.8)] border border-outline-variant/20">
+<span class="material-symbols-outlined text-tertiary text-sm" style="font-variation-settings: 'FILL' 1;">assignment</span>
+<span class="font-label font-medium text-xs tracking-wider uppercase text-on-surface-variant">Multiple Choice</span>
+</div>
+<h1 class="font-display font-extrabold text-4xl md:text-5xl lg:text-6xl tracking-tight leading-tight max-w-4xl px-4">
+                What is the normal resting heart rate for an adult?
+            </h1>
+</div>
+<!-- Options Grid (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto w-full mt-auto mb-8">
+<!-- Option A -->
+<button class="group relative overflow-hidden rounded-lg bg-surface-container-low text-left hover:bg-surface-container transition-all duration-300 transform hover:scale-[1.02] shadow-[0_8px_32px_0_rgba(11,19,38,0.5)] border border-transparent hover:border-primary-container/30">
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-primary-container group-hover:bg-primary transition-colors"></div>
+<div class="p-6 md:p-8 pl-10">
+<div class="flex items-center justify-between">
+<span class="font-display font-bold text-2xl md:text-3xl text-on-surface">40-60 bpm</span>
+<div class="w-8 h-8 rounded-full border-2 border-outline-variant group-hover:border-primary flex items-center justify-center transition-colors">
+<span class="font-headline font-bold text-sm text-outline-variant group-hover:text-primary">A</span>
+</div>
+</div>
+</div>
+</button>
+<!-- Option B -->
+<button class="group relative overflow-hidden rounded-lg bg-surface-container-low text-left hover:bg-surface-container transition-all duration-300 transform hover:scale-[1.02] shadow-[0_8px_32px_0_rgba(11,19,38,0.5)] border border-transparent hover:border-tertiary/30">
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-tertiary group-hover:bg-tertiary-fixed transition-colors"></div>
+<div class="p-6 md:p-8 pl-10">
+<div class="flex items-center justify-between">
+<span class="font-display font-bold text-2xl md:text-3xl text-on-surface">60-100 bpm</span>
+<div class="w-8 h-8 rounded-full border-2 border-outline-variant group-hover:border-tertiary flex items-center justify-center transition-colors">
+<span class="font-headline font-bold text-sm text-outline-variant group-hover:text-tertiary">B</span>
+</div>
+</div>
+</div>
+</button>
+<!-- Option C -->
+<button class="group relative overflow-hidden rounded-lg bg-surface-container-low text-left hover:bg-surface-container transition-all duration-300 transform hover:scale-[1.02] shadow-[0_8px_32px_0_rgba(11,19,38,0.5)] border border-transparent hover:border-error/30">
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-error group-hover:bg-error-container transition-colors"></div>
+<div class="p-6 md:p-8 pl-10">
+<div class="flex items-center justify-between">
+<span class="font-display font-bold text-2xl md:text-3xl text-on-surface">100-120 bpm</span>
+<div class="w-8 h-8 rounded-full border-2 border-outline-variant group-hover:border-error flex items-center justify-center transition-colors">
+<span class="font-headline font-bold text-sm text-outline-variant group-hover:text-error">C</span>
+</div>
+</div>
+</div>
+</button>
+<!-- Option D -->
+<button class="group relative overflow-hidden rounded-lg bg-surface-container-low text-left hover:bg-surface-container transition-all duration-300 transform hover:scale-[1.02] shadow-[0_8px_32px_0_rgba(11,19,38,0.5)] border border-transparent hover:border-[#f59e0b]/30">
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-[#f59e0b] group-hover:bg-[#fcd34d] transition-colors"></div>
+<div class="p-6 md:p-8 pl-10">
+<div class="flex items-center justify-between">
+<span class="font-display font-bold text-2xl md:text-3xl text-on-surface">120-140 bpm</span>
+<div class="w-8 h-8 rounded-full border-2 border-outline-variant group-hover:border-[#f59e0b] flex items-center justify-center transition-colors">
+<span class="font-headline font-bold text-sm text-outline-variant group-hover:text-[#f59e0b]">D</span>
+</div>
+</div>
+</div>
+</button>
+</div>
+</main>
+</body></html>

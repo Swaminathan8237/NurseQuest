@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Teacher Dashboard - Create Quiz</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed-variant": "#583876",
+                    "background": "#0b1326",
+                    "outline-variant": "#4c4353",
+                    "error": "#ffb4ab",
+                    "surface-container-highest": "#2d3449",
+                    "secondary-fixed": "#f0dbff",
+                    "on-primary-fixed": "#2c0051",
+                    "on-primary-container": "#400071",
+                    "primary-fixed": "#f0dbff",
+                    "tertiary-container": "#32a097",
+                    "primary": "#ddb7ff",
+                    "on-tertiary-fixed-variant": "#00504a",
+                    "secondary-container": "#583876",
+                    "error-container": "#93000a",
+                    "on-tertiary-container": "#00302c",
+                    "tertiary": "#71d7cd",
+                    "primary-fixed-dim": "#ddb7ff",
+                    "tertiary-fixed": "#8ef4e9",
+                    "on-tertiary": "#003733",
+                    "on-primary-fixed-variant": "#670dae",
+                    "on-secondary-container": "#cba6ed",
+                    "on-error": "#690005",
+                    "on-secondary-fixed": "#2a0848",
+                    "surface-container-low": "#131b2e",
+                    "on-secondary": "#40215e",
+                    "outline": "#988d9e",
+                    "surface-dim": "#0b1326",
+                    "secondary-fixed-dim": "#ddb7ff",
+                    "surface": "#0b1326",
+                    "surface-container-lowest": "#060d20",
+                    "surface-container": "#171f33",
+                    "on-surface-variant": "#cfc2d5",
+                    "inverse-on-surface": "#283044",
+                    "surface-container-high": "#222a3e",
+                    "on-tertiary-fixed": "#00201d",
+                    "on-primary": "#490080",
+                    "surface-tint": "#ddb7ff",
+                    "primary-container": "#b76dff",
+                    "tertiary-fixed-dim": "#71d7cd",
+                    "on-error-container": "#ffdad6",
+                    "surface-variant": "#2d3449",
+                    "surface-bright": "#31394e",
+                    "secondary": "#ddb7ff",
+                    "on-surface": "#dbe2fd",
+                    "inverse-surface": "#dbe2fd",
+                    "inverse-primary": "#8134c7",
+                    "on-background": "#dbe2fd"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope", "sans-serif"],
+                    "display": ["Manrope", "sans-serif"],
+                    "body": ["Inter", "sans-serif"],
+                    "label": ["Inter", "sans-serif"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+      body {
+        background-color: theme('colors.background');
+        color: theme('colors.on-surface');
+      }
+      .glass-panel {
+        background: rgba(23, 31, 51, 0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+      }
+    </style>
+</head>
+<body class="font-body min-h-screen flex flex-col md:flex-row overflow-hidden">
+<!-- SideNavBar (Shared Component) -->
+<nav class="h-screen w-72 left-0 top-0 border-r border-white/5 bg-[#0b1326] hidden md:flex flex-col py-8 shadow-2xl shadow-black/50 z-40 relative">
+<div class="px-6 mb-8 flex items-center gap-3">
+<span class="material-symbols-outlined text-4xl text-[#b76dff]" data-weight="fill" style="font-variation-settings: 'FILL' 1;">medical_services</span>
+<div>
+<h1 class="text-lg font-black text-white font-headline tracking-tighter">Teacher Studio</h1>
+<p class="text-xs text-slate-400 font-label">Clinical Luminary v1.0</p>
+</div>
+</div>
+<div class="px-4 mb-8 flex flex-col items-center">
+<img alt="NurseQuest Luminary" class="w-20 h-20 rounded-full border-2 border-[#b76dff] shadow-[0_0_15px_rgba(183,109,255,0.4)] mb-3 object-cover" data-alt="portrait of a confident female nursing instructor in scrubs with a subtle warm smile in a modern bright clinical setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBcH_RiIuL4wn_4Od9SkLKDgOW1uW7rPvJRa9tI8-zo4w0QQWM3Go6-iBZllmGx5e3ybw0Scy4-s6R7GEYnNc35Tvz2yIfvpg_hJvpcfU1aux527Fk5KSEUXLUJ_6U89jV_M5K0HEEgQ-wHg73p7SJJ9VC1xvRSgHCN6mpVsLXkXZ1Y_qCwRrDJOJTKTnBIwfY3WUFwixBH1brbh2mOzOjqACxq70b0O_AFNA6pXzaMghdiSZbHeNjMPIvYG2PSxwO3n1_zrYPjtGo"/>
+<button class="w-full bg-surface-variant/40 backdrop-blur text-primary text-sm font-semibold rounded-full py-2 hover:bg-white/5 transition-all">
+                Create New Quiz
+            </button>
+</div>
+<ul class="flex-1 space-y-2 font-['Inter'] text-sm font-semibold">
+<li>
+<a class="flex items-center gap-4 text-slate-400 hover:text-white mx-4 px-4 py-3 hover:bg-white/5 rounded-full transition-all scale-100 active:scale-98" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                    Home
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-4 text-slate-400 hover:text-white mx-4 px-4 py-3 hover:bg-white/5 rounded-full transition-all scale-100 active:scale-98" href="#">
+<span class="material-symbols-outlined">menu_book</span>
+                    Curriculum
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-4 bg-gradient-to-br from-[#b76dff] to-[#ddb7ff] text-white rounded-full mx-4 px-4 py-3 shadow-[0_0_20px_rgba(183,109,255,0.3)] transition-all scale-100 active:scale-98" href="#">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">database</span>
+                    Question Bank
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-4 text-slate-400 hover:text-white mx-4 px-4 py-3 hover:bg-white/5 rounded-full transition-all scale-100 active:scale-98" href="#">
+<span class="material-symbols-outlined">assignment</span>
+                    Assignments
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-4 text-slate-400 hover:text-white mx-4 px-4 py-3 hover:bg-white/5 rounded-full transition-all scale-100 active:scale-98" href="#">
+<span class="material-symbols-outlined">settings</span>
+                    Settings
+                </a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col h-screen overflow-hidden">
+<!-- TopNavBar (Shared Component, Modified for Layout) -->
+<header class="bg-[#0b1326]/80 backdrop-blur-xl docked full-width top-0 z-50 shadow-xl shadow-purple-500/5 bg-surface-container-low/30 border-b border-white/5 hidden md:block">
+<div class="flex justify-between items-center w-full px-8 py-4 max-w-[1920px] mx-auto">
+<div class="flex items-center gap-6">
+<span class="text-2xl font-black text-[#b76dff] tracking-tighter font-headline">NurseQuest</span>
+<nav class="hidden lg:flex gap-6 ml-8 font-['Manrope'] font-bold tracking-tight text-on-surface">
+<a class="text-slate-400 font-medium hover:text-white transition-colors" href="#">Dashboard</a>
+<a class="text-[#b76dff] border-b-2 border-[#b76dff] pb-1" href="#">Courses</a>
+<a class="text-slate-400 font-medium hover:text-white transition-colors" href="#">Quizzes</a>
+<a class="text-slate-400 font-medium hover:text-white transition-colors" href="#">Analytics</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-slate-400 hover:bg-[#b76dff]/10 hover:text-[#ddb7ff] rounded-full p-2 transition-all duration-300 ease-out active:scale-95">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-slate-400 hover:bg-[#b76dff]/10 hover:text-[#ddb7ff] rounded-full p-2 transition-all duration-300 ease-out active:scale-95">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<img alt="Instructor Profile" class="w-10 h-10 rounded-full border border-primary/30 ml-2 object-cover" data-alt="small circular portrait of female nursing instructor" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZHahBSj0uQs07czNDQIp09LiNQk1Sg6SNu_J8i0paT8XnPSjl3BudsuUHkHIRMr8v_6oxug8YXOrRLDL5LXNnY37G3dfE0vC91ptoMd00GYvPhKM2MxbNOJD3qIzKBmTF4tx3ag7jj3_DzbTMYhNZX5IJCtqYViwOaiC9ovA6h2SsEgpZFfh940RqFdlbv3eR2BhHYNfHo_V5nEAqFfSTXYRHLibKa9DT9zTRskzxK670ZYsByS5ZOYu1HE_UIQBVdW3ccYiuRuU"/>
+</div>
+</div>
+</header>
+<!-- Mobile Top Nav (Simplified) -->
+<header class="md:hidden flex justify-between items-center p-4 bg-surface-container/50 backdrop-blur z-50">
+<span class="text-xl font-black text-[#b76dff] tracking-tighter font-headline">NurseQuest</span>
+<button class="text-on-surface"><span class="material-symbols-outlined">menu</span></button>
+</header>
+<!-- Workspace Split -->
+<div class="flex-1 flex flex-col md:flex-row overflow-hidden p-4 md:p-6 gap-6 max-w-[1920px] mx-auto w-full">
+<!-- LEFT PANEL: Quiz Builder (65%) -->
+<section class="flex-[0_0_65%] flex flex-col overflow-y-auto space-y-6 pr-2 custom-scrollbar">
+<!-- Breadcrumbs & Header -->
+<div class="glass-panel rounded-lg p-6 flex flex-col gap-2">
+<nav class="flex text-sm text-slate-400 font-label items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">home</span>
+<span>/</span>
+<span>Courses</span>
+<span>/</span>
+<span class="text-primary">Create Quiz</span>
+</nav>
+<h2 class="text-display-sm font-headline font-extrabold text-on-surface tracking-tight flex items-center gap-3">
+<span class="text-3xl">✏️</span> Create Quiz
+                    </h2>
+</div>
+<!-- Quiz Details Form -->
+<div class="glass-panel rounded-lg p-8 space-y-6">
+<h3 class="text-xl font-headline font-bold text-primary mb-4 border-b border-white/5 pb-2">Quiz Settings</h3>
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-label text-slate-400 mb-1">Title</label>
+<input class="w-full bg-surface-container-high border-none rounded-md px-4 py-3 text-on-surface font-body focus:ring-1 focus:ring-primary/30 transition-shadow" type="text" value="Fundamentals of Patient Care"/>
+</div>
+<div>
+<label class="block text-sm font-label text-slate-400 mb-1">Description</label>
+<textarea class="w-full bg-surface-container-high border-none rounded-md px-4 py-3 text-on-surface font-body focus:ring-1 focus:ring-primary/30 transition-shadow h-24 resize-none">Test your knowledge on basic patient interaction, hygiene, and monitoring.</textarea>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div>
+<label class="block text-sm font-label text-slate-400 mb-1">Category</label>
+<select class="w-full bg-surface-container-high border-none rounded-md px-4 py-3 text-on-surface font-body focus:ring-1 focus:ring-primary/30 appearance-none">
+<option>Patient Care</option>
+<option>Pharmacology</option>
+<option>Anatomy</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-label text-slate-400 mb-2">Difficulty</label>
+<div class="flex gap-2">
+<button class="flex-1 bg-surface-container-high text-slate-400 rounded-md py-2 text-sm font-semibold hover:bg-tertiary/20 hover:text-tertiary transition-colors border border-transparent">Easy</button>
+<button class="flex-1 bg-tertiary-container/20 text-tertiary rounded-md py-2 text-sm font-semibold border border-tertiary/30 shadow-[0_0_10px_rgba(113,215,205,0.1)]">Medium</button>
+<button class="flex-1 bg-surface-container-high text-slate-400 rounded-md py-2 text-sm font-semibold hover:bg-error/20 hover:text-error transition-colors border border-transparent">Hard</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Question Editor -->
+<div class="glass-panel rounded-lg p-8 space-y-6 relative overflow-hidden">
+<!-- Subtle decorative background glow -->
+<div class="absolute -top-20 -right-20 w-64 h-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none"></div>
+<h3 class="text-xl font-headline font-bold text-primary mb-4 border-b border-white/5 pb-2 flex justify-between items-center">
+                        Question Editor
+                        <span class="text-sm font-normal text-slate-400 bg-surface-container-highest px-3 py-1 rounded-full">Drafting Q7</span>
+</h3>
+<!-- Question Types -->
+<div class="grid grid-cols-3 gap-3 mb-6">
+<button class="bg-primary-container/20 border border-primary/30 text-primary rounded-md py-3 flex flex-col items-center justify-center gap-1 shadow-[0_0_15px_rgba(183,109,255,0.15)]">
+<span class="material-symbols-outlined text-lg">list_alt</span>
+<span class="text-xs font-semibold">Multiple Choice</span>
+</button>
+<button class="bg-surface-container-high text-slate-400 hover:text-on-surface rounded-md py-3 flex flex-col items-center justify-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-lg">image</span>
+<span class="text-xs font-semibold">Image</span>
+</button>
+<button class="bg-surface-container-high text-slate-400 hover:text-on-surface rounded-md py-3 flex flex-col items-center justify-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-lg">play_circle</span>
+<span class="text-xs font-semibold">Video</span>
+</button>
+</div>
+<!-- Editor Fields -->
+<div class="space-y-5">
+<div>
+<label class="block text-sm font-label text-slate-400 mb-1">Question Text</label>
+<textarea class="w-full bg-surface-container-highest border-none rounded-md px-4 py-4 text-on-surface font-body text-lg focus:ring-1 focus:ring-primary/30 h-32 resize-none" placeholder="Enter question here..."></textarea>
+</div>
+<!-- Media Upload Zone -->
+<div class="border-2 border-dashed border-outline-variant/50 rounded-lg p-6 flex flex-col items-center justify-center text-center bg-surface-container-low/50 hover:bg-surface-container-low transition-colors group cursor-pointer relative overflow-hidden">
+<div class="absolute inset-0 bg-black/40 hidden group-hover:flex items-center justify-center backdrop-blur-sm transition-all z-10">
+<span class="material-symbols-outlined text-white text-3xl">upload</span>
+</div>
+<img alt="Medical Chart Preview" class="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-luminosity" data-alt="close up of a modern digital medical chart showing patient vital signs in a clinical app interface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2wsyDz8mskJnQkLbtz2OiI0f5IcohbX5RTGqH8JQtSwG4esV-zSXo3JcIllL-txwPJ749k27P9GVqDmmBIzZmkyM8hDkUebt2tj_db4tGUP_J6w8ccFbbazQsyLNEkeZ3Gs-4s5UsQDES4IivKLT5L5lNjIxhhlGGjmv0ZN9RJTgAdj7UVdBMHobDFfhWXrqgW5zx8nmH58sLdfyrGxPeIIr-qDR9nXJJlOnys1_2lITGZN-eGMjt9i3MZscXRWSpn-HYm-kcJrI"/>
+<span class="material-symbols-outlined text-4xl text-slate-500 mb-2 relative z-0">add_photo_alternate</span>
+<p class="text-sm font-medium text-slate-300 relative z-0">Drag &amp; drop media here</p>
+<p class="text-xs text-slate-500 mt-1 relative z-0">PNG, JPG, MP4 up to 10MB</p>
+</div>
+<!-- Options Grid -->
+<div>
+<label class="block text-sm font-label text-slate-400 mb-3">Answer Options</label>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+<div class="flex items-center gap-3 bg-surface-container-high rounded-md p-2 pl-4 border border-transparent focus-within:border-primary/30">
+<div class="w-3 h-3 rounded-full bg-primary shadow-[0_0_8px_rgba(221,183,255,0.6)]"></div>
+<input class="bg-transparent border-none text-sm text-on-surface flex-1 focus:ring-0" placeholder="Option A" type="text"/>
+<button class="text-slate-500 hover:text-error pr-2"><span class="material-symbols-outlined text-sm">close</span></button>
+</div>
+<div class="flex items-center gap-3 bg-surface-container-high rounded-md p-2 pl-4 border border-transparent focus-within:border-primary/30">
+<div class="w-3 h-3 rounded-full bg-tertiary shadow-[0_0_8px_rgba(113,215,205,0.6)]"></div>
+<input class="bg-transparent border-none text-sm text-on-surface flex-1 focus:ring-0" placeholder="Option B" type="text"/>
+<button class="text-slate-500 hover:text-error pr-2"><span class="material-symbols-outlined text-sm">close</span></button>
+</div>
+<div class="flex items-center gap-3 bg-surface-container-high rounded-md p-2 pl-4 border border-transparent focus-within:border-primary/30">
+<div class="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></div>
+<input class="bg-transparent border-none text-sm text-on-surface flex-1 focus:ring-0" placeholder="Option C" type="text"/>
+<button class="text-slate-500 hover:text-error pr-2"><span class="material-symbols-outlined text-sm">close</span></button>
+</div>
+<div class="flex items-center justify-center gap-2 bg-surface-container-low border border-dashed border-outline-variant/30 rounded-md p-2 cursor-pointer hover:bg-surface-container transition-colors text-slate-400 hover:text-primary">
+<span class="material-symbols-outlined text-sm">add</span>
+<span class="text-sm font-medium">Add Option</span>
+</div>
+</div>
+</div>
+<!-- Correct Answer & Explanation -->
+<div class="pt-4 border-t border-white/5 space-y-4">
+<div class="flex items-center gap-4">
+<label class="text-sm font-label text-slate-400 w-32 shrink-0">Correct Answer:</label>
+<select class="flex-1 bg-surface-container-high border-none rounded-md px-4 py-2 text-on-surface font-body text-sm focus:ring-1 focus:ring-primary/30">
+<option>Select Option...</option>
+<option>Option A</option>
+<option>Option B</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-label text-slate-400 mb-1">Explanation (Optional)</label>
+<textarea class="w-full bg-surface-container-high border-none rounded-md px-4 py-2 text-sm text-slate-300 font-body focus:ring-1 focus:ring-primary/30 h-20 resize-none" placeholder="Explain why this answer is correct..."></textarea>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex justify-end gap-3 pt-4">
+<button class="px-6 py-2 rounded-full bg-surface-variant/40 backdrop-blur text-primary text-sm font-semibold hover:bg-white/5 transition-all">
+                                Save Draft
+                            </button>
+<button class="px-6 py-2 rounded-full bg-gradient-to-br from-primary-container to-primary text-on-primary-container text-sm font-bold shadow-[0_4px_20px_rgba(183,109,255,0.4)] hover:shadow-[0_4px_25px_rgba(183,109,255,0.6)] transition-all">
+                                Add Question
+                            </button>
+</div>
+</div>
+</div>
+</section>
+<!-- RIGHT PANEL: Question List (35%) -->
+<aside class="flex-[0_0_35%] flex flex-col bg-surface-container-low rounded-lg shadow-xl shadow-black/40 overflow-hidden border border-white/5">
+<div class="p-6 border-b border-white/5 bg-surface-container/50 backdrop-blur flex justify-between items-center z-10">
+<h3 class="text-lg font-headline font-bold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary">format_list_bulleted</span>
+                        Questions (6)
+                    </h3>
+<span class="text-xs bg-surface-container-highest px-2 py-1 rounded-md text-slate-400">Total: 10 mins</span>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+<!-- Question Card 1 -->
+<div class="bg-surface-container-highest rounded-md p-4 flex items-start gap-3 group border border-transparent hover:border-outline-variant/30 transition-colors cursor-move">
+<span class="material-symbols-outlined text-slate-500 mt-1 cursor-grab active:cursor-grabbing text-sm">drag_indicator</span>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-xs font-bold text-primary bg-primary/10 px-2 rounded">Q1</span>
+<span class="material-symbols-outlined text-[14px] text-slate-400">image</span>
+</div>
+<p class="text-sm text-on-surface font-medium line-clamp-2">Identify the primary sterile field area in the provided diagram.</p>
+</div>
+<button class="text-slate-500 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity p-1">
+<span class="material-symbols-outlined text-sm">delete</span>
+</button>
+</div>
+<!-- Question Card 2 -->
+<div class="bg-surface-container-highest rounded-md p-4 flex items-start gap-3 group border border-transparent hover:border-outline-variant/30 transition-colors cursor-move">
+<span class="material-symbols-outlined text-slate-500 mt-1 cursor-grab active:cursor-grabbing text-sm">drag_indicator</span>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-xs font-bold text-primary bg-primary/10 px-2 rounded">Q2</span>
+<span class="material-symbols-outlined text-[14px] text-slate-400">list_alt</span>
+</div>
+<p class="text-sm text-on-surface font-medium line-clamp-2">Which of the following is considered a normal resting heart rate for an adult?</p>
+</div>
+<button class="text-slate-500 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity p-1">
+<span class="material-symbols-outlined text-sm">delete</span>
+</button>
+</div>
+<!-- Question Card 3 (Active) -->
+<div class="bg-primary/5 rounded-md p-4 flex items-start gap-3 group border border-primary/30 transition-colors cursor-move relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+<span class="material-symbols-outlined text-primary mt-1 cursor-grab active:cursor-grabbing text-sm">drag_indicator</span>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-xs font-bold text-primary bg-primary/20 px-2 rounded">Q3</span>
+<span class="material-symbols-outlined text-[14px] text-primary">play_circle</span>
+</div>
+<p class="text-sm text-on-surface font-medium line-clamp-2 text-primary-fixed">Review the patient interview video and identify the primary symptom.</p>
+</div>
+<button class="text-slate-500 hover:text-error opacity-0 group-hover:opacity-100 transition-opacity p-1">
+<span class="material-symbols-outlined text-sm">delete</span>
+</button>
+</div>
+</div>
+<!-- Right Panel Footer CTA -->
+<div class="p-6 bg-surface-container-high border-t border-white/5 space-y-3 z-10">
+<button class="w-full py-3 rounded-full bg-surface-variant/40 backdrop-blur text-on-surface text-sm font-semibold hover:bg-white/10 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">visibility</span>
+                        Preview Quiz
+                    </button>
+<button class="w-full py-3 rounded-full bg-gradient-to-r from-tertiary-container to-tertiary text-on-tertiary-container text-sm font-bold shadow-[0_4px_20px_rgba(50,160,151,0.3)] hover:shadow-[0_4px_25px_rgba(50,160,151,0.5)] transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-weight="fill" style="font-variation-settings: 'FILL' 1;">send</span>
+                        Publish Quiz
+                    </button>
+</div>
+</aside>
+</div>
+</main>
+</body></html>

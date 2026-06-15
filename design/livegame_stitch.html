@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Clinical Pulse Arena - Live Gameplay</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#2ae500",
+                        "on-tertiary-fixed-variant": "#095300",
+                        "surface": "#10141a",
+                        "secondary-fixed-dim": "#ddb7ff",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#2d3137",
+                        "on-secondary-fixed-variant": "#670dae",
+                        "on-primary-fixed": "#001f24",
+                        "tertiary-fixed": "#79ff5b",
+                        "on-primary-container": "#00626e",
+                        "inverse-primary": "#006875",
+                        "tertiary-container": "#2cf100",
+                        "secondary": "#ddb7ff",
+                        "surface-dim": "#10141a",
+                        "secondary-container": "#670dae",
+                        "on-secondary-container": "#d1a1ff",
+                        "primary-container": "#00e5ff",
+                        "surface-variant": "#31353c",
+                        "on-background": "#dfe2eb",
+                        "on-secondary": "#490080",
+                        "surface-container-lowest": "#0a0e14",
+                        "on-tertiary-fixed": "#022100",
+                        "inverse-surface": "#dfe2eb",
+                        "surface-tint": "#00daf3",
+                        "primary-fixed-dim": "#00daf3",
+                        "on-tertiary": "#053900",
+                        "on-primary": "#00363d",
+                        "primary": "#c3f5ff",
+                        "background": "#10141a",
+                        "error-container": "#93000a",
+                        "outline-variant": "#3b494c",
+                        "error": "#ffb4ab",
+                        "outline": "#849396",
+                        "on-secondary-fixed": "#2c0051",
+                        "surface-container": "#1c2026",
+                        "on-tertiary-container": "#0e6800",
+                        "surface-container-high": "#262a31",
+                        "primary-fixed": "#9cf0ff",
+                        "tertiary": "#baffa2",
+                        "on-primary-fixed-variant": "#004f58",
+                        "surface-container-low": "#181c22",
+                        "on-surface-variant": "#bac9cc",
+                        "on-error-container": "#ffdad6",
+                        "surface-bright": "#353940",
+                        "secondary-fixed": "#f0dbff",
+                        "on-surface": "#dfe2eb",
+                        "surface-container-highest": "#31353c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "display": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(49, 53, 60, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .ghost-border {
+            box-shadow: inset 0 0 0 1px rgba(59, 73, 76, 0.15);
+        }
+        .neon-glow-primary {
+            box-shadow: 0 0 24px 0 rgba(0, 229, 255, 0.08);
+        }
+        .text-gradient {
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-body min-h-screen flex flex-col overflow-hidden">
+<!-- Top Navigation Placeholder (suppressed per context, keeping minimal brand anchor) -->
+<header class="flex justify-between items-center px-8 h-16 w-full bg-slate-950/60 backdrop-blur-md z-50 shrink-0">
+<div class="font-headline font-black text-primary-fixed-dim tracking-tighter text-xl text-gradient bg-gradient-to-br from-primary to-primary-container">
+            CLINICAL PULSE ARENA
+        </div>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<span class="material-symbols-outlined font-[300]" data-icon="leaderboard">leaderboard</span>
+<span class="material-symbols-outlined font-[300]" data-icon="account_circle">account_circle</span>
+</div>
+</header>
+<main class="flex-1 flex overflow-hidden">
+<!-- Main Quiz Canvas (Left) -->
+<section class="flex-[7] flex flex-col p-8 lg:p-12 gap-8 overflow-y-auto relative z-10">
+<!-- Top HUD: Progress & Timer -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-6">
+<!-- Live Badge -->
+<div class="flex items-center gap-2 bg-error-container/30 px-3 py-1.5 rounded-full border border-error-container/50">
+<div class="w-2 h-2 rounded-full bg-error"></div>
+<span class="font-headline font-bold text-xs tracking-[0.1em] text-error">LIVE</span>
+</div>
+<!-- Progress -->
+<div>
+<div class="font-mono text-sm text-on-surface-variant mb-2">QUESTION 07 / 15</div>
+<div class="w-48 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-primary to-primary-container w-[46.6%] shadow-[0_0_8px_rgba(0,229,255,0.4)]"></div>
+</div>
+</div>
+</div>
+<!-- Timer -->
+<div class="relative w-20 h-20 flex items-center justify-center">
+<!-- Fake SVG Ring -->
+<svg class="absolute inset-0 w-full h-full -rotate-90" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="45" stroke="#262a31" stroke-width="6"></circle>
+<circle class="drop-shadow-[0_0_4px_rgba(251,191,36,0.6)]" cx="50" cy="50" fill="none" r="45" stroke="#fbbf24" stroke-dasharray="282.7" stroke-dashoffset="110" stroke-linecap="round" stroke-width="6"></circle>
+</svg>
+<span class="font-mono text-3xl font-medium text-amber-400 z-10">12</span>
+</div>
+</div>
+<!-- Question Area -->
+<div class="glass-panel p-8 lg:p-10 rounded-xl ghost-border neon-glow-primary relative flex-shrink-0">
+<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary-container/40 to-transparent"></div>
+<h2 class="font-headline text-2xl lg:text-3xl leading-snug tracking-wide text-on-surface">
+                    A patient on warfarin therapy presents with INR of 4.8 and minor gum bleeding. What is the appropriate nursing intervention?
+                </h2>
+</div>
+<!-- Answer Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+<!-- Option A -->
+<button class="glass-panel p-6 rounded-lg text-left relative overflow-hidden group hover:bg-surface-variant/60 transition-all border-l-4 border-primary">
+<div class="flex gap-4 items-start">
+<div class="w-8 h-8 shrink-0 rounded flex items-center justify-center bg-surface-container-high text-on-surface-variant font-mono text-sm shadow-inner mt-1">A</div>
+<span class="font-body text-base text-on-surface group-hover:text-primary transition-colors">Administer Vitamin K 10mg IV push immediately.</span>
+</div>
+</button>
+<!-- Option B -->
+<button class="glass-panel p-6 rounded-lg text-left relative overflow-hidden group hover:bg-surface-variant/60 transition-all border-l-4 border-tertiary-fixed-dim">
+<div class="flex gap-4 items-start">
+<div class="w-8 h-8 shrink-0 rounded flex items-center justify-center bg-surface-container-high text-on-surface-variant font-mono text-sm shadow-inner mt-1">B</div>
+<span class="font-body text-base text-on-surface group-hover:text-primary transition-colors">Hold the next dose of warfarin and notify the provider.</span>
+</div>
+</button>
+<!-- Option C -->
+<button class="glass-panel p-6 rounded-lg text-left relative overflow-hidden group hover:bg-surface-variant/60 transition-all border-l-4 border-error">
+<div class="flex gap-4 items-start">
+<div class="w-8 h-8 shrink-0 rounded flex items-center justify-center bg-surface-container-high text-on-surface-variant font-mono text-sm shadow-inner mt-1">C</div>
+<span class="font-body text-base text-on-surface group-hover:text-primary transition-colors">Administer Fresh Frozen Plasma (FFP) STAT.</span>
+</div>
+</button>
+<!-- Option D -->
+<button class="glass-panel p-6 rounded-lg text-left relative overflow-hidden group hover:bg-surface-variant/60 transition-all border-l-4 border-amber-400">
+<div class="flex gap-4 items-start">
+<div class="w-8 h-8 shrink-0 rounded flex items-center justify-center bg-surface-container-high text-on-surface-variant font-mono text-sm shadow-inner mt-1">D</div>
+<span class="font-body text-base text-on-surface group-hover:text-primary transition-colors">Encourage vigorous tooth brushing to clear clots.</span>
+</div>
+</button>
+</div>
+<!-- Power Ups -->
+<div class="mt-auto pt-6 flex items-center gap-4">
+<span class="font-headline text-xs tracking-widest text-on-surface-variant uppercase">Tactics</span>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-full border border-primary-fixed/20 hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="ac_unit">ac_unit</span>
+<span class="font-headline text-xs font-bold text-on-surface">FREEZE</span>
+<span class="font-mono text-xs text-primary bg-primary/10 px-1.5 rounded">1</span>
+</button>
+<button class="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-full border border-secondary/20 hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="splitscreen">splitscreen</span>
+<span class="font-headline text-xs font-bold text-on-surface">50/50</span>
+<span class="font-mono text-xs text-secondary bg-secondary/10 px-1.5 rounded">2</span>
+</button>
+<button class="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-full border border-amber-400/20 hover:bg-surface-container transition-colors opacity-50 cursor-not-allowed">
+<span class="material-symbols-outlined text-amber-400 text-sm" data-icon="bolt">bolt</span>
+<span class="font-headline text-xs font-bold text-on-surface text-amber-400">2X</span>
+<span class="font-mono text-xs text-amber-400 bg-amber-400/10 px-1.5 rounded">0</span>
+</button>
+<button class="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-full border border-tertiary-fixed-dim/20 hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-tertiary-fixed-dim text-sm" data-icon="shield">shield</span>
+<span class="font-headline text-xs font-bold text-on-surface text-tertiary-fixed-dim">SHIELD</span>
+<span class="font-mono text-xs text-tertiary-fixed-dim bg-tertiary-fixed-dim/10 px-1.5 rounded">1</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Sidebar Scoreboard (Right) -->
+<aside class="flex-[3] bg-surface-container-low border-l border-surface-container-high flex flex-col z-20 hidden lg:flex">
+<div class="p-6 border-b border-surface-container-high flex items-center justify-between">
+<h3 class="font-headline font-bold text-sm tracking-widest text-on-surface uppercase">LIVE RANKINGS</h3>
+<span class="font-mono text-xs text-primary bg-primary/10 px-2 py-1 rounded">18 PLYRS</span>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-2">
+<!-- Rank 1 -->
+<div class="flex items-center p-3 rounded-lg bg-surface-container relative overflow-hidden group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>
+<div class="w-8 font-mono text-amber-400 text-sm pl-2">01</div>
+<div class="flex-1 font-body text-sm font-medium text-on-surface truncate">Dr. S. Chen</div>
+<div class="font-mono text-sm text-on-surface-variant mr-3">8450</div>
+<span class="material-symbols-outlined text-tertiary-fixed-dim text-sm" data-icon="check_circle">check_circle</span>
+</div>
+<!-- Rank 2 -->
+<div class="flex items-center p-3 rounded-lg bg-surface-container relative overflow-hidden group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-slate-300"></div>
+<div class="w-8 font-mono text-slate-300 text-sm pl-2">02</div>
+<div class="flex-1 font-body text-sm font-medium text-on-surface truncate">RN_Nova</div>
+<div class="font-mono text-sm text-on-surface-variant mr-3">8210</div>
+<span class="material-symbols-outlined text-tertiary-fixed-dim text-sm" data-icon="check_circle">check_circle</span>
+</div>
+<!-- Rank 3 -->
+<div class="flex items-center p-3 rounded-lg bg-surface-container relative overflow-hidden group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-orange-400"></div>
+<div class="w-8 font-mono text-orange-400 text-sm pl-2">03</div>
+<div class="flex-1 font-body text-sm font-medium text-on-surface truncate">MedTech_Pro</div>
+<div class="font-mono text-sm text-on-surface-variant mr-3">7900</div>
+<span class="material-symbols-outlined text-amber-400 text-sm" data-icon="hourglass_empty">hourglass_empty</span>
+</div>
+<!-- Current User Row -->
+<div class="flex items-center p-3 rounded-lg bg-surface-variant/50 border border-primary/30 shadow-[0_0_12px_rgba(0,229,255,0.15)] relative overflow-hidden mt-4 mb-4">
+<div class="w-8 font-mono text-primary text-sm pl-2 flex items-center gap-1">
+                        08
+                        <span class="material-symbols-outlined text-[10px] text-tertiary-fixed-dim" data-icon="arrow_upward">arrow_upward</span>
+</div>
+<div class="flex-1 font-body text-sm font-bold text-primary truncate">COMMANDER (You)</div>
+<div class="font-mono text-sm text-primary mr-3">6420</div>
+<span class="material-symbols-outlined text-amber-400 text-sm" data-icon="hourglass_empty">hourglass_empty</span>
+</div>
+<!-- Rank Generic -->
+<div class="flex items-center p-3 rounded-lg hover:bg-surface-container transition-colors relative overflow-hidden">
+<div class="w-8 font-mono text-on-surface-variant text-sm pl-2">09</div>
+<div class="flex-1 font-body text-sm text-on-surface-variant truncate">ClinicianX</div>
+<div class="font-mono text-sm text-on-surface-variant mr-3">6100</div>
+<span class="material-symbols-outlined text-error text-sm" data-icon="cancel">cancel</span>
+</div>
+<div class="flex items-center p-3 rounded-lg hover:bg-surface-container transition-colors relative overflow-hidden">
+<div class="w-8 font-mono text-on-surface-variant text-sm pl-2">10</div>
+<div class="flex-1 font-body text-sm text-on-surface-variant truncate">NightShift_RN</div>
+<div class="font-mono text-sm text-on-surface-variant mr-3">5890</div>
+<span class="material-symbols-outlined text-tertiary-fixed-dim text-sm" data-icon="check_circle">check_circle</span>
+</div>
+</div>
+</aside>
+</main>
+<!-- Bottom Status Bar -->
+<footer class="h-10 bg-surface-container-lowest border-t border-surface-container-high flex items-center justify-between px-6 shrink-0 z-50 text-xs font-mono text-on-surface-variant">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<span class="text-on-surface opacity-50">ROOM:</span>
+<span class="text-primary tracking-widest">BA4ARN</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-on-surface opacity-50">HOST:</span>
+<span class="text-on-surface">Dr. Sarah Johnson</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]" data-icon="groups">groups</span>
+<span>18/30 PLAYERS</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-tertiary-fixed-dim shadow-[0_0_6px_#2ae500]"></div>
+<span>STABLE</span>
+</div>
+</footer>
+</body></html>

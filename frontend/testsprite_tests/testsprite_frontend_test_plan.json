@@ -1,0 +1,600 @@
+[
+  {
+    "id": "TC001",
+    "title": "Student can register/login with role and reach dashboard",
+    "description": "Verifies a user can enter a name, select the student role, authenticate, and land on the dashboard successfully.",
+    "category": "Authentication (Login & Register)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Fill Student One into the name field"
+      },
+      {
+        "type": "action",
+        "description": "Select the student role"
+      },
+      {
+        "type": "action",
+        "description": "Submit the authentication form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the dashboard"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Host a live session and advance questions while seeing leaderboard updates",
+    "description": "Verifies a teacher can host a live session from an existing quiz, advance through questions, and observe leaderboard updates after each question.",
+    "category": "Live Session (Host and Join)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the live session page"
+      },
+      {
+        "type": "action",
+        "description": "Select an existing quiz to host"
+      },
+      {
+        "type": "action",
+        "description": "Start the live session"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a join code is displayed for students to use"
+      },
+      {
+        "type": "action",
+        "description": "Advance to the next question"
+      },
+      {
+        "type": "action",
+        "description": "Advance again after the question completes"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the live leaderboard updates after question progression"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Join a live session by code and answer synced questions with leaderboard updates",
+    "description": "Verifies a student can join an in-progress live session using a join code, receive questions in sync, submit an answer, and see leaderboard updates.",
+    "category": "Live Session (Host and Join)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the live session page"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid join code into the join code field"
+      },
+      {
+        "type": "action",
+        "description": "Join the live session"
+      },
+      {
+        "type": "action",
+        "description": "Wait for a question to appear"
+      },
+      {
+        "type": "action",
+        "description": "Select an answer option"
+      },
+      {
+        "type": "action",
+        "description": "Submit the answer"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the leaderboard is displayed and reflects an update after the question resolves"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Create and save a quiz with at least one question and see it listed on dashboard",
+    "description": "Verifies an educator can create a quiz with settings and a question, save it successfully, and then find the new quiz listed on the dashboard.",
+    "category": "Quiz Builder",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the quiz builder"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new quiz"
+      },
+      {
+        "type": "action",
+        "description": "Fill a unique quiz title into the title field"
+      },
+      {
+        "type": "action",
+        "description": "Add a question and select a valid question type and time limit"
+      },
+      {
+        "type": "action",
+        "description": "Save the quiz"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the newly created quiz is listed in the available or recent quizzes list"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC005",
+    "title": "First-time onboarding to avatar setup then dashboard reflects saved avatar",
+    "description": "Verifies a newly authenticated user can customize and save an avatar and then see it reflected on the dashboard.",
+    "category": "Avatar Setup",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Fill Student Avatar into the name field"
+      },
+      {
+        "type": "action",
+        "description": "Select the student role"
+      },
+      {
+        "type": "action",
+        "description": "Submit the authentication form"
+      },
+      {
+        "type": "action",
+        "description": "Click the option to set up or edit the avatar"
+      },
+      {
+        "type": "action",
+        "description": "Adjust at least one avatar attribute"
+      },
+      {
+        "type": "action",
+        "description": "Save the avatar"
+      },
+      {
+        "type": "action",
+        "description": "Click the link to go to the dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an avatar is displayed on the dashboard"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "Dashboard shows core progression stats",
+    "description": "Verifies that an authenticated student can view XP, level, and streak metrics on the dashboard.",
+    "category": "View Dashboard (Student Analytics)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Fill Student Stats into the name field"
+      },
+      {
+        "type": "action",
+        "description": "Select the student role"
+      },
+      {
+        "type": "action",
+        "description": "Submit the authentication form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify progression stats are displayed on the dashboard"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "Student can open a recent attempt and see its details",
+    "description": "Verifies that a student can drill into a recent quiz attempt from the dashboard and view score and timestamp details.",
+    "category": "View Dashboard (Student Analytics)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Fill Student Attempts into the name field"
+      },
+      {
+        "type": "action",
+        "description": "Select the student role"
+      },
+      {
+        "type": "action",
+        "description": "Submit the authentication form"
+      },
+      {
+        "type": "action",
+        "description": "Scroll to the recent attempts section"
+      },
+      {
+        "type": "action",
+        "description": "Open the first available recent attempt"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify attempt details include a score and a timestamp"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC008",
+    "title": "Edit a draft quiz by adding an additional question before saving",
+    "description": "Verifies an educator can add multiple questions to a quiz and save the updated quiz successfully.",
+    "category": "Quiz Builder",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the quiz builder"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new quiz"
+      },
+      {
+        "type": "action",
+        "description": "Fill a unique quiz title into the title field"
+      },
+      {
+        "type": "action",
+        "description": "Add a first question and select a valid question type"
+      },
+      {
+        "type": "action",
+        "description": "Add a second question and select a valid question type and time limit"
+      },
+      {
+        "type": "action",
+        "description": "Save the quiz"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the quiz is saved successfully and the quiz content area shows the added questions"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC009",
+    "title": "Authentication requires both name and role",
+    "description": "Verifies submitting authentication with only a name shows a validation error and does not proceed to the dashboard.",
+    "category": "Authentication (Login & Register)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Fill Student Missing Role into the name field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the authentication form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a validation error is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user remains on the authentication page"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC010",
+    "title": "Avatar changes persist after refresh and remain visible on dashboard",
+    "description": "Verifies that after saving an avatar, reloading the dashboard still shows an avatar present for the user.",
+    "category": "Avatar Setup",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Fill Student Persist Avatar into the name field"
+      },
+      {
+        "type": "action",
+        "description": "Select the student role"
+      },
+      {
+        "type": "action",
+        "description": "Submit the authentication form"
+      },
+      {
+        "type": "action",
+        "description": "Click the option to set up or edit the avatar"
+      },
+      {
+        "type": "action",
+        "description": "Adjust at least one avatar attribute"
+      },
+      {
+        "type": "action",
+        "description": "Save the avatar"
+      },
+      {
+        "type": "action",
+        "description": "Click the link to go to the dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Reload the page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an avatar is displayed on the dashboard"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC011",
+    "title": "Prevent saving a quiz without a title",
+    "description": "Verifies the quiz builder blocks saving when the title is missing and shows a validation error.",
+    "category": "Quiz Builder",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the quiz builder"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new quiz"
+      },
+      {
+        "type": "action",
+        "description": "Ensure the quiz title field is empty"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to save the quiz"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a title validation error is visible and the quiz is not saved"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC012",
+    "title": "Block joining a live session with an invalid join code",
+    "description": "Verifies the join flow prevents entry when the join code is invalid and shows a user-facing error.",
+    "category": "Live Session (Host and Join)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the live session page"
+      },
+      {
+        "type": "action",
+        "description": "Fill an invalid join code into the join code field"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to join the live session"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an invalid code error is visible and the user is not placed into an active session view"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC013",
+    "title": "Dashboard shows an empty state when no recent attempts exist",
+    "description": "Verifies that when a student has no recent attempts available, the dashboard shows an empty state for recent activity.",
+    "category": "View Dashboard (Student Analytics)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Fill Student No Attempts into the name field"
+      },
+      {
+        "type": "action",
+        "description": "Select the student role"
+      },
+      {
+        "type": "action",
+        "description": "Submit the authentication form"
+      },
+      {
+        "type": "action",
+        "description": "Scroll to the recent attempts section"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an empty state is visible for recent attempts"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC014",
+    "title": "Cancel quiz creation by leaving without saving and confirm it does not appear on dashboard",
+    "description": "Verifies that leaving the quiz builder without saving does not create a new quiz entry on the dashboard.",
+    "category": "Quiz Builder",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the quiz builder"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new quiz"
+      },
+      {
+        "type": "action",
+        "description": "Fill a unique quiz title into the title field"
+      },
+      {
+        "type": "action",
+        "description": "Add a question and select a valid question type"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the dashboard without saving"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the unsaved quiz does not appear in the available or recent quizzes list"
+      }
+    ],
+    "priority": "Low"
+  }
+]

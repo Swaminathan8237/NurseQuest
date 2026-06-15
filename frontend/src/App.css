@@ -1,0 +1,8 @@
+.nq-logo {
+  font-size: 3rem;
+}
+
+/* Page transition wrapper */
+.page-enter {
+  animation: fadeInUp 0.5s ease-out;
+}

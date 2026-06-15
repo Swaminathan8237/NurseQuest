@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>THE ARENA</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700;800&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-container": "#670dae",
+                        "surface-dim": "#10141a",
+                        "surface-variant": "#31353c",
+                        "on-background": "#dfe2eb",
+                        "on-secondary-container": "#d1a1ff",
+                        "primary-container": "#00e5ff",
+                        "on-tertiary-fixed": "#022100",
+                        "on-secondary": "#490080",
+                        "surface-container-lowest": "#0a0e14",
+                        "surface-tint": "#00daf3",
+                        "primary-fixed-dim": "#00daf3",
+                        "on-tertiary": "#053900",
+                        "inverse-surface": "#dfe2eb",
+                        "tertiary-fixed-dim": "#2ae500",
+                        "on-tertiary-fixed-variant": "#095300",
+                        "surface": "#10141a",
+                        "on-secondary-fixed-variant": "#670dae",
+                        "on-primary-fixed": "#001f24",
+                        "secondary-fixed-dim": "#ddb7ff",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#2d3137",
+                        "on-primary-container": "#00626e",
+                        "inverse-primary": "#006875",
+                        "tertiary-fixed": "#79ff5b",
+                        "secondary": "#ddb7ff",
+                        "tertiary-container": "#2cf100",
+                        "surface-container-low": "#181c22",
+                        "on-surface-variant": "#bac9cc",
+                        "on-error-container": "#ffdad6",
+                        "tertiary": "#baffa2",
+                        "on-primary-fixed-variant": "#004f58",
+                        "surface-bright": "#353940",
+                        "secondary-fixed": "#f0dbff",
+                        "on-surface": "#dfe2eb",
+                        "surface-container-highest": "#31353c",
+                        "error-container": "#93000a",
+                        "outline-variant": "#3b494c",
+                        "on-primary": "#00363d",
+                        "primary": "#c3f5ff",
+                        "background": "#10141a",
+                        "surface-container": "#1c2026",
+                        "on-tertiary-container": "#0e6800",
+                        "error": "#ffb4ab",
+                        "outline": "#849396",
+                        "on-secondary-fixed": "#2c0051",
+                        "surface-container-high": "#262a31",
+                        "primary-fixed": "#9cf0ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "sm": "0.125rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "sans-serif"],
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-panel {
+            background-color: rgba(49, 53, 60, 0.5); /* surface-variant at 50% opacity */
+            backdrop-filter: blur(12px);
+        }
+        .text-glow-primary {
+            text-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+        }
+        .box-glow-primary {
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
+        }
+        .box-glow-gold {
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.15);
+        }
+        .box-glow-silver {
+            box-shadow: 0 0 15px rgba(192, 192, 192, 0.1);
+        }
+        .box-glow-bronze {
+            box-shadow: 0 0 15px rgba(205, 127, 50, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-body antialiased min-h-screen flex flex-col">
+<!-- Top Navigation Anchor -->
+<nav class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-8 h-16 bg-[#0a0e14]/90 backdrop-blur-md shadow-2xl shadow-cyan-900/20 border-b border-outline-variant/15">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-black tracking-tighter text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.4)] font-display">THE ARENA</span>
+<div class="hidden md:flex gap-6 font-headline uppercase tracking-[0.1em] text-sm font-bold">
+<a class="text-slate-400 hover:text-white pb-1 transition-all duration-300" href="#">DASHBOARD</a>
+<a class="text-[#00e5ff] border-b-2 border-[#00e5ff] pb-1 transition-all duration-300" href="#">ARENA</a>
+<a class="text-slate-400 hover:text-white pb-1 transition-all duration-300" href="#">LEADERBOARD</a>
+<a class="text-slate-400 hover:text-white pb-1 transition-all duration-300" href="#">CHALLENGES</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface hover:bg-white/5 hover:text-[#00e5ff] transition-colors p-2 rounded-full active:scale-95 duration-200">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface hover:bg-white/5 hover:text-[#00e5ff] transition-colors p-2 rounded-full active:scale-95 duration-200">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<img alt="User profile" class="w-8 h-8 rounded-full border border-primary/30" data-alt="Portrait of a young professional wearing a clean, modern scrub top against a dark studio background with subtle dramatic lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBemTBzvD0UJDW8Qh9zLs2yuBRs5BmholLlHadbYw6fj3w2aMwlxYOwDzEG5dIB3bOBIp9GlY6R_wcoD8vvdnMpvCDbV7dPoKq6ZAyQp3H7zwqw8i4rdnn-OWv5wBE2ecI-2QOdDpMSustn07pixl2_rMOn8QWVZ623Lg3i-qVaLGKzqNRyR53N232i7JmWj9nUgcVYwLFM2i5huHCZb5FeDRp8IFuNJCOY1_6unIs3Q-ZcHyvn7NvZCDtchfsXONVpu6k-Outw-AY"/>
+</div>
+<div class="bg-gradient-to-r from-transparent via-[#00e5ff]/10 to-transparent h-[1px] w-full absolute bottom-0 left-0"></div>
+</nav>
+<!-- Main Layout -->
+<div class="flex-1 flex flex-col md:flex-row mt-16 max-w-[1600px] mx-auto w-full">
+<!-- Main Canvas -->
+<main class="flex-1 p-6 md:p-12 lg:pl-16 lg:pr-12 xl:pr-16 flex flex-col gap-12 overflow-y-auto">
+<!-- Header Section -->
+<header class="flex flex-col items-center text-center gap-2">
+<h1 class="text-5xl md:text-6xl font-display font-bold tracking-widest text-on-surface uppercase drop-shadow-md">THE ARENA</h1>
+<p class="text-on-surface-variant font-body text-lg tracking-wide">Global rankings. Prove your clinical mastery.</p>
+<!-- Filter Tabs -->
+<div class="mt-8 flex gap-8 font-headline text-sm tracking-wider uppercase">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors pb-2">TODAY</button>
+<button class="text-primary border-b-2 border-primary pb-2 font-bold box-glow-primary relative">
+                        THIS WEEK
+                        <div class="absolute -bottom-[2px] left-0 w-full h-[2px] bg-primary blur-[2px]"></div>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors pb-2">THIS MONTH</button>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors pb-2">ALL TIME</button>
+</div>
+</header>
+<!-- Podium -->
+<section class="flex flex-col md:flex-row justify-center items-end gap-6 h-80 mt-4 mb-8">
+<!-- Rank 2 (Left) -->
+<div class="glass-panel rounded-xl p-6 flex flex-col items-center w-48 relative order-2 md:order-1 h-64 justify-end">
+<div class="absolute -top-12">
+<div class="relative rounded-full p-[3px] bg-gradient-to-b from-[#C0C0C0] to-[#C0C0C0]/20 box-glow-silver">
+<img alt="Player Avatar" class="w-20 h-20 rounded-full border-2 border-surface-container-low object-cover" data-alt="Female professional wearing glasses and dark blue scrubs, focused expression, cinematic lighting on a dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAl8RF1DgCb5RtQekOKoi4FICMzi2BJvEsOUBnr-EtAoTXJVmUhUlgjvzMobQ-d2dL2IHlxM6u5iZ-VZhlFAFMbCeum562OGbItDMW1aOIIK6RVeICrqCltDp0man8-VAXMYxiehdRVWmZXDRx8L4XdwohGRarBTqBGEm8Di6lT6TRqJPkAdAwwMh2NF2CzMZfGZ4lQTQ0QDfpwaDO2hypgMMNZwglJhMrnO2cNIr2SHqJ_B9J9cc2CiYdl-TdKKWmlyvdEAlM3Kl8"/>
+</div>
+</div>
+<span class="font-headline font-bold text-[#C0C0C0] text-sm tracking-widest mt-6">RANK 2</span>
+<h3 class="font-display font-bold text-on-surface mt-2 text-center text-lg">Dr. S. Patel</h3>
+<div class="font-mono text-primary mt-1 text-sm">48,250 XP</div>
+</div>
+<!-- Rank 1 (Center) -->
+<div class="glass-panel rounded-xl p-6 flex flex-col items-center w-56 relative order-1 md:order-2 h-full justify-end border-t border-[#FFD700]/30 shadow-[0_-10px_30px_rgba(255,215,0,0.1)]">
+<div class="absolute -top-16">
+<div class="relative rounded-full p-[4px] bg-gradient-to-b from-[#FFD700] to-[#FFD700]/20 box-glow-gold">
+<img alt="Player Avatar" class="w-24 h-24 rounded-full border-4 border-surface-container-lowest object-cover" data-alt="Male doctor looking directly at camera, serious and confident, dramatic split lighting against completely black background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfhtbxvMPoRsdLz_S6EqWgffg8hs7eqgV3cmGHDa1eYVcQHqRjWnpSy6F9cMruBA8x41KHHZ248-92_fyACNvyXtIQzSb50sEIKzGCmnhABbBrWGeF-MlHsexJvIJRbShxful_8nezhSY6kgt5vgew4p0i-LRbJIJicWaZOnVjmlphDOD8XN50vgJePymgLq3l9SFIcRNoMExx4ex-ufkcLP81DnpWCoNiFA_o-RtDop72HloyDdnSJtLiZUR4qX5aTuqCsojcLZU"/>
+</div>
+<div class="absolute -bottom-2 -right-2 bg-[#FFD700] text-surface-container-lowest w-8 h-8 rounded-full flex items-center justify-center font-display font-black text-sm z-10 shadow-lg">1</div>
+</div>
+<span class="font-headline font-bold text-[#FFD700] text-sm tracking-widest mt-8">RANK 1</span>
+<h3 class="font-display font-bold text-on-surface mt-2 text-center text-xl">Dr. J. Chen</h3>
+<div class="font-mono text-primary mt-2 text-base font-bold text-glow-primary">52,900 XP</div>
+</div>
+<!-- Rank 3 (Right) -->
+<div class="glass-panel rounded-xl p-6 flex flex-col items-center w-48 relative order-3 h-56 justify-end">
+<div class="absolute -top-10">
+<div class="relative rounded-full p-[2px] bg-gradient-to-b from-[#CD7F32] to-[#CD7F32]/20 box-glow-bronze">
+<img alt="Player Avatar" class="w-16 h-16 rounded-full border-2 border-surface-container-low object-cover" data-alt="Young female medical student in white coat, determined look, high contrast cool lighting on dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlPQTX5uQg9HuhZwyh8SsOE-s0pcZwAOsMMrgtz5-bxUuaNiG8ktRSvniyzGCo12_yljqRWHlHtGx1mFdJfGNsEk6Z5SUSRa-I2oxMxszdMtv-Z4c8R6tlck8lKkkiQaXLLySY6YA79JOAjAZ7anqn7-NsxxNmrMcDBiSdif6KYFK185J6iCRJ8fNVLxBILGWJ2QD1K5d4bxfWzaRC_LrjYRY2U7tgs2GZiykr8yHe08971oNwJObXAg5X89WbBeRlWVQob0YbiU4"/>
+</div>
+</div>
+<span class="font-headline font-bold text-[#CD7F32] text-sm tracking-widest mt-4">RANK 3</span>
+<h3 class="font-display font-bold text-on-surface mt-2 text-center text-lg">M. Ross, RN</h3>
+<div class="font-mono text-primary mt-1 text-sm">45,100 XP</div>
+</div>
+</section>
+<!-- Rankings Table -->
+<div class="bg-surface-container-low rounded-lg overflow-hidden flex flex-col">
+<div class="grid grid-cols-12 gap-4 px-6 py-4 border-b border-outline-variant/15 font-headline text-xs text-on-surface-variant font-bold tracking-wider uppercase bg-surface-container">
+<div class="col-span-1 text-center">RANK</div>
+<div class="col-span-4">PLAYER</div>
+<div class="col-span-1 text-center">LEVEL</div>
+<div class="col-span-2 text-center">QUIZZES</div>
+<div class="col-span-2 text-center">AVG SCORE</div>
+<div class="col-span-2 text-right">TOTAL XP</div>
+</div>
+<div class="flex flex-col">
+<!-- Row 4 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-white/5 transition-colors border-b border-outline-variant/5">
+<div class="col-span-1 font-mono text-on-surface-variant text-center">04</div>
+<div class="col-span-4 flex items-center gap-3">
+<img alt="Player" class="w-8 h-8 rounded-full" data-alt="Small circular avatar of male professional" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCyASbwykOUc3ofUd6G4OxaEDdttEu9X5LMO34Y_txOHXga3AER_tgJZAyteH_qgCBXACsVJliRs33LZfUbca9jKDnANC5X9VCF8r8Qf86lrBKezWYC-9zKA27ITp-04FbkJkWCXqeuW3YywEfJ7gFTGKqf5RjnvLgxNJcdHj978KWwJbevZH6GkaK0Wl84DLHDCH4nEon38B7jAZth7btMqyOCdr6WOtLUfsC6f_nxAw2LQZdv39LH2pdq-G3QbSCaUZ0Rz2-lVcI"/>
+<span class="font-display font-semibold text-on-surface text-sm">T. Harris</span>
+</div>
+<div class="col-span-1 font-mono text-on-surface-variant text-center text-sm">42</div>
+<div class="col-span-2 font-mono text-on-surface-variant text-center text-sm">128</div>
+<div class="col-span-2 font-mono text-on-surface-variant text-center text-sm">94.2%</div>
+<div class="col-span-2 font-mono text-primary text-right text-sm">44,850</div>
+</div>
+<!-- Row 5 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-4 items-center bg-white/[0.02] hover:bg-white/5 transition-colors border-b border-outline-variant/5">
+<div class="col-span-1 font-mono text-on-surface-variant text-center">05</div>
+<div class="col-span-4 flex items-center gap-3">
+<img alt="Player" class="w-8 h-8 rounded-full" data-alt="Small circular avatar of female professional" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlb6HlNV_vJxXdYxyuRv-D6mY3BpyWL3cR6F-PS_TAnBCrVN3uGdTwftXKmpr_fmZk-t59iE9mG1xKmYsp-VzwA0qIgyYGwpuBCAn8aW070iosJRI265yZBZhasf3GeyJPprxdY8u74Mz0mxjESyryQxvHD6wk7ypa7gpyJ9u_tJMgDp75dxBat4xpXASXFiuKKlkclvaiZvb1C5l45ineKlHTeFYqKZB81_1VR90iyRStmrpMhbVtRFSlCd4O0LXAEcJ6Ze1g3t4"/>
+<span class="font-display font-semibold text-on-surface text-sm">E. Wong</span>
+</div>
+<div class="col-span-1 font-mono text-on-surface-variant text-center text-sm">41</div>
+<div class="col-span-2 font-mono text-on-surface-variant text-center text-sm">115</div>
+<div class="col-span-2 font-mono text-on-surface-variant text-center text-sm">93.8%</div>
+<div class="col-span-2 font-mono text-primary text-right text-sm">43,200</div>
+</div>
+<!-- Active User Row -->
+<div class="grid grid-cols-12 gap-4 px-6 py-4 items-center bg-primary/5 border border-primary/30 relative rounded-DEFAULT mx-2 my-1 box-glow-primary z-10">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary"></div>
+<div class="col-span-1 font-mono text-primary font-bold text-center">06</div>
+<div class="col-span-4 flex items-center gap-3">
+<img alt="Player" class="w-8 h-8 rounded-full border border-primary" data-alt="Small circular avatar of active user" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFgW-1qOuMRmWqNRXQ4Gsf7hXMjK67fruun8RkOTiStc_gR220ilE5_8RUo3JgcElBYzrsX3Zum9PJCR4xfxC8PmnrENrpJaxF5FzHXORyl-F4trQ4VJLsJ9uICWzSgQudct9pT1NzJBvUgOmJhvP3mkDkIcPYYSQF3vr6PDA1O_rsn9IHuQmpJx-YlAw0CVAvCsarj7lceDyrR_UKaNK3nNJE4DzDXUUFUGxklTHbjpWl3DdzCVGXvZ5_b_M9iYMr3R8AyW3SNGU"/>
+<span class="font-display font-bold text-on-surface text-sm">Alex Rivera</span>
+<span class="bg-secondary-container text-on-secondary-container text-[10px] px-2 py-0.5 rounded-sm font-headline tracking-wider ml-2">YOU</span>
+</div>
+<div class="col-span-1 font-mono text-primary text-center text-sm font-medium">40</div>
+<div class="col-span-2 font-mono text-on-surface text-center text-sm">112</div>
+<div class="col-span-2 font-mono text-on-surface text-center text-sm">92.5%</div>
+<div class="col-span-2 font-mono text-primary font-bold text-right text-sm text-glow-primary">41,500</div>
+</div>
+<!-- Row 7 -->
+<div class="grid grid-cols-12 gap-4 px-6 py-4 items-center bg-white/[0.02] hover:bg-white/5 transition-colors border-b border-outline-variant/5">
+<div class="col-span-1 font-mono text-on-surface-variant text-center">07</div>
+<div class="col-span-4 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-bright flex items-center justify-center font-display text-xs text-on-surface-variant">L</div>
+<span class="font-display font-semibold text-on-surface-variant text-sm">L. Gomez</span>
+</div>
+<div class="col-span-1 font-mono text-on-surface-variant text-center text-sm">39</div>
+<div class="col-span-2 font-mono text-on-surface-variant text-center text-sm">108</div>
+<div class="col-span-2 font-mono text-on-surface-variant text-center text-sm">91.0%</div>
+<div class="col-span-2 font-mono text-on-surface-variant text-right text-sm">39,800</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Right Sidebar (30%) -->
+<aside class="w-full md:w-[380px] lg:w-[420px] bg-surface-container-low p-6 md:p-8 flex flex-col gap-8 border-l border-outline-variant/15 overflow-y-auto">
+<!-- Your Status Card -->
+<div class="glass-panel p-6 rounded-lg relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
+<h2 class="font-headline text-xs font-bold text-on-surface-variant tracking-widest uppercase mb-4">YOUR STATUS</h2>
+<div class="flex items-center justify-between mb-6">
+<div>
+<div class="text-4xl font-display font-black text-on-surface">#06</div>
+<div class="text-sm font-body text-on-surface-variant mt-1">Global Rank</div>
+</div>
+<div class="bg-tertiary-fixed-dim/10 border border-tertiary-fixed-dim/30 px-3 py-1.5 rounded-DEFAULT flex items-center gap-1 shadow-[0_0_10px_rgba(42,229,0,0.1)]">
+<span class="material-symbols-outlined text-tertiary-fixed-dim text-sm font-bold" data-icon="arrow_upward">arrow_upward</span>
+<span class="font-mono text-tertiary-fixed-dim font-bold text-sm">2</span>
+</div>
+</div>
+<div class="h-1.5 w-full bg-surface-container-lowest rounded-full overflow-hidden mb-2">
+<div class="h-full bg-gradient-to-r from-primary to-primary-container w-[75%] rounded-full shadow-[0_0_8px_rgba(0,229,255,0.6)]"></div>
+</div>
+<div class="flex justify-between font-mono text-[10px] text-on-surface-variant uppercase">
+<span>41,500 XP</span>
+<span>1,700 XP TO RANK 5</span>
+</div>
+</div>
+<!-- Target Card -->
+<div class="bg-surface-container p-6 rounded-lg border border-outline-variant/20">
+<div class="flex justify-between items-center mb-4">
+<h2 class="font-headline text-xs font-bold text-error tracking-widest uppercase flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]" data-icon="my_location">my_location</span> TARGET ACQUIRED
+                    </h2>
+<span class="font-mono text-[10px] text-on-surface-variant border border-outline-variant/30 px-2 py-0.5 rounded-sm">RANK 05</span>
+</div>
+<div class="flex items-center gap-4 mb-6">
+<img alt="Target Player" class="w-12 h-12 rounded-full border border-surface-bright" data-alt="Small circular avatar of female professional, slightly desaturated" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDplxBeoM_lzSPTUzWmxH6QIjHhb_ZriD1uIWT3PXYToTU4L2NtNEZVL54eerS0_c-YLrDsPOz2Fqej0XFUqYX0Zvo4fq0Q8xgiszaU8uV5Ug-cIQc0viAE1M78MuOJD_A2s_AnyqzFvr6Rrr_NtkP8cp4zIpaaubQpzCH7fLzfW2H74rd2AsRE3xdiaG2I0a5b1HP50feZnxZnVT9WNq1T4Zs9AkqAsBzRzaMi3fKfnRYI-c5DjQLzoe05-SO7MQldHN9Z2nN9qyA"/>
+<div>
+<div class="font-display font-bold text-on-surface">E. Wong</div>
+<div class="font-mono text-xs text-on-surface-variant mt-0.5">43,200 XP</div>
+</div>
+</div>
+<button class="w-full bg-gradient-to-r from-error/20 to-error-container/20 hover:from-error/30 hover:to-error-container/30 border border-error/50 text-error font-headline font-bold text-sm tracking-wider py-3 rounded-DEFAULT transition-all active:scale-95 flex justify-center items-center gap-2 uppercase">
+<span class="material-symbols-outlined text-[18px]" data-icon="swords">swords</span>
+                    CHALLENGE TO DUEL
+                </button>
+</div>
+<!-- Rare Achievements -->
+<div>
+<h2 class="font-headline text-xs font-bold text-on-surface-variant tracking-widest uppercase mb-4 pl-1">RARE ACHIEVEMENTS</h2>
+<div class="grid grid-cols-4 gap-3">
+<div class="aspect-square bg-surface-container-highest rounded-lg border border-outline-variant/10 flex items-center justify-center group relative cursor-pointer hover:border-primary/50 transition-colors shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+<span class="material-symbols-outlined text-3xl text-primary opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all drop-shadow-[0_0_5px_rgba(0,229,255,0.5)]" data-icon="military_tech">military_tech</span>
+</div>
+<div class="aspect-square bg-surface-container-highest rounded-lg border border-outline-variant/10 flex items-center justify-center group relative cursor-pointer hover:border-secondary/50 transition-colors shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+<span class="material-symbols-outlined text-3xl text-secondary opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all drop-shadow-[0_0_5px_rgba(221,183,255,0.5)]" data-icon="hub">hub</span>
+</div>
+<div class="aspect-square bg-surface-container-highest rounded-lg border border-outline-variant/10 flex items-center justify-center group relative cursor-pointer hover:border-tertiary/50 transition-colors shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+<span class="material-symbols-outlined text-3xl text-tertiary opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all drop-shadow-[0_0_5px_rgba(186,255,162,0.5)]" data-icon="vital_signs">vital_signs</span>
+</div>
+<div class="aspect-square bg-surface-container-lowest rounded-lg border border-outline-variant/5 flex items-center justify-center border-dashed">
+<span class="material-symbols-outlined text-2xl text-on-surface-variant/30" data-icon="lock">lock</span>
+</div>
+</div>
+</div>
+<!-- Statistics -->
+<div>
+<h2 class="font-headline text-xs font-bold text-on-surface-variant tracking-widest uppercase mb-4 pl-1">STATISTICS</h2>
+<div class="flex flex-col gap-3">
+<div class="flex justify-between items-center py-2 border-b border-outline-variant/10">
+<span class="font-body text-sm text-on-surface-variant">Win Rate</span>
+<span class="font-mono text-sm text-on-surface font-medium">68.4%</span>
+</div>
+<div class="flex justify-between items-center py-2 border-b border-outline-variant/10">
+<span class="font-body text-sm text-on-surface-variant">Longest Streak</span>
+<span class="font-mono text-sm text-on-surface font-medium">14 DAYS</span>
+</div>
+<div class="flex justify-between items-center py-2 border-b border-outline-variant/10">
+<span class="font-body text-sm text-on-surface-variant">Top Category</span>
+<span class="font-mono text-sm text-primary font-medium">PHARMACOLOGY</span>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</body></html>

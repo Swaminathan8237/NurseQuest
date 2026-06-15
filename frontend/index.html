@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="NurseQuest - Gamified Interactive Learning Platform for Nursing Education" />
+    <title>NurseQuest | Gamified Nursing Education</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed-dim": "#ddb7ff",
+                        "primary-fixed-dim": "#ddb7ff",
+                        "surface-bright": "var(--bg-elevated)",
+                        "on-tertiary-fixed": "#00201d",
+                        "on-primary-container": "#400071",
+                        "tertiary": "#71d7cd",
+                        "surface-container-lowest": "var(--bg-base)",
+                        "outline": "var(--text-muted)",
+                        "on-secondary-fixed": "#2a0848",
+                        "on-secondary-fixed-variant": "#583876",
+                        "inverse-surface": "var(--bg-surface)",
+                        "on-primary": "#490080",
+                        "surface-dim": "var(--bg-base)",
+                        "secondary-fixed": "#f0dbff",
+                        "on-error": "#690005",
+                        "inverse-primary": "#8134c7",
+                        "background": "var(--bg-base)",
+                        "inverse-on-surface": "var(--text-primary)",
+                        "tertiary-fixed-dim": "#71d7cd",
+                        "tertiary-fixed": "#8ef4e9",
+                        "surface-container-low": "var(--bg-card)",
+                        "primary-container": "#b76dff",
+                        "on-background": "var(--text-primary)",
+                        "on-tertiary-container": "#00302c",
+                        "surface-container-highest": "var(--bg-hover)",
+                        "primary-fixed": "#f0dbff",
+                        "outline-variant": "var(--border)",
+                        "secondary": "#ddb7ff",
+                        "error": "#ffb4ab",
+                        "on-secondary-container": "#cba6ed",
+                        "tertiary-container": "#32a097",
+                        "surface-container": "var(--bg-surface)",
+                        "error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#00504a",
+                        "on-error-container": "#ffdad6",
+                        "surface": "var(--bg-surface)",
+                        "on-surface-variant": "var(--text-secondary)",
+                        "on-surface": "var(--text-primary)",
+                        "surface-variant": "var(--bg-elevated)",
+                        "secondary-container": "#583876",
+                        "on-secondary": "#40215e",
+                        "on-primary-fixed-variant": "#670dae",
+                        "surface-tint": "#ddb7ff",
+                        "primary": "#6C5CE7",
+                        "on-primary-fixed": "#2c0051",
+                        "surface-container-high": "var(--bg-elevated)",
+                        "on-tertiary": "#003733"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope", "sans-serif"],
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+  </head>
+  <body class="font-body text-on-background bg-background min-h-screen">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

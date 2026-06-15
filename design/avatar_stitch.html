@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NurseQuest - Avatar Customization</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#0b1326",
+                        "surface-bright": "#31394e",
+                        "on-tertiary-container": "#00302c",
+                        "secondary-container": "#583876",
+                        "surface-container-lowest": "#060d20",
+                        "surface-container-highest": "#2d3449",
+                        "on-tertiary-fixed-variant": "#00504a",
+                        "tertiary-fixed": "#8ef4e9",
+                        "primary-fixed-dim": "#ddb7ff",
+                        "on-tertiary-fixed": "#00201d",
+                        "on-primary-container": "#400071",
+                        "tertiary": "#71d7cd",
+                        "primary": "#ddb7ff",
+                        "outline-variant": "#4c4353",
+                        "on-secondary": "#40215e",
+                        "on-primary": "#490080",
+                        "secondary": "#ddb7ff",
+                        "surface-variant": "#2d3449",
+                        "surface-container-low": "#131b2e",
+                        "error-container": "#93000a",
+                        "on-surface": "#dbe2fd",
+                        "surface-container": "#171f33",
+                        "on-tertiary": "#003733",
+                        "on-background": "#dbe2fd",
+                        "inverse-primary": "#8134c7",
+                        "surface-tint": "#ddb7ff",
+                        "on-secondary-fixed-variant": "#583876",
+                        "on-error-container": "#ffdad6",
+                        "on-surface-variant": "#cfc2d5",
+                        "secondary-fixed-dim": "#ddb7ff",
+                        "outline": "#988d9e",
+                        "tertiary-container": "#32a097",
+                        "surface-dim": "#0b1326",
+                        "on-secondary-container": "#cba6ed",
+                        "error": "#ffb4ab",
+                        "on-error": "#690005",
+                        "on-primary-fixed": "#2c0051",
+                        "background": "#0b1326",
+                        "surface-container-high": "#222a3e",
+                        "on-primary-fixed-variant": "#670dae",
+                        "primary-fixed": "#f0dbff",
+                        "tertiary-fixed-dim": "#71d7cd",
+                        "on-secondary-fixed": "#2a0848",
+                        "inverse-surface": "#dbe2fd",
+                        "inverse-on-surface": "#283044",
+                        "secondary-fixed": "#f0dbff",
+                        "primary-container": "#b76dff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Manrope"],
+                        "display": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(49, 57, 78, 0.4);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .avatar-glow {
+            filter: drop-shadow(0 0 30px rgba(183, 109, 255, 0.3));
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b1326;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2d3449;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30 min-h-screen pb-32">
+<!-- TopAppBar Shell -->
+<header class="flex justify-between items-center w-full px-6 py-4 fixed top-0 z-50 bg-[#0b1326]/80 backdrop-blur-lg shadow-[0_8px_32px_0_rgba(11,19,38,0.8)]">
+<div class="flex items-center gap-2">
+<span class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#b76dff] to-[#ddb7ff] font-headline tracking-tighter">NurseQuest</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-slate-400 hover:bg-white/5 transition-all duration-300 p-2 rounded-full active:scale-90">
+<span class="material-symbols-outlined" data-icon="leaderboard">leaderboard</span>
+</button>
+<button class="text-slate-400 hover:bg-white/5 transition-all duration-300 p-2 rounded-full active:scale-90">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden p-0.5 ring-2 ring-primary/20">
+<img class="w-full h-full object-cover rounded-full" data-alt="Close up portrait of a professional nurse in blue medical scrubs smiling in a clean hospital hallway" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8Jfp1_4juZvuY-Zr1TnMvTf0FSXdhxmjq0S496W_WE0V_xdv7twRMmrU0rDHkvBmngqK8wS6G1V8LGJeq6TyzXEANi5cO-R1NLftvcaOlpCNF6LmWMqGucwGzowhlB4ufCiQsKBXTcmnO_SGRzyx7N7CySlgA2mJrC5TFLZYdSnIcRBC5san2VNc52aFuQsO5LJk7VLfkFefiPoicy_-yfV6caYLxRLamTicOPAj2uLAcZxLSWu8xsJ1X0I3fgew60hu-ecbf550"/>
+</div>
+</div>
+</header>
+<main class="pt-24 px-6 max-w-5xl mx-auto">
+<header class="mb-10 text-center">
+<h1 class="text-4xl md:text-5xl font-headline font-extrabold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-tertiary mb-3">
+                Create Your Nurse Avatar
+            </h1>
+<p class="text-on-surface-variant font-medium opacity-80">Personalize your clinical identity in the NurseQuest ecosystem.</p>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Avatar Preview Section (Center Column) -->
+<div class="lg:col-span-5 flex flex-col items-center gap-6 sticky top-28">
+<div class="relative group">
+<!-- Glow background effect -->
+<div class="absolute inset-0 bg-primary/20 blur-[60px] rounded-full scale-110"></div>
+<div class="w-64 h-64 md:w-80 md:h-80 bg-surface-container-low rounded-xl flex items-center justify-center glass-card relative overflow-hidden ring-1 ring-white/10">
+<img class="w-full h-full object-contain avatar-glow transform transition-transform duration-700 group-hover:scale-105" data-alt="3D stylized cartoon character illustration of a smiling professional nurse with short hair and modern scrubs on a clean neutral background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkA3Jq1UMpe6NiT0wVsMgRwdMAfzVBOObwE8GbQnEMRpiJkx1IAWBPKBgAWSOXNX0r_QrAeZHsExjAEyKJB_Zep-l2sHpjd6rhEDRwJpSa14r_cGt4Ds26Pd9Impzuk8dxkQapoIcRhim6U3SGibCiI6siSz_BSB9_45S4ajwiKlsz-4AKRh6-83Yo_DccHzk5ZjH8e1S1qsB5AhT_b8ExVKThW8gJZi-liklhJGGP1MUxYW_bjRN4VKIu09_OzlPyGdyoQ8E_Kf8"/>
+</div>
+</div>
+<div class="flex gap-4 w-full">
+<button class="flex-1 py-4 px-6 rounded-lg bg-tertiary text-on-tertiary font-headline font-bold flex items-center justify-center gap-2 transition-all hover:brightness-110 active:scale-95">
+<span class="material-symbols-outlined text-xl" data-icon="casino">casino</span>
+                        Randomize
+                    </button>
+<button class="flex-1 py-4 px-6 rounded-lg bg-gradient-to-br from-primary-container to-primary text-on-primary font-headline font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary-container/30 transition-all hover:scale-[1.02] active:scale-95">
+<span class="material-symbols-outlined text-xl" data-icon="save">save</span>
+                        Save Avatar
+                    </button>
+</div>
+</div>
+<!-- Customization Controls (Right Column) -->
+<div class="lg:col-span-7 space-y-6">
+<!-- Face & Skin Section -->
+<section class="glass-card p-8 rounded-lg ring-1 ring-white/10">
+<div class="flex items-center gap-3 mb-6">
+<span class="material-symbols-outlined text-tertiary" data-icon="face">face</span>
+<h2 class="text-xl font-headline font-bold">Face &amp; Skin</h2>
+</div>
+<div class="space-y-8">
+<div>
+<p class="text-sm font-label font-semibold text-on-surface-variant uppercase tracking-widest mb-4">Face Shape</p>
+<div class="flex flex-wrap gap-4">
+<button class="w-12 h-12 rounded-full bg-surface-container-highest ring-2 ring-primary transition-all shadow-lg"></button>
+<button class="w-12 h-12 rounded-full bg-surface-container-highest ring-1 ring-outline-variant hover:ring-primary/50 transition-all"></button>
+<button class="w-12 h-12 rounded-full bg-surface-container-highest ring-1 ring-outline-variant hover:ring-primary/50 transition-all"></button>
+<button class="w-12 h-12 rounded-full bg-surface-container-highest ring-1 ring-outline-variant hover:ring-primary/50 transition-all"></button>
+<button class="w-12 h-12 rounded-full bg-surface-container-highest ring-1 ring-outline-variant hover:ring-primary/50 transition-all"></button>
+<button class="w-12 h-12 rounded-full bg-surface-container-highest ring-1 ring-outline-variant hover:ring-primary/50 transition-all"></button>
+</div>
+</div>
+<div>
+<p class="text-sm font-label font-semibold text-on-surface-variant uppercase tracking-widest mb-4">Skin Tone</p>
+<div class="flex flex-wrap gap-3">
+<button class="w-8 h-8 rounded-full bg-[#FFE3D1] ring-2 ring-offset-2 ring-offset-surface-container ring-primary"></button>
+<button class="w-8 h-8 rounded-full bg-[#F5D1B8]"></button>
+<button class="w-8 h-8 rounded-full bg-[#E5B899]"></button>
+<button class="w-8 h-8 rounded-full bg-[#D19F7E]"></button>
+<button class="w-8 h-8 rounded-full bg-[#A97C5F]"></button>
+<button class="w-8 h-8 rounded-full bg-[#8E5A3F]"></button>
+<button class="w-8 h-8 rounded-full bg-[#6C442D]"></button>
+<button class="w-8 h-8 rounded-full bg-[#482F1E]"></button>
+</div>
+</div>
+</div>
+</section>
+<!-- Hair Style Section -->
+<section class="glass-card p-8 rounded-lg ring-1 ring-white/10">
+<div class="flex items-center gap-3 mb-6">
+<span class="material-symbols-outlined text-primary" data-icon="content_cut">content_cut</span>
+<h2 class="text-xl font-headline font-bold">Hair &amp; Color</h2>
+</div>
+<div class="space-y-8">
+<div class="grid grid-cols-4 gap-4">
+<button class="aspect-square rounded-md bg-surface-container-highest flex items-center justify-center ring-2 ring-primary">
+<span class="material-symbols-outlined text-3xl" data-icon="person">person</span>
+</button>
+<button class="aspect-square rounded-md bg-surface-container-high flex items-center justify-center hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-3xl" data-icon="account_circle">account_circle</span>
+</button>
+<button class="aspect-square rounded-md bg-surface-container-high flex items-center justify-center hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-3xl" data-icon="sentiment_satisfied">sentiment_satisfied</span>
+</button>
+<button class="aspect-square rounded-md bg-surface-container-high flex items-center justify-center hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-3xl" data-icon="face_6">face_6</span>
+</button>
+<button class="aspect-square rounded-md bg-surface-container-high flex items-center justify-center hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-3xl" data-icon="face_3">face_3</span>
+</button>
+<button class="aspect-square rounded-md bg-surface-container-high flex items-center justify-center hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-3xl" data-icon="face_5">face_5</span>
+</button>
+<button class="aspect-square rounded-md bg-surface-container-high flex items-center justify-center hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-3xl" data-icon="face_2">face_2</span>
+</button>
+<button class="aspect-square rounded-md bg-surface-container-high flex items-center justify-center hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-3xl" data-icon="face_4">face_4</span>
+</button>
+</div>
+<div>
+<p class="text-sm font-label font-semibold text-on-surface-variant uppercase tracking-widest mb-4">Hair Color</p>
+<div class="h-6 w-full rounded-full bg-gradient-to-r from-black via-[#8e5a3f] via-[#ddb7ff] to-white ring-1 ring-outline-variant relative">
+<div class="absolute left-1/3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border-4 border-white shadow-lg bg-surface-container-highest cursor-pointer"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Features Section -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="glass-card p-6 rounded-lg ring-1 ring-white/10">
+<p class="text-sm font-label font-semibold text-on-surface-variant uppercase tracking-widest mb-4">Eye Styles</p>
+<div class="flex gap-2">
+<button class="flex-1 h-12 rounded-md bg-surface-container-highest ring-2 ring-primary"></button>
+<button class="flex-1 h-12 rounded-md bg-surface-container-low border border-outline-variant"></button>
+<button class="flex-1 h-12 rounded-md bg-surface-container-low border border-outline-variant"></button>
+<button class="flex-1 h-12 rounded-md bg-surface-container-low border border-outline-variant"></button>
+<button class="flex-1 h-12 rounded-md bg-surface-container-low border border-outline-variant"></button>
+</div>
+</div>
+<div class="glass-card p-6 rounded-lg ring-1 ring-white/10">
+<p class="text-sm font-label font-semibold text-on-surface-variant uppercase tracking-widest mb-4">Mouth Styles</p>
+<div class="flex gap-2">
+<button class="flex-1 h-12 rounded-md bg-surface-container-low border border-outline-variant"></button>
+<button class="flex-1 h-12 rounded-md bg-surface-container-highest ring-2 ring-primary"></button>
+<button class="flex-1 h-12 rounded-md bg-surface-container-low border border-outline-variant"></button>
+<button class="flex-1 h-12 rounded-md bg-surface-container-low border border-outline-variant"></button>
+<button class="flex-1 h-12 rounded-md bg-surface-container-low border border-outline-variant"></button>
+</div>
+</div>
+</section>
+<!-- Accessories Section -->
+<section class="glass-card p-8 rounded-lg ring-1 ring-white/10">
+<p class="text-sm font-label font-semibold text-on-surface-variant uppercase tracking-widest mb-6">Clinical Accessories</p>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+<button class="flex flex-col items-center gap-2 p-4 rounded-md bg-primary-container text-on-primary-container ring-1 ring-primary transition-all">
+<span class="material-symbols-outlined" data-icon="medical_services">medical_services</span>
+<span class="text-xs font-bold uppercase tracking-tighter">Cap</span>
+</button>
+<button class="flex flex-col items-center gap-2 p-4 rounded-md bg-surface-container-low text-on-surface-variant border border-outline-variant hover:bg-surface-container-high transition-all">
+<span class="material-symbols-outlined" data-icon="stethoscope">stethoscope</span>
+<span class="text-xs font-bold uppercase tracking-tighter">Stethoscope</span>
+</button>
+<button class="flex flex-col items-center gap-2 p-4 rounded-md bg-surface-container-low text-on-surface-variant border border-outline-variant hover:bg-surface-container-high transition-all">
+<span class="material-symbols-outlined" data-icon="badge">badge</span>
+<span class="text-xs font-bold uppercase tracking-tighter">Badge</span>
+</button>
+<button class="flex flex-col items-center gap-2 p-4 rounded-md bg-surface-container-low text-on-surface-variant border border-outline-variant hover:bg-surface-container-high transition-all">
+<span class="material-symbols-outlined" data-icon="eyeglasses">eyeglasses</span>
+<span class="text-xs font-bold uppercase tracking-tighter">Glasses</span>
+</button>
+</div>
+</section>
+<!-- Scrubs Section -->
+<section class="glass-card p-8 rounded-lg ring-1 ring-white/10">
+<div class="flex items-center justify-between mb-6">
+<p class="text-sm font-label font-semibold text-on-surface-variant uppercase tracking-widest">Scrubs Color</p>
+<button class="text-xs text-primary font-bold hover:underline">Custom Picker</button>
+</div>
+<div class="flex flex-wrap gap-4">
+<button class="w-14 h-14 rounded-md bg-blue-600 ring-4 ring-offset-4 ring-offset-surface-container ring-primary"></button>
+<button class="w-14 h-14 rounded-md bg-emerald-600"></button>
+<button class="w-14 h-14 rounded-md bg-indigo-800"></button>
+<button class="w-14 h-14 rounded-md bg-slate-700"></button>
+<button class="w-14 h-14 rounded-md bg-rose-600"></button>
+<button class="w-14 h-14 rounded-md bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-white" data-icon="palette">palette</span>
+</button>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- BottomNavBar Shell -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-2 bg-[#0b1326]/90 backdrop-blur-2xl rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-[#b76dff] transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform" data-icon="dashboard">dashboard</span>
+<span class="font-inter text-[10px] font-semibold tracking-wide uppercase mt-1">Dashboard</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-[#b76dff] transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform" data-icon="menu_book">menu_book</span>
+<span class="font-inter text-[10px] font-semibold tracking-wide uppercase mt-1">Modules</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 hover:text-[#b76dff] transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-2xl group-hover:scale-110 transition-transform" data-icon="biotech">biotech</span>
+<span class="font-inter text-[10px] font-semibold tracking-wide uppercase mt-1">Anatomy</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-gradient-to-br from-[#b76dff] to-[#ddb7ff] text-white rounded-full w-14 h-14 -mt-6 shadow-lg shadow-[#b76dff]/40 cursor-pointer scale-110">
+<span class="material-symbols-outlined text-2xl" data-icon="face" style="font-variation-settings: 'FILL' 1;">face</span>
+<span class="font-inter text-[10px] font-semibold tracking-wide uppercase mt-1 hidden">Avatar</span>
+</div>
+</nav>
+</body></html>

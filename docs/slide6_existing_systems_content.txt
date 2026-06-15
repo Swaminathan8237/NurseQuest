@@ -1,0 +1,219 @@
+================================================================================
+SLIDE 6 – REVIEW OF EXISTING SYSTEM (S/W/H/W PRODUCTS, TOOLS)
+================================================================================
+Columns (left to right):
+  1. Author / Developer  |  Year (chronological order)
+  2. Methodology / Materials and Methods
+  3. Datasets
+  4. Results / Outcome
+  5. Advantage / Key findings from the work
+  6. Disadvantage / GAP Identified from the work
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+ROW 1
+────────────────────────────────────────────────────────────────────────────────
+Author/Developer  : Kahoot! AS
+Year              : 2013
+
+Methodology       : Game-based learning platform using a host-device model.
+                    Teachers launch quizzes on screen; students respond via
+                    personal devices in real time using a join PIN.
+
+Datasets          : 300 million+ registered users globally; used across
+                    K-12, higher education, and corporate training environments.
+
+Results/Outcome   : Demonstrated significant improvement in student engagement
+                    and short-term knowledge recall in classroom settings.
+
+Advantage         : Simple, intuitive UI; real-time leaderboard; broad device
+                    compatibility; widely adopted in education worldwide.
+
+Disadvantage/GAP  : No nursing-specific content or clinical question types;
+                    no XP/rank progression system; no role-based educator
+                    access; lacks media-rich clinical scenarios (ECG, audio).
+
+────────────────────────────────────────────────────────────────────────────────
+ROW 2
+────────────────────────────────────────────────────────────────────────────────
+Author/Developer  : Quizlet Inc.
+Year              : 2005
+
+Methodology       : Spaced-repetition and active recall via digital flashcards.
+                    Students self-study using study modes (Learn, Match, Test).
+
+Datasets          : 500 million+ study sets created by users; 60 million
+                    active learners across 130+ countries.
+
+Results/Outcome   : Improved memorisation of terminology and definitions;
+                    effective for vocabulary-heavy subjects like anatomy.
+
+Advantage         : Easy flashcard creation; collaborative study sets;
+                    multiple study modes; supports images in cards.
+
+Disadvantage/GAP  : No real-time multiplayer or live competitive sessions;
+                    no gamification engine (XP, badges, levels); not designed
+                    for clinical scenario-based assessment.
+
+────────────────────────────────────────────────────────────────────────────────
+ROW 3
+────────────────────────────────────────────────────────────────────────────────
+Author/Developer  : Moodle Pty Ltd (Open Source)
+Year              : 2002
+
+Methodology       : Learning Management System (LMS) built on PHP. Delivers
+                    course content, quizzes, forums, and grading through
+                    a structured course-module architecture.
+
+Datasets          : Used by 300 million+ users in 250+ countries; deployed
+                    across universities, hospitals, and government institutions.
+
+Results/Outcome   : Provides comprehensive course management; supports
+                    blended and online learning with detailed progress reports.
+
+Advantage         : Open-source and free; highly extensible via plugins;
+                    supports SCORM, rich media, peer assessment, and grading.
+
+Disadvantage/GAP  : Heavy and complex server setup; no built-in gamification
+                    or competitive gameplay; poor UI/UX for student engagement;
+                    lacks real-time quiz session capability.
+
+────────────────────────────────────────────────────────────────────────────────
+ROW 4
+────────────────────────────────────────────────────────────────────────────────
+Author/Developer  : Google LLC
+Year              : 2012
+
+Methodology       : Web-based form/survey tool adapted for quiz delivery.
+                    Auto-grading via multiple-choice and short-answer types.
+
+Datasets          : Used by millions of educators globally; integrated with
+                    Google Workspace (Classroom, Sheets, Drive).
+
+Results/Outcome   : Simple, fast quiz creation with automatic grade export
+                    to Google Sheets for teacher review.
+
+Advantage         : Zero cost; no account needed for respondents; instant
+                    result collation; integrates with Google Classroom.
+
+Disadvantage/GAP  : No gamification; no live multiplayer; no media-rich
+                    clinical question types; no student progression tracking,
+                    streaks, or achievement system.
+
+────────────────────────────────────────────────────────────────────────────────
+ROW 5
+────────────────────────────────────────────────────────────────────────────────
+Author/Developer  : Mentimeter AB
+Year              : 2014
+
+Methodology       : Interactive slide-based presentation tool using live
+                    audience polling, word clouds, and Q&A widgets embedded
+                    into teacher-driven slideshow sessions.
+
+Datasets          : Used by 300 million+ participants across 200+ countries
+                    in corporate and academic presentation settings.
+
+Results/Outcome   : Increases audience participation and live feedback
+                    during lectures; reduces passive listening in classrooms.
+
+Advantage         : Visually appealing real-time responses; easy to embed
+                    in presentations; supports anonymous participation.
+
+Disadvantage/GAP  : Not a dedicated quiz/assessment platform; no scoring
+                    system, no XP or levels, no curriculum-linked assessments,
+                    and no nursing domain-specific content.
+
+────────────────────────────────────────────────────────────────────────────────
+ROW 6
+────────────────────────────────────────────────────────────────────────────────
+Author/Developer  : Wayground (EdTech Startup)
+Year              : 2019
+
+Methodology       : Online assessment and analytics platform with configurable
+                    test forms, auto-grading, and student dashboard reporting.
+
+Datasets          : Used in select universities and training centers; primarily
+                    corporate and professional certification environments.
+
+Results/Outcome   : Enables structured online assessments with dashboard
+                    analytics for tracking student performance over time.
+
+Advantage         : Customisable assessments; decent analytics; integration
+                    support with popular LMS tools; automated grading.
+
+Disadvantage/GAP  : No gamification or competitive elements; no live
+                    multiplayer mode; generic content with no nursing or
+                    clinical domain specificity.
+
+────────────────────────────────────────────────────────────────────────────────
+ROW 7
+────────────────────────────────────────────────────────────────────────────────
+Author/Developer  : Nearpod Inc.
+Year              : 2012
+
+Methodology       : Teacher-paced interactive lesson delivery platform.
+                    Lessons include embedded quizzes, polls, VR experiences,
+                    and collaborative boards synced to student devices.
+
+Datasets          : Used in 15,000+ schools; 2 million+ teachers; primarily
+                    K-12 in the US; integrated with Google Classroom & Canvas.
+
+Results/Outcome   : Improved student attention and lesson comprehension;
+                    real-time teacher visibility of student responses.
+
+Advantage         : Rich lesson formats (VR, 3D, video); real-time student
+                    response monitoring; integrates with major LMS platforms.
+
+Disadvantage/GAP  : Primarily a lesson delivery tool, not a standalone
+                    competitive quiz game; no XP system, no student rank
+                    progression, no nursing-specific content.
+
+────────────────────────────────────────────────────────────────────────────────
+ROW 8
+────────────────────────────────────────────────────────────────────────────────
+Author/Developer  : Socrative Inc. (acquired by Mastery Connect)
+Year              : 2011
+
+Methodology       : Classroom response system using teacher-created quizzes,
+                    exit tickets, and team "space races" for formative
+                    assessment in real time.
+
+Datasets          : Used by 2 million+ teachers in 150+ countries; primarily
+                    higher education and secondary school environments.
+
+Results/Outcome   : Effective formative assessment tool; instant class
+                    performance reports; identifies student knowledge gaps.
+
+Advantage         : Simple quiz creation; real-time feedback; team Space
+                    Race adds competitive element; downloadable reports.
+
+Disadvantage/GAP  : Limited question types (MCQ, T/F, short answer only);
+                    no media-rich clinical scenarios; no gamification engine
+                    or XP/badge progression system for nursing education.
+
+────────────────────────────────────────────────────────────────────────────────
+ROW 9
+────────────────────────────────────────────────────────────────────────────────
+Author/Developer  : ProProfs (Merger of Snow Technologies)
+Year              : 2006
+
+Methodology       : Online quiz maker with branching logic, timed tests,
+                    certificates of completion, and performance analytics
+                    dashboard for instructors.
+
+Datasets          : Used by 15 million+ users; deployed in corporate training,
+                    higher education, and professional certification programs.
+
+Results/Outcome   : Enables self-paced online assessment; auto-generates
+                    certificates; provides detailed student performance reports.
+
+Advantage         : Rich quiz creation options; branching logic; certificate
+                    generation; white-label options; strong analytics.
+
+Disadvantage/GAP  : No nursing-specific domain modules; no live multiplayer
+                    mode; limited question types; subscription-based pricing
+                    limits accessibility for academic institutions.
+
+================================================================================
+END OF SLIDE 6 CONTENT
+================================================================================

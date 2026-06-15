@@ -1,0 +1,85 @@
+const API_BASE = '/api';
+
+function getToken() {
+  return sessionStorage.getItem('nursequest_token');
+}
+
+function getHeaders() {
+  const token = getToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+async function request(endpoint, options = {}) {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers: { ...getHeaders(), ...options.headers },
+  });
+  
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (e) {
+    console.error("Failed to parse JSON:", text);
+    if (!res.ok) throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+  }
+  
+  if (!res.ok) {
+    throw new Error(data.error || `Request failed with status ${res.status}`);
+  }
+  
+  return data;
+}
+
+// Auth
+export const authAPI = {
+  login: (email, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  getProfile: () => request('/auth/me'),
+  updateAvatar: (avatarConfig) => request('/auth/avatar', { method: 'PUT', body: JSON.stringify({ avatarConfig }) }),
+};
+
+// Quizzes
+export const quizAPI = {
+  getAll: (params) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/quizzes${query ? '?' + query : ''}`);
+  },
+  getMyQuizzes: () => request('/quizzes/my-quizzes'),
+  getById: (id) => request(`/quizzes/${id}`),
+  create: (data) => request('/quizzes', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/quizzes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id) => request(`/quizzes/${id}`, { method: 'DELETE' }),
+};
+
+// Scores
+export const scoreAPI = {
+  submit: (quizId, answers) => request('/scores/submit', { method: 'POST', body: JSON.stringify({ quizId, answers }) }),
+  getLeaderboard: (params) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/scores/leaderboard${query ? '?' + query : ''}`);
+  },
+  getHistory: () => request('/scores/history'),
+  getAnalytics: (quizId) => request(`/scores/analytics/${quizId}`),
+};
+
+// Users
+export const userAPI = {
+  getStudents: () => request('/users/students'),
+  getStudent: (id) => request(`/users/students/${id}`),
+  getDashboardStats: () => request('/users/dashboard-stats'),
+};
+
+// Modules
+export const moduleAPI = {
+  getAll: () => request('/modules'),
+  getById: (id) => request(`/modules/${id}`),
+  create: (data) => request('/modules', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/modules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id) => request(`/modules/${id}`, { method: 'DELETE' }),
+};
+
+export default { authAPI, quizAPI, scoreAPI, userAPI, moduleAPI };

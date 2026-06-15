@@ -1,0 +1,374 @@
+Slide width: 9144000  height: 5143500
+Total slides: 15
+
+=== Slide 1 (layout: Title Slide) ===
+  Shape 0: name='Title 1' type=TEXT_BOX (17) has_text=True
+    P0: 'A Gamified Web based Quiz Platform for Interactive Nursing Education'
+      font: Times New Roman, size=355600, bold=True, color=A50021
+  Shape 1: name='TextBox 5' type=TEXT_BOX (17) has_text=True
+    P0: 'Team Members'
+      font: Times New Roman, size=None, bold=True, color=None
+    P1: '1. G L Swaminathan (E0224033)'
+      font: Times New Roman, size=None, bold=True, color=None
+  Shape 2: name='TextBox 9' type=TEXT_BOX (17) has_text=True
+    P0: 'Project Guide'
+      font: Times New Roman, size=None, bold=True, color=None
+    P1: 'Dr. G. Jayanthi'
+      font: Times New Roman, size=None, bold=True, color=None
+  Shape 3: name='TextBox 7' type=TEXT_BOX (17) has_text=True
+    P0: 'CYB23IN201 Internship -II'
+      font: Times New Roman, size=254000, bold=True, color=None
+  Shape 4: name='TextBox 11' type=TEXT_BOX (17) has_text=True
+    P0: 'First Review'
+      font: Times New Roman, size=254000, bold=True, color=FF0000
+    P1: 'Date: 5.6.2026 & 6.6.2026'
+      font: Times New Roman, size=254000, bold=True, color=FF0000
+  Shape 5: name='image1.png' type=PICTURE (13) has_text=False
+
+=== Slide 2 (layout: Title and Content) ===
+  Shape 0: name='Slide Number Placeholder 6' type=PLACEHOLDER (14) has_text=True
+    P0: '2'
+  Shape 1: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'INTRODUCTION'
+      font: Times New Roman, size=304800, bold=True, color=C00000
+  Shape 2: name='TextBox 4' type=TEXT_BOX (17) has_text=True
+    P0: 'Applications:'
+      font: Times New Roman, size=None, bold=True, color=C00000
+    P1: 'Interactive Learning'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P2: 'Experience points-based level progression'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P3: 'User centric customization'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P4: 'Day to Day Leaderboard Update'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P5: 'Different Question Modes'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P6: 'Domain based Modules'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P7: 'Live Quiz'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P8: 'And more…'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+  Shape 3: name='TextBox 5' type=TEXT_BOX (17) has_text=True
+    P0: 'Need for the technology:'
+      font: Times New Roman, size=None, bold=True, color=C00000
+    P1: 'Domain based platforms are hard to find publicly on the Internet. Usually Interactive Quizzes and Quiz Platforms that ar'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+  Shape 4: name='Date Placeholder 2' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 5: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 3 (layout: Title and Content) ===
+  Shape 0: name='Date Placeholder 3' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 1: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'INT500 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+  Shape 2: name='Slide Number Placeholder 5' type=PLACEHOLDER (14) has_text=True
+    P0: '3'
+  Shape 3: name='TextBox 6' type=TEXT_BOX (17) has_text=True
+    P0: 'Motivation behind the study:'
+      font: Times New Roman, size=None, bold=True, color=C00000
+    P1: 'The Motivation is that a study on how the Gamified or interactive learning implies effective learning among students. As'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+  Shape 4: name='TextBox 7' type=TEXT_BOX (17) has_text=True
+    P0: 'Challenges to be addressed:'
+      font: Times New Roman, size=None, bold=True, color=C00000
+    P1: 'Handling Multiple Users at once (Scaling)'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P2: 'Creating Creative Question Modes'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P3: 'Selecting Suitable UI'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P4: 'Thinking of creative features to add'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P5: 'Making it portable for Multi Device'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P6: 'Designing User-centric customizations'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+    P7: 'Implementing security measures for security of the website'
+      font: Times New Roman, size=203200, bold=True, color=C00000
+
+=== Slide 4 (layout: Title and Content) ===
+  Shape 0: name='Slide Number Placeholder 6' type=PLACEHOLDER (14) has_text=True
+    P0: '4'
+  Shape 1: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'REVIEW OF LITERATURE  (Minimum 15 Works)'
+      font: Times New Roman, size=355600, bold=True, color=A50021
+  Shape 2: name='Table 2' type=TABLE (19) has_text=False
+  Shape 3: name='Date Placeholder 2' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 4: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 5 (layout: Title and Content) ===
+  Shape 0: name='Slide Number Placeholder 6' type=PLACEHOLDER (14) has_text=True
+    P0: '5'
+  Shape 1: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'REVIEW OF LITERATURE  (Minimum 15 Works Continued….)'
+      font: Times New Roman, size=304800, bold=True, color=A50021
+  Shape 2: name='Table 2' type=TABLE (19) has_text=False
+  Shape 3: name='Date Placeholder 2' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 4: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 6 (layout: Title and Content) ===
+  Shape 0: name='Slide Number Placeholder 6' type=PLACEHOLDER (14) has_text=True
+    P0: '6'
+  Shape 1: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'REVIEW OF EXISTING SYSTEM (S/W/H/W PRODUCTS, TOOLS)'
+      font: Times New Roman, size=304800, bold=True, color=A50021
+  Shape 2: name='Table 2' type=TABLE (19) has_text=False
+  Shape 3: name='Date Placeholder 2' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 4: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 7 (layout: Title and Content) ===
+  Shape 0: name='Slide Number Placeholder 6' type=PLACEHOLDER (14) has_text=True
+    P0: '7'
+  Shape 1: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'PROBLEM STATEMENT'
+      font: Times New Roman, size=355600, bold=True, color=A50021
+  Shape 2: name='TextBox 1' type=TEXT_BOX (17) has_text=True
+    P0: '#Describe the core method/algorithm/technology focused in your work in bullet points'
+      font: Times New Roman, size=None, bold=None, color=None
+  Shape 3: name='Date Placeholder 2' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 4: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 8 (layout: Title and Content) ===
+  Shape 0: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'OBJECTIVES'
+      font: Times New Roman, size=355600, bold=True, color=A50021
+  Shape 1: name='Slide Number Placeholder 3' type=PLACEHOLDER (14) has_text=True
+    P0: '8'
+  Shape 2: name='TextBox 2' type=TEXT_BOX (17) has_text=True
+    P0: 'Objective  - 1'
+      font: Times New Roman, size=None, bold=None, color=None
+    P1: 'Objective  - 2'
+      font: Times New Roman, size=None, bold=None, color=None
+    P2: 'Objective  - 3'
+      font: Times New Roman, size=None, bold=None, color=None
+    P3: 'Objective  - 4'
+      font: Times New Roman, size=None, bold=None, color=None
+    P4: 'Objective  - 5'
+      font: Times New Roman, size=None, bold=None, color=None
+  Shape 3: name='Date Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 4: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 9 (layout: Title and Content) ===
+  Shape 0: name='Slide Number Placeholder 6' type=PLACEHOLDER (14) has_text=True
+    P0: '9'
+  Shape 1: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'WORKFLOW DIAGRAM'
+      font: Times New Roman, size=355600, bold=True, color=A50021
+  Shape 2: name='Date Placeholder 1' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 3: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 10 (layout: Title and Content) ===
+  Shape 0: name='Slide Number Placeholder 6' type=PLACEHOLDER (14) has_text=True
+    P0: '10'
+  Shape 1: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'MODULES'
+      font: Times New Roman, size=355600, bold=True, color=A50021
+  Shape 2: name='Table 2' type=TABLE (19) has_text=False
+  Shape 3: name='Date Placeholder 1' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 4: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 11 (layout: Title and Content) ===
+  Shape 0: name='Slide Number Placeholder 6' type=PLACEHOLDER (14) has_text=True
+    P0: '11'
+  Shape 1: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'TENTATIVE RESULTS/ EXPECTED OUTCOME'
+      font: Times New Roman, size=355600, bold=True, color=A50021
+  Shape 2: name='Date Placeholder 1' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 3: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 12 (layout: Title and Content) ===
+  Shape 0: name='Slide Number Placeholder 6' type=PLACEHOLDER (14) has_text=True
+    P0: '12'
+  Shape 1: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'CONCLUSION'
+      font: Times New Roman, size=355600, bold=True, color=A50021
+  Shape 2: name='TextBox 3' type=TEXT_BOX (17) has_text=True
+    P0: '#Conclusion section must be present in all review presentations.'
+      font: Times New Roman, size=203200, bold=None, color=None
+    P1: '# For first review, specify the work progressed until 13 MAR 25/ 15 MARCH 25 in bullet points'
+      font: Times New Roman, size=203200, bold=None, color=None
+    P2: 'Like status of Review of Literature,'
+      font: Times New Roman, size=203200, bold=None, color=None
+    P3: 'Progress in implementation etc.'
+      font: Times New Roman, size=203200, bold=None, color=None
+  Shape 3: name='Date Placeholder 1' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 4: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 13 (layout: Title and Content) ===
+  Shape 0: name='Slide Number Placeholder 6' type=PLACEHOLDER (14) has_text=True
+    P0: '13'
+  Shape 1: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'REFERENCES (A minimum of 15 Journal references required for First Review)'
+      font: Times New Roman, size=254000, bold=True, color=A50021
+  Shape 2: name='TextBox 7' type=TEXT_BOX (17) has_text=True
+    P0: '[1]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P1: '[2]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P2: '[3]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P3: '[4]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P4: '[5]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P5: '[6]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P6: '[7]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P7: '[8][9]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P8: '[10]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P9: '[11]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P10: '[12]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P11: '[13]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P12: '[14]'
+      font: Times New Roman, size=152400, bold=None, color=None
+    P13: '[15]'
+      font: Times New Roman, size=152400, bold=None, color=None
+  Shape 3: name='Rectangle 1' type=AUTO_SHAPE (1) has_text=True
+    P0: '[Ref number] Author’s initials. Author’s Surname, “Title of article,” Title of journal abbreviated in Italics, vol. numb'
+      font: Times New Roman, size=139700, bold=None, color=None
+    P2: 'Example:'
+      font: Times New Roman, size=139700, bold=None, color=None
+    P3: '[4] F. Yan, Y. Gu, Y. Wang, C. M. Wang, X. Y. Hu, H. X. Peng, et al., "Study on the interaction mechanism between laser '
+      font: Times New Roman, size=139700, bold=None, color=None
+  Shape 4: name='Date Placeholder 2' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 5: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN301 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 14 (layout: Title and Content) ===
+  Shape 0: name='Slide Number Placeholder 6' type=PLACEHOLDER (14) has_text=True
+    P0: '14'
+  Shape 1: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'REFERENCES'
+      font: Times New Roman, size=355600, bold=True, color=A50021
+  Shape 2: name='TextBox 7' type=TEXT_BOX (17) has_text=True
+    P0: 'WEB REFERENCE:'
+      font: Cambria, size=None, bold=None, color=A50021
+  Shape 3: name='Date Placeholder 1' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 4: name='Footer Placeholder 2' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide 15 (layout: Title and Content) ===
+  Shape 0: name='Title 1' type=PLACEHOLDER (14) has_text=True
+    P0: 'Thank you'
+      font: Times New Roman, size=457200, bold=True, color=None
+  Shape 1: name='Slide Number Placeholder 2' type=PLACEHOLDER (14) has_text=True
+    P0: '15'
+  Shape 2: name='Date Placeholder 3' type=PLACEHOLDER (14) has_text=True
+    P0: '4 June 2026'
+  Shape 3: name='Footer Placeholder 4' type=PLACEHOLDER (14) has_text=True
+    P0: 'CYB23IN101 REVIEW - I'
+      font: None, size=None, bold=None, color=None
+
+=== Slide Layouts ===
+  Layout 0: 'Title Slide'
+    PH idx=0 name='Title 1'
+    PH idx=1 name='Subtitle 2'
+    PH idx=10 name='Date Placeholder 3'
+    PH idx=11 name='Footer Placeholder 4'
+    PH idx=12 name='Slide Number Placeholder 5'
+  Layout 1: 'Title and Content'
+    PH idx=0 name='Title 1'
+    PH idx=1 name='Content Placeholder 2'
+    PH idx=10 name='Date Placeholder 3'
+    PH idx=11 name='Footer Placeholder 4'
+    PH idx=12 name='Slide Number Placeholder 5'
+  Layout 2: 'Section Header'
+    PH idx=0 name='Title 1'
+    PH idx=1 name='Text Placeholder 2'
+    PH idx=10 name='Date Placeholder 3'
+    PH idx=11 name='Footer Placeholder 4'
+    PH idx=12 name='Slide Number Placeholder 5'
+  Layout 3: 'Two Content'
+    PH idx=0 name='Title 1'
+    PH idx=1 name='Content Placeholder 2'
+    PH idx=2 name='Content Placeholder 3'
+    PH idx=10 name='Date Placeholder 4'
+    PH idx=11 name='Footer Placeholder 5'
+    PH idx=12 name='Slide Number Placeholder 6'
+  Layout 4: 'Comparison'
+    PH idx=0 name='Title 1'
+    PH idx=1 name='Text Placeholder 2'
+    PH idx=2 name='Content Placeholder 3'
+    PH idx=3 name='Text Placeholder 4'
+    PH idx=4 name='Content Placeholder 5'
+    PH idx=10 name='Date Placeholder 6'
+    PH idx=11 name='Footer Placeholder 7'
+    PH idx=12 name='Slide Number Placeholder 8'
+  Layout 5: 'Title Only'
+    PH idx=0 name='Title 1'
+    PH idx=10 name='Date Placeholder 2'
+    PH idx=11 name='Footer Placeholder 3'
+    PH idx=12 name='Slide Number Placeholder 4'
+  Layout 6: 'Blank'
+    PH idx=10 name='Date Placeholder 1'
+    PH idx=11 name='Footer Placeholder 2'
+    PH idx=12 name='Slide Number Placeholder 3'
+  Layout 7: 'Content with Caption'
+    PH idx=0 name='Title 1'
+    PH idx=1 name='Content Placeholder 2'
+    PH idx=2 name='Text Placeholder 3'
+    PH idx=10 name='Date Placeholder 4'
+    PH idx=11 name='Footer Placeholder 5'
+    PH idx=12 name='Slide Number Placeholder 6'
+  Layout 8: 'Picture with Caption'
+    PH idx=0 name='Title 1'
+    PH idx=1 name='Picture Placeholder 2'
+    PH idx=2 name='Text Placeholder 3'
+    PH idx=10 name='Date Placeholder 4'
+    PH idx=11 name='Footer Placeholder 5'
+    PH idx=12 name='Slide Number Placeholder 6'
+  Layout 9: 'Title and Vertical Text'
+    PH idx=0 name='Title 1'
+    PH idx=1 name='Vertical Text Placeholder 2'
+    PH idx=10 name='Date Placeholder 3'
+    PH idx=11 name='Footer Placeholder 4'
+    PH idx=12 name='Slide Number Placeholder 5'
+  Layout 10: 'Vertical Title and Text'
+    PH idx=0 name='Vertical Title 1'
+    PH idx=1 name='Vertical Text Placeholder 2'
+    PH idx=10 name='Date Placeholder 3'
+    PH idx=11 name='Footer Placeholder 4'
+    PH idx=12 name='Slide Number Placeholder 5'

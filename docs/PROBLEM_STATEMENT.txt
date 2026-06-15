@@ -1,0 +1,62 @@
+PROBLEM STATEMENT
+=================
+
+Project Title: NurseQuest — Gamified Nursing Education Platform
+
+Describe the core method/algorithm/technology focused in your work in bullet points:
+
+• Gamification-Based Learning Engine
+  - Implements an Experience Points (XP) and leveling system with 7 nursing ranks
+    (Nurse Intern → Chief Nurse) to motivate continuous learning.
+  - Uses a scoring algorithm that factors in answer correctness, response time,
+    and streak bonuses to reward both accuracy and speed.
+  - Integrates achievement badges, daily streaks, and a global leaderboard with
+    podium rankings to foster healthy competition among nursing students.
+
+• Real-Time Multiplayer Quiz Sessions (Kahoot-Style)
+  - Utilizes Socket.IO (WebSocket protocol) to enable live, real-time multiplayer
+    quiz sessions where a teacher hosts and students join via a game code.
+  - Implements server-side game state synchronization, ensuring all participants
+    receive question broadcasts, timer countdowns, and score updates simultaneously.
+  - Handles concurrent connections, player join/leave events, and real-time
+    score aggregation with live leaderboard updates after each question round.
+
+• Multi-Format Question Engine
+  - Supports 6 diverse question types: Multiple Choice (MCQ), Image-Based,
+    Video-Based, Audio-Based, Jumbled Letters, and Sequence Ordering.
+  - Enables multimedia upload (images, audio, video) to create rich, clinically
+    relevant nursing scenarios for assessment.
+  - Implements a flexible Quiz Builder interface for teachers to create, edit,
+    and manage quizzes with mixed question types.
+
+• Role-Based Access Control (RBAC) and JWT Authentication
+  - Uses JSON Web Tokens (JWT) for stateless, secure authentication across
+    the frontend and backend.
+  - Implements role-based routing and middleware (Teacher vs. Student) to
+    restrict access to dashboards, quiz creation tools, module management,
+    and administrative features based on the authenticated user's role.
+
+• Modular Learning Content Management
+  - Provides a Module Manager for teachers to organize nursing curriculum into
+    structured learning modules with rich-text content.
+  - Students can browse and study modules, linking theoretical learning to
+    practical quiz assessments.
+
+• Full-Stack Modern Web Architecture
+  - Frontend: React 19 with Vite for fast HMR (Hot Module Replacement) development,
+    component-based UI architecture, and Context API for global state management
+    (AuthContext, ThemeContext).
+  - Backend: Node.js with Express 5 RESTful API server handling routing, middleware
+    chains, file uploads, and database operations.
+  - Database: SQLite (via better-sqlite3) for lightweight, serverless, embedded
+    relational data storage — suitable for single-server deployment.
+  - Real-Time Layer: Socket.IO for bidirectional, event-driven communication
+    between server and connected clients during live game sessions.
+
+• Responsive UI with Theme Support
+  - Implements a Dark/Light theme toggle using CSS custom properties and React
+    Context, persisted across sessions.
+  - Customizable avatar system allowing students to personalize their in-app
+    identity.
+  - Mobile-responsive design ensuring accessibility across devices used in
+    clinical and classroom settings.

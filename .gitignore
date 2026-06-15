@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output
+frontend/dist/
+
+# Database files
+backend/db/*.db
+backend/db/*.db-shm
+backend/db/*.db-wal
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Uploads (user-generated content)
+backend/uploads/images/*
+backend/uploads/videos/*
+backend/uploads/audio/*
+!backend/uploads/images/.gitkeep
+!backend/uploads/videos/.gitkeep
+!backend/uploads/audio/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test artifacts
+frontend/testsprite_tests/tmp/
+
+# Build logs
+frontend/build_log.txt

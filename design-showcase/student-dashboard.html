@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NurseQuest - Student Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1" rel="stylesheet" />
+</head>
+<body>
+  <div class="ambient-glow-1"></div>
+  <div class="ambient-glow-2"></div>
+
+  <!-- Top Navigation Bar -->
+  <nav class="navbar">
+    <a href="index.html" class="nav-brand">
+      <span class="logo-icon material-symbols-outlined">health_and_safety</span>
+      <span>NurseQuest</span>
+    </a>
+    <div class="nav-links">
+      <a href="student-dashboard.html" class="nav-link active">Dashboard</a>
+      <a href="#" class="nav-link">Curriculum</a>
+      <a href="#" class="nav-link">Library</a>
+    </div>
+    <div class="nav-actions">
+      <!-- Dynamic audio button -->
+      <button id="sound-toggle" class="btn btn-secondary" style="padding: 0.5rem;" title="Toggle sound effects">
+        <span class="material-symbols-outlined" style="font-size: 1.25rem;">volume_up</span>
+      </button>
+      <div class="avatar-container">
+        <div class="avatar-wrapper">
+          <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=150&auto=format&fit=crop" class="avatar-img" alt="Alex Rivera Profile">
+          <div class="avatar-level-badge" id="player-level">42</div>
+        </div>
+        <span class="avatar-info-text">Alex Rivera</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <div class="container">
+    
+    <!-- Welcome Hero -->
+    <section class="welcome-hero">
+      <div class="hero-profile">
+        <div class="hero-avatar-large">
+          <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop" alt="Alex Rivera Large">
+          <div class="status-dot"></div>
+        </div>
+        <div class="hero-text">
+          <h1>Welcome back, Alex!</h1>
+          <p>Ready to level up your clinical nursing knowledge today?</p>
+        </div>
+      </div>
+      
+      <!-- XP Progression Widget -->
+      <div class="hero-xp-card">
+        <div class="xp-header">
+          <span class="xp-rank">Senior Nurse Intern</span>
+          <span class="xp-numbers"><span id="player-xp">4200 / 5000</span> XP</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-bar-fill" style="width: 84%;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dashboard Grid -->
+    <div class="dashboard-grid">
+      
+      <!-- Main Content Column -->
+      <div class="grid-main-column">
+        
+        <!-- Active Quizzes -->
+        <section>
+          <div class="section-header">
+            <h2 class="section-title">
+              <span class="material-symbols-outlined" style="color: var(--secondary); font-variation-settings: 'FILL' 1;">local_fire_department</span>
+              Active Clinical Missions
+            </h2>
+            <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;">3 Quizzes Available</span>
+          </div>
+          
+          <div class="quiz-grid">
+            
+            <!-- Quiz Card 1 -->
+            <div class="quiz-card">
+              <div class="quiz-badge-container">
+                <span class="quiz-category">Critical Care</span>
+                <span class="quiz-xp-badge">+150 XP</span>
+              </div>
+              <h3 class="quiz-title">Cardiorespiratory Nursing & Clinical Assessment</h3>
+              <p class="quiz-description">Assess cardiac biomarkers, analyze ECG rhythm strips, and construct nursing care plans for myocardial infarction.</p>
+              <div class="quiz-stats">
+                <div class="quiz-stat-item">
+                  <span class="material-symbols-outlined" style="font-size: 1rem;">menu_book</span>
+                  <span>10 Questions</span>
+                </div>
+                <div class="quiz-stat-item">
+                  <span class="material-symbols-outlined" style="font-size: 1rem;">schedule</span>
+                  <span>15 Sec/Q</span>
+                </div>
+              </div>
+              <div class="quiz-footer">
+                <span style="font-size: 0.75rem; color: var(--text-secondary);">Last Played: 2d ago</span>
+                <a href="quiz-player.html" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+                  Play Mission <span class="material-symbols-outlined" style="font-size: 0.95rem;">play_arrow</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Quiz Card 2 -->
+            <div class="quiz-card">
+              <div class="quiz-badge-container">
+                <span class="quiz-category" style="color: var(--primary-light); background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.25);">Pharmacology</span>
+                <span class="quiz-xp-badge" style="color: var(--primary-light); background: rgba(168, 85, 247, 0.1);">+200 XP</span>
+              </div>
+              <h3 class="quiz-title">Dosage Calculations & Patient Admin</h3>
+              <p class="quiz-description">Master intravenous flow rates, pediatric dilutions, and drug administration formulas with clinical case scenarios.</p>
+              <div class="quiz-stats">
+                <div class="quiz-stat-item">
+                  <span class="material-symbols-outlined" style="font-size: 1rem;">menu_book</span>
+                  <span>8 Questions</span>
+                </div>
+                <div class="quiz-stat-item">
+                  <span class="material-symbols-outlined" style="font-size: 1rem;">schedule</span>
+                  <span>30 Sec/Q</span>
+                </div>
+              </div>
+              <div class="quiz-footer">
+                <span style="font-size: 0.75rem; color: var(--text-secondary);">Locked (Req. Lvl 43)</span>
+                <button class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.8rem; cursor: not-allowed; opacity: 0.5;" disabled>
+                  Locked <span class="material-symbols-outlined" style="font-size: 0.95rem;">lock</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Achievements Section -->
+        <section>
+          <div class="section-header">
+            <h2 class="section-title">
+              <span class="material-symbols-outlined" style="color: var(--primary-light); font-variation-settings: 'FILL' 1;">workspace_premium</span>
+              Earned Ranks & Badges
+            </h2>
+            <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;">2 / 4 Unlocked</span>
+          </div>
+
+          <div class="glass-panel">
+            <div class="achievement-row">
+              
+              <!-- Badge 1 -->
+              <div class="achievement-badge unlocked">
+                <div class="badge-art">
+                  <span class="material-symbols-outlined" style="font-size: 1.8rem; font-variation-settings: 'FILL' 1;">medical_services</span>
+                </div>
+                <h4 class="badge-title">First Responder</h4>
+                <p class="badge-desc">Complete your first clinical assessment quiz.</p>
+              </div>
+
+              <!-- Badge 2 -->
+              <div class="achievement-badge unlocked">
+                <div class="badge-art">
+                  <span class="material-symbols-outlined" style="font-size: 1.8rem; font-variation-settings: 'FILL' 1;">local_fire_department</span>
+                </div>
+                <h4 class="badge-title">Hot Streak</h4>
+                <p class="badge-desc">Play 3 days consecutively.</p>
+              </div>
+
+              <!-- Badge 3 -->
+              <div class="achievement-badge">
+                <div class="badge-art">
+                  <span class="material-symbols-outlined" style="font-size: 1.8rem;">emoji_events</span>
+                </div>
+                <h4 class="badge-title">Ward Chief</h4>
+                <p class="badge-desc">Reach Rank 1 on the global leaderboard.</p>
+              </div>
+
+              <!-- Badge 4 -->
+              <div class="achievement-badge">
+                <div class="badge-art">
+                  <span class="material-symbols-outlined" style="font-size: 1.8rem;">auto_awesome</span>
+                </div>
+                <h4 class="badge-title">Perfect Dose</h4>
+                <p class="badge-desc">Get 100% on a dosage calc mission.</p>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Sidebar Column -->
+      <div class="grid-sidebar-column">
+        
+        <!-- Daily Quests -->
+        <section>
+          <div class="section-header">
+            <h2 class="section-title">
+              <span class="material-symbols-outlined" style="color: var(--warning); font-variation-settings: 'FILL' 1;">task_alt</span>
+              Daily Quests
+            </h2>
+          </div>
+          
+          <div class="glass-panel quest-list">
+            
+            <!-- Quest Item 1 -->
+            <div class="quest-item">
+              <div class="quest-icon-container completed">
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+              </div>
+              <div class="quest-content">
+                <div class="quest-name">Study Session</div>
+                <div class="quest-desc">Log into NurseQuest.</div>
+                <div class="quest-progress-bar">
+                  <div class="quest-progress-fill" style="width: 100%; background-color: var(--success);"></div>
+                </div>
+              </div>
+              <div class="quest-reward">+50 XP</div>
+            </div>
+
+            <!-- Quest Item 2 -->
+            <div class="quest-item">
+              <div class="quest-icon-container">
+                <span class="material-symbols-outlined">quiz</span>
+              </div>
+              <div class="quest-content">
+                <div class="quest-name">Mission Complete</div>
+                <div class="quest-desc">Complete Cardiorespiratory Quiz.</div>
+                <div class="quest-progress-bar">
+                  <div class="quest-progress-fill" style="width: 0%;"></div>
+                </div>
+              </div>
+              <div class="quest-reward">+100 XP</div>
+            </div>
+
+            <!-- Quest Item 3 -->
+            <div class="quest-item">
+              <div class="quest-icon-container">
+                <span class="material-symbols-outlined">workspace_premium</span>
+              </div>
+              <div class="quest-content">
+                <div class="quest-name">Precision Dose</div>
+                <div class="quest-desc">Get >90% score on a pharmacology quiz.</div>
+                <div class="quest-progress-bar">
+                  <div class="quest-progress-fill" style="width: 40%;"></div>
+                </div>
+              </div>
+              <div class="quest-reward">+150 XP</div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Leaderboard -->
+        <section>
+          <div class="section-header">
+            <h2 class="section-title">
+              <span class="material-symbols-outlined" style="color: var(--primary-light); font-variation-settings: 'FILL' 1;">leaderboard</span>
+              Top Rankings
+            </h2>
+          </div>
+
+          <div class="glass-panel leaderboard-widget">
+            <div class="leaderboard-list">
+              
+              <!-- User 1 -->
+              <div class="leaderboard-item">
+                <div class="leaderboard-left">
+                  <span class="leaderboard-rank rank-1">1</span>
+                  <img src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=100&auto=format&fit=crop" class="leaderboard-avatar" alt="Dr. Sarah Jenkins">
+                  <span class="leaderboard-name">Sarah Jenkins</span>
+                </div>
+                <div class="leaderboard-right">
+                  <span class="leaderboard-xp">8,450 XP</span>
+                </div>
+              </div>
+
+              <!-- User 2 -->
+              <div class="leaderboard-item">
+                <div class="leaderboard-left">
+                  <span class="leaderboard-rank rank-2">2</span>
+                  <img src="https://images.unsplash.com/photo-1537368910025-700350fe46c7?q=80&w=100&auto=format&fit=crop" class="leaderboard-avatar" alt="Liam Davies">
+                  <span class="leaderboard-name">Liam Davies</span>
+                </div>
+                <div class="leaderboard-right">
+                  <span class="leaderboard-xp">7,210 XP</span>
+                </div>
+              </div>
+
+              <!-- User 3 -->
+              <div class="leaderboard-item">
+                <div class="leaderboard-left">
+                  <span class="leaderboard-rank rank-3">3</span>
+                  <img src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=100&auto=format&fit=crop" class="leaderboard-avatar" alt="Mia Thompson">
+                  <span class="leaderboard-name">Mia Thompson</span>
+                </div>
+                <div class="leaderboard-right">
+                  <span class="leaderboard-xp">5,980 XP</span>
+                </div>
+              </div>
+
+              <!-- Current User -->
+              <div class="leaderboard-item currentUser">
+                <div class="leaderboard-left">
+                  <span class="leaderboard-rank rank-other">4</span>
+                  <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=100&auto=format&fit=crop" class="leaderboard-avatar" alt="Alex Rivera">
+                  <span class="leaderboard-name">Alex Rivera (You)</span>
+                </div>
+                <div class="leaderboard-right">
+                  <span class="leaderboard-xp">4,200 XP</span>
+                </div>
+              </div>
+
+              <!-- User 5 -->
+              <div class="leaderboard-item">
+                <div class="leaderboard-left">
+                  <span class="leaderboard-rank rank-other">5</span>
+                  <img src="https://images.unsplash.com/photo-1582971805810-b24306e0afe8?q=80&w=100&auto=format&fit=crop" class="leaderboard-avatar" alt="Noah Martinez">
+                  <span class="leaderboard-name">Noah Martinez</span>
+                </div>
+                <div class="leaderboard-right">
+                  <span class="leaderboard-xp">4,120 XP</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

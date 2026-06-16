@@ -4,8 +4,6 @@ Use this template to create questions in a TXT or Word document.
 Each question starts with a number (e.g. 1.) or a type tag (e.g. [Matching]).
 Leave a blank line between questions. 
 
-Multiple Choice (MCQ) — Default Format (No type tag required)
---------------------------------------------------------------
 1. What is the normal resting heart rate range for an adult?
 A) 40-60 bpm
 B) 60-100 bpm
@@ -14,15 +12,11 @@ D) 120-150 bpm
 Answer: B
 Explanation: The normal resting heart rate for adults ranges from 60 to 100 beats per minute.
 
-True / False Question
-----------------------
 [TrueFalse]
 2. Hand hygiene is the single most important practice in reducing infection transmission.
 Answer: True
 Explanation: Hand hygiene is the cornerstone of clinical infection prevention.
 
-Matching Pairs Question
-------------------------
 [Matching]
 3. Match the medical condition with its primary diagnostic indicator:
 Diabetes = Polyuria
@@ -30,8 +24,6 @@ Hypertension = Elevated blood pressure
 Hypothyroidism = Elevated TSH levels
 Explanation: Polyuria is common in diabetes; elevated BP in hypertension; elevated TSH in hypothyroidism.
 
-Sequence / Procedure Ordering
-------------------------------
 [Sequence]
 4. Order the steps for clean dressing change:
 1) Perform hand hygiene
@@ -40,24 +32,17 @@ Sequence / Procedure Ordering
 4) Clean wound site
 Explanation: Hand hygiene must always be done first, followed by glove application, removal, and cleaning.
 
-Jumbled Letters (Vocabulary Unscramble)
-----------------------------------------
 [Jumble]
 5. Unscramble the term representing slow heart rate:
 Word: BRADYCARDIA
 Explanation: Bradycardia refers to a heart rate below 60 beats per minute.
 
-Slider (Numeric Range Question)
---------------------------------
 [Slider]
 6. What temperature defines a fever in Celsius?
 Min: 35  Max: 41  Step: 0.1  Answer: 38
 Unit: °C
 Explanation: A body temperature of 38°C (100.4°F) or above is clinically considered a fever.
 
-Media MCQ (Image/Video/Audio)
-------------------------------
-Specify the exact filename. If importing via ZIP, place files inside a folder named "media".
 [Image]
 7. Identify the anatomical structure indicated:
 Media: heart_diagram.png
@@ -85,9 +70,6 @@ C) High-pitched wheezing
 Answer: C
 Explanation: High-pitched whistling sounds on expiration represent wheezing.
 
-Image CAPTCHA (Visual Target Selection)
-----------------------------------------
-Define the coordinates of the correct bounding box (x, y, width, height as percentages from 0.0 to 1.0).
 [Captcha]
 10. Click on the injection site in the image:
 Media: arm_deltoid.jpg

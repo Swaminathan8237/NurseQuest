@@ -34,6 +34,7 @@
 - [Database Schema](#-database-schema)
 - [Real-Time Events](#-real-time-events-socketio)
 - [Scoring System](#-scoring-system)
+- [Planned Enhancements](#-planned-enhancements)
 - [Deployment](#-deployment)
 - [Contributing](#-contributing)
 - [References](#-references)
@@ -610,6 +611,28 @@ Score = Base Points × Correctness × Time Bonus × Streak Multiplier
 | 5 | 🔴 Charge Nurse | 7,000 |
 | 6 | ⭐ Nurse Supervisor | 12,000 |
 | 7 | 👑 Chief Nurse | 20,000 |
+
+---
+
+## 🔮 Planned Enhancements
+
+### 1. Live Leaderboard & Final Podium Showcase
+*   **Question-by-Question Standings:** Display a real-time leaderboard update after every single question in the multiplayer live game. This boosts competitive drive and helps students see their ranking trajectory in real-time.
+*   **End-of-Game Podium:** Showcase a dedicated, animated podium for the top performers at the conclusion of each live session, celebrating achievements with special visual effects (confetti, custom ranks).
+
+### 2. Instructor Presentation Mode
+*   **Synchronized Display:** A dedicated Presentation Mode designed for classroom projectors or shared screens. Instructors can display questions, videos/images, and choices on the main board while students submit their responses using their personal devices as controllers.
+*   **Interactive Controls:** Pause, play, skip, and display answer distributions dynamically from the presentation dashboard.
+
+### 3. Dedicated Modules Section & Admin Management
+*   **Separated Learning Modules:** Move the learning modules from the main student dashboard into a dedicated sidebar/navigation section (similar to the Leaderboard page).
+*   **Admin Panel & Roles:** Establish an administrative dashboard with full access to create, publish, modify, and delete learning modules and manage user roles (students, teachers, administrators).
+*   **Progression & Locking System:** Implement sequential module progression. Students must successfully complete or pass the current module (e.g. achieve a passing score on the associated quiz) to unlock the subsequent module.
+
+### 4. Multi-Tenant Role Handling (Multiple Instructors & Students)
+*   **Cohort Isolation:** Support for multiple independent doctors and instructors. Teachers will only manage the students and quiz attempts within their own class sections or cohorts.
+*   **Collaborative / Private Quizzes:** Ability to flag quizzes as "private" to a specific instructor or shared across the institution.
+*   **Classroom Management:** Enhanced rosters where instructors can create class sections, invite students, and view section-specific analytics.
 
 ---
 

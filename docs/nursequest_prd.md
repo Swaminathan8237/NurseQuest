@@ -60,6 +60,10 @@
 *   **Design Language:** The platform must use a "Clinical Luminary" design system—employing sleek dark modes, vibrant gradients, and glassmorphism to look premium and distinct from standard learning management systems.
 
 ## 6. Future Roadmap (V2.0 & Beyond)
+*   **Live Leaderboard & Final Podium Showcase:** Real-time leaderboard updates after each question in live games, plus a showcase of top performers on an animated podium.
+*   **Instructor Presentation Mode:** Split view system where instructors project questions and options onto a main screen while students use devices as answer controllers.
+*   **Dedicated Modules & Admin Controls:** Dedicated navigation section for learning modules, an admin panel to manage users/content, and locked module progression (complete current to unlock next).
+*   **Multi-Tenant Role Support:** Independent management of students and quiz rosters by multiple doctors/instructors.
 *   Integration with external LMS platforms (Canvas, Blackboard).
 *   AI-generated clinical scenarios and adaptive difficulty scaling based on student performance.
 *   Advanced 3D anatomical models for interactive exploration.

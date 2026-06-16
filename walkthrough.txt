@@ -1,0 +1,104 @@
+NurseQuest Platform - Feature Enhancement Walkthrough
+=====================================================
+
+This walkthrough outlines the proposed architectural changes, database updates, and user interaction flows for the upcoming NurseQuest platform enhancements.
+
+Table of Contents:
+1. Live Leaderboard & End-of-Game Showcase
+2. Instructor Presentation Mode
+3. Dedicated Modules Section & Admin Management
+4. Multi-Tenant Role Handling (Multiple Instructors & Students)
+
+---------------------------------------------------------
+1. Live Leaderboard & End-of-Game Showcase
+---------------------------------------------------------
+Description:
+Keeps students engaged by showing real-time rankings during multiplayer sessions.
+
+User Interaction Flow:
+- During a live quiz session, after the time expires for a question (or all participants submit their answers), the host clicks "Next" or the server triggers a transition.
+- Before displaying the next question, a "Round Leaderboard" screen is presented to all players showing the top 5 players, their current scores, and visual indicators of who climbed up or down in rank.
+- A personalized message is shown on each student's mobile screen (e.g., "Rank 3 - You're on fire! +850 pts", "Rank 12 - Climbing up!").
+- At the end of the game, a full screen 3D/animated Podium (1st, 2nd, 3rd places) is displayed on the host screen using confetti effects.
+- The student's screen shows their final statistics, badges earned, and absolute rank.
+
+Technical / Database Updates:
+- Socket.IO Events:
+  * Server broadcasts `live-leaderboard` after each question containing the sorted list of top players.
+  * Server broadcasts `final-results` containing the top 3 podium players and their metadata (avatar configuration, name, score) at the game's end.
+- Backend State:
+  * The server-side room object in `socket.js` must maintain a `questionScores` array that resets each round, mapping player IDs to their answers, correctness, response times, and round scores.
+- Database Schema:
+  * The `live_participants` table is updated at the end of each round to persist current cumulative score and rank.
+
+---------------------------------------------------------
+2. Instructor Presentation Mode
+---------------------------------------------------------
+Description:
+Allows instructors to run NurseQuest in a traditional classroom setup where the projector displays the dashboard/questions, and students use their mobile devices or laptops solely to submit answers (no questions displayed on student screens, only colored answer panels or input controls).
+
+User Interaction Flow:
+- Instructor activates "Presentation Mode" when launching a live session.
+- The host view transitions to a high-contrast, large-font screen showing the join code and instructions.
+- Once the game starts, the host view displays the question text, associated media (image/video/audio), and the color-coded answer choices.
+- The student devices act as controllers, rendering 4 large colored buttons (for MCQs) corresponding to the choices on the board, a slider control (for Slider questions), or drag-and-drop lists (for Sequence/Matching questions).
+- The presentation screen displays a live counter of submitted answers and a countdown timer.
+- Once the round ends, the presentation screen displays the answer distribution chart (bar graph) and highlights the correct answer, followed by the Live Leaderboard.
+
+Technical / Database Updates:
+- Frontend Routing:
+  * Create `PresentationHost.jsx` as a specialized full-screen view for the host.
+  * Adjust `LiveGame.jsx` (student side) to detect if the session is in presentation mode and render controller-only UI panels.
+- Socket.IO Events:
+  * Introduce `presentation-state-update` events to synchronize the question details on the host screen while sending only UI structure (buttons, sliders) to students.
+
+---------------------------------------------------------
+3. Dedicated Modules Section & Admin Management
+---------------------------------------------------------
+Description:
+Refactors module management so that learning modules are a first-class, standalone section. Restricts creation and publishing to a new Admin role, and implements structured learning progression (complete one module to unlock the next).
+
+User Interaction Flow:
+- The navigation bar includes a new "Modules" link (separated from the Student Dashboard).
+- Clicking "Modules" displays a grid of curriculum modules (e.g., Module 1: Pharmacology Essentials, Module 2: Pediatric Care).
+- Locked modules are visually grayed out with a lock icon. Hovering shows the prerequisite module.
+- Students must complete all quizzes or read-through tasks within Module N with a passing threshold (e.g., >70% score) to unlock Module N+1.
+- Admin Panel: Users with the `admin` role can access `/admin`, which provides user management (view/edit roles, ban users) and a Module Builder.
+- Admins can create new modules, attach quizzes to them, set the sequential order, and toggle the `is_published` flag.
+
+Technical / Database Updates:
+- Database Schema:
+  * Add `prerequisite_id` to the `modules` table (self-referencing FK).
+  * Add a `user_module_progress` table to track completion status:
+    `CREATE TABLE user_module_progress (user_id INTEGER, module_id INTEGER, status TEXT, completed_at DATETIME, PRIMARY KEY(user_id, module_id))`
+  * Add a new role type `'admin'` to the `users` table check constraint (if any).
+- Backend Routes:
+  * `/api/admin/users`: GET (list all users), PUT (change role/status).
+  * `/api/modules`: Update PUT/POST/DELETE to require `admin` authorization.
+  * `/api/modules/progress`: GET user completion states to calculate which modules are locked.
+
+---------------------------------------------------------
+4. Multi-Tenant Role Handling (Multiple Instructors & Students)
+---------------------------------------------------------
+Description:
+Supports scaling the platform for institutional use where multiple independent doctors/instructors run classes without seeing or interfering with other instructors' cohorts.
+
+User Interaction Flow:
+- Instructors register and are verified under the `'instructor'` (or `'doctor'`) role.
+- Upon login, an instructor can create a "Classroom" (e.g., "NURS-201 Section A").
+- Instructors generate a "Class invite code" for students. Students enter this code to link their accounts to that instructor's class.
+- Instructors only see dashboards, stats, and quiz attempts for students enrolled in their classes.
+- Quizzes can be designated as "Private" (only visible/hostable by the creator) or "Public" (shared across all instructors in the system).
+
+Technical / Database Updates:
+- Database Schema:
+  * Create a `classrooms` table:
+    `CREATE TABLE classrooms (id INTEGER PRIMARY KEY, name TEXT, code TEXT UNIQUE, instructor_id INTEGER)`
+  * Create a `classroom_students` enrollment table:
+    `CREATE TABLE classroom_students (classroom_id INTEGER, student_id INTEGER, enrolled_at DATETIME, PRIMARY KEY(classroom_id, student_id))`
+  * Add `instructor_id` to the `quizzes` table to track ownership.
+  * Add `is_public` boolean to the `quizzes` table.
+- Backend Authorization:
+  * Middleware updates in `backend/middleware/auth.js` to support `isInstructor` or `isAdmin` validations.
+  * Update endpoints like `/api/quizzes` to filter by public status OR matching `instructor_id`.
+  * Update `/api/scores` and student analytics reports to scope data by the instructor's classroom ID.

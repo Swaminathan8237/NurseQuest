@@ -819,8 +819,10 @@ export default function QuizPlayer() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto w-full mt-auto mb-8 relative z-10">
             {question.options.map((opt, i) => {
               const baseColors = ['bg-primary-container', 'bg-[#71d7cd]', 'bg-error', 'bg-[#f59e0b]'];
+              const activeBorderColors = ['border-primary-container', 'border-[#71d7cd]', 'border-error', 'border-[#f59e0b]'];
               const hoverColors = ['group-hover:bg-primary', 'group-hover:bg-[#8ef4e9]', 'group-hover:bg-error-container', 'group-hover:bg-[#fcd34d]'];
               const borderColors = ['hover:border-primary-container/30', 'hover:border-[#71d7cd]/30', 'hover:border-error/30', 'hover:border-[#f59e0b]/30'];
+              const groupHoverBorderColors = ['group-hover:border-primary-container', 'group-hover:border-[#71d7cd]', 'group-hover:border-error', 'group-hover:border-[#f59e0b]'];
               const textColors = ['text-primary', 'text-[#71d7cd]', 'text-error', 'text-[#f59e0b]'];
               const groupTextColors = ['group-hover:text-primary', 'group-hover:text-[#71d7cd]', 'group-hover:text-error', 'group-hover:text-[#f59e0b]'];
               
@@ -837,7 +839,7 @@ export default function QuizPlayer() {
                   key={i}
                   disabled={showAnswer}
                   onClick={() => handleSubmit(opt)}
-                  className={`group relative overflow-hidden rounded-lg bg-surface-container-low text-left transition-all duration-300 transform shadow-[0_8px_32px_0_rgba(11,19,38,0.5)] border animate-slideUp stagger-${(i % 4) + 1} quiz-option-btn ${showAnswer ? '' : 'hover:scale-[1.02]'} ${isFaded ? 'opacity-50 grayscale' : 'opacity-100'} ${isCorrect ? `border-[${baseColors[cIdx].replace('bg-','')}] bg-surface-container-high scale-[1.02] shadow-[0_0_30px_rgba(255,255,255,0.1)] z-10` : isWrong ? 'border-error bg-error/10 animate-shake z-10' : `border-transparent ${borderColors[cIdx]} hover:bg-surface-container`}`}
+                  className={`group relative overflow-hidden rounded-lg bg-surface-container-low text-left transition-all duration-300 transform shadow-[0_8px_32px_0_rgba(11,19,38,0.5)] border animate-slideUp stagger-${(i % 4) + 1} quiz-option-btn ${showAnswer ? '' : 'hover:scale-[1.02]'} ${isFaded ? 'opacity-50 grayscale' : 'opacity-100'} ${isCorrect ? `${activeBorderColors[cIdx]} bg-surface-container-high scale-[1.02] shadow-[0_0_30px_rgba(255,255,255,0.1)] z-10` : isWrong ? 'border-error bg-error/10 animate-shake z-10' : `border-transparent ${borderColors[cIdx]} hover:bg-surface-container`}`}
                 >
                   <div className={`absolute left-0 top-0 bottom-0 w-2 transition-colors ${isCorrect ? baseColors[cIdx] : isWrong ? 'bg-error' : `${baseColors[cIdx]} ${hoverColors[cIdx]}`}`}></div>
                   <div className="p-6 md:p-8 pl-10">
@@ -845,7 +847,7 @@ export default function QuizPlayer() {
                       <span className={`font-display font-bold text-xl md:text-2xl lg:text-3xl pr-4 ${isCorrect ? textColors[cIdx] : isWrong ? 'text-error' : 'text-on-surface'}`}>
                         {opt}
                       </span>
-                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isCorrect ? `border-[${baseColors[cIdx].replace('bg-','')}] ${baseColors[cIdx]} text-surface-container-lowest` : isWrong ? 'border-error bg-error text-surface-container-lowest' : `border-outline-variant group-hover:border-[${baseColors[cIdx].replace('bg-','')}]`}`}>
+                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isCorrect ? `${activeBorderColors[cIdx]} ${baseColors[cIdx]} text-surface-container-lowest` : isWrong ? 'border-error bg-error text-surface-container-lowest' : `border-outline-variant ${groupHoverBorderColors[cIdx]}`}`}>
                         <span className={`font-headline font-bold text-sm ${isCorrect || isWrong ? 'text-surface-container-lowest' : `text-outline-variant ${groupTextColors[cIdx]}`}`}>
                           {isCorrect ? '✓' : isWrong ? '✗' : letters[i]}
                         </span>

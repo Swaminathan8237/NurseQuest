@@ -374,8 +374,14 @@ async function importQuestions() {
   let totalQuizzes = 0;
   let totalQuestions = 0;
 
+  const resolvedDocsDir = path.resolve(DOCS_DIR);
   for (const filename of DOC_FILES) {
-    const filePath = path.join(DOCS_DIR, filename);
+    const filePath = path.normalize(path.join(resolvedDocsDir, filename));
+
+    if (!filePath.startsWith(resolvedDocsDir)) {
+      console.warn(`⚠️ Path traversal warning: skipped ${filename}`);
+      continue;
+    }
 
     if (!fs.existsSync(filePath)) {
       console.warn(`⚠️  File not found, skipping: ${filename}`);

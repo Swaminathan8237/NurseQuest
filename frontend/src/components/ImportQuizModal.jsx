@@ -461,7 +461,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
         description: quizMeta.description,
         category: quizMeta.category,
         difficulty: quizMeta.difficulty,
-        unit: parseInt(quizMeta.unit) || 1,
+        unit: quizMeta.unit === null ? null : (parseInt(quizMeta.unit) || 1),
         timePerQuestion: parseInt(quizMeta.timePerQuestion) || 30,
         moduleId: quizMeta.moduleId || null,
         questions: questions.map(q => {
@@ -604,14 +604,16 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Module</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Unit</label>
                       <select
                         className="w-full bg-surface-container-high border border-outline-variant/30 rounded px-3 py-2 text-sm text-on-surface outline-none"
-                        value={quizMeta.moduleId}
-                        onChange={e => setQuizMeta({ ...quizMeta, moduleId: e.target.value })}
+                        value={quizMeta.unit === null ? 'standalone' : quizMeta.unit}
+                        onChange={e => setQuizMeta({ ...quizMeta, unit: e.target.value === 'standalone' ? null : (parseInt(e.target.value) || 1) })}
                       >
-                        <option value="">No Module (Standalone)</option>
-                        {modules.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+                        <option value="standalone">None (Standalone / Practice)</option>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(u => (
+                          <option key={u} value={u}>Unit {u}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="grid grid-cols-2 gap-2">

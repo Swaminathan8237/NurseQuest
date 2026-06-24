@@ -36,6 +36,11 @@ export default function Navbar() {
           <NavLink to={dashPath} className={navLinkClass}>
             Dashboard
           </NavLink>
+          {isStudent && (
+            <NavLink to="/units" className={navLinkClass}>
+              Units
+            </NavLink>
+          )}
           <NavLink to="/leaderboard" className={navLinkClass}>
             Leaderboard
           </NavLink>

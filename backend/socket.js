@@ -91,7 +91,6 @@ function initializeSocket(io) {
     for (const p of session.participants.values()) {
       const ansInfo = p.answers[session.currentQuestion];
       if (ansInfo && ansInfo.answer !== null) {
-        // Stringify or parse if sequence, but keep simple string tag for MCQ
         let ansKey = ansInfo.answer;
         if (Array.isArray(ansKey)) ansKey = ansKey.join(',');
         else if (ansKey === undefined) ansKey = 'Timeout';
@@ -109,7 +108,7 @@ function initializeSocket(io) {
     });
   }
 
-  function sendNextQuestion(session) {
+  async function sendNextQuestion(session) {
     clearSessionTimers(session);
     session.currentQuestion++;
 
@@ -117,8 +116,12 @@ function initializeSocket(io) {
       const rankings = getRankings(session);
       io.to(session.id).emit('game-over', { rankings });
       session.status = 'finished';
-      const db = getDB();
-      db.prepare("UPDATE live_sessions SET status = ?, ended_at = datetime('now') WHERE id = ?").run('finished', session.id);
+      const sql = getDB();
+      try {
+        await sql`UPDATE live_sessions SET status = 'finished', ended_at = CURRENT_TIMESTAMP WHERE id = ${session.id}`;
+      } catch (err) {
+        console.error('Failed to update live session ended_at:', err);
+      }
       setTimeout(() => liveSessions.delete(session.id), 300000);
       return;
     }
@@ -173,51 +176,55 @@ function initializeSocket(io) {
     console.log('🔌 Client connected:', socket.id);
 
     // Teacher creates a live session
-    socket.on('create-session', (data) => {
-      const db = getDB();
-      const joinCode = generateJoinCode();
-      const sessionId = uuidv4();
+    socket.on('create-session', async (data) => {
+      try {
+        const sql = getDB();
+        const joinCode = generateJoinCode();
+        const sessionId = uuidv4();
 
-      const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ?').get(data.quizId);
-      if (!quiz) return socket.emit('error', { message: 'Quiz not found' });
+        const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${data.quizId}`;
+        const quiz = quizzes[0];
+        if (!quiz) return socket.emit('error', { message: 'Quiz not found' });
 
-      const questions = db.prepare('SELECT * FROM questions WHERE quiz_id = ? ORDER BY order_index').all(data.quizId);
-      questions.forEach(q => {
-        q.options = JSON.parse(q.options || '[]');
-        q.matching_pairs = JSON.parse(q.matching_pairs || '[]');
-      });
+        const questions = await sql`SELECT * FROM questions WHERE quiz_id = ${data.quizId} ORDER BY order_index`;
+        questions.forEach(q => {
+          q.options = JSON.parse(q.options || '[]');
+          q.matching_pairs = JSON.parse(q.matching_pairs || '[]');
+        });
 
-      const session = {
-        id: sessionId,
-        quizId: data.quizId,
-        quizTitle: quiz.title,
-        hostId: data.userId,
-        joinCode,
-        status: 'waiting',
-        currentQuestion: -1,
-        questions,
-        participants: new Map(),
-        timePerQuestion: quiz.time_per_question,
-        questionTimer: null,
-        nextQuestionTimer: null,
-        questionStartedAt: null,
-        questionEndsAt: null,
-        resultsEmittedForQuestion: -1
-      };
+        const session = {
+          id: sessionId,
+          quizId: data.quizId,
+          quizTitle: quiz.title,
+          hostId: data.userId,
+          joinCode,
+          status: 'waiting',
+          currentQuestion: -1,
+          questions,
+          participants: new Map(),
+          timePerQuestion: quiz.time_per_question,
+          questionTimer: null,
+          nextQuestionTimer: null,
+          questionStartedAt: null,
+          questionEndsAt: null,
+          resultsEmittedForQuestion: -1
+        };
 
-      liveSessions.set(sessionId, session);
+        liveSessions.set(sessionId, session);
 
-      // Save to DB
-      db.prepare(`INSERT INTO live_sessions (id, quiz_id, host_id, join_code, status) VALUES (?, ?, ?, ?, ?)`).run(
-        sessionId, data.quizId, data.userId, joinCode, 'waiting'
-      );
+        // Save to DB
+        await sql`INSERT INTO live_sessions (id, quiz_id, host_id, join_code, status) VALUES (${sessionId}, ${data.quizId}, ${data.userId}, ${joinCode}, 'waiting')`;
 
-      socket.join(sessionId);
-      socket.sessionId = sessionId;
-      socket.userId = data.userId;
+        socket.join(sessionId);
+        socket.sessionId = sessionId;
+        socket.userId = data.userId;
 
-      socket.emit('session-created', { sessionId, joinCode, quizTitle: quiz.title, questionCount: questions.length });
-      console.log(`📋 Session created: ${joinCode}`);
+        socket.emit('session-created', { sessionId, joinCode, quizTitle: quiz.title, questionCount: questions.length });
+        console.log(`📋 Session created: ${joinCode}`);
+      } catch (err) {
+        console.error('Create session socket error:', err);
+        socket.emit('error', { message: 'Server error' });
+      }
     });
 
     // Student joins a live session
@@ -263,20 +270,26 @@ function initializeSocket(io) {
     });
 
     // Teacher starts the game
-    socket.on('start-game', () => {
-      const session = liveSessions.get(socket.sessionId);
-      if (!session || session.hostId !== socket.userId) return;
+    socket.on('start-game', async () => {
+      try {
+        const session = liveSessions.get(socket.sessionId);
+        if (!session || session.hostId !== socket.userId) return;
 
-      clearSessionTimers(session);
+        clearSessionTimers(session);
 
-      session.status = 'active';
-      const db = getDB();
-      db.prepare("UPDATE live_sessions SET status = ?, started_at = datetime('now') WHERE id = ?").run('active', session.id);
+        session.status = 'active';
+        const sql = getDB();
+        await sql`UPDATE live_sessions SET status = 'active', started_at = CURRENT_TIMESTAMP WHERE id = ${session.id}`;
 
-      io.to(session.id).emit('game-started', { totalQuestions: session.questions.length });
+        io.to(session.id).emit('game-started', { totalQuestions: session.questions.length });
 
-      // Send first question after 3 second countdown
-      setTimeout(() => sendNextQuestion(session), 3000);
+        // Send first question after 3 second countdown
+        setTimeout(() => {
+          sendNextQuestion(session).catch(err => console.error(err));
+        }, 3000);
+      } catch (err) {
+        console.error('Start game socket error:', err);
+      }
     });
 
     // Student submits answer for live question
@@ -327,6 +340,11 @@ function initializeSocket(io) {
 
         const answeredCount = Array.from(session.participants.values()).filter(p => p.answers[questionIndex] !== undefined).length;
         io.to(session.id).emit('answer-count', { answered: answeredCount, total: session.participants.size });
+
+        if (session.participants.size > 0 && answeredCount === session.participants.size) {
+          clearSessionTimers(session);
+          emitQuestionResults(session);
+        }
         return;
       }
 
@@ -336,15 +354,14 @@ function initializeSocket(io) {
           const userBox = typeof data.answer === 'string' ? JSON.parse(data.answer) : data.answer;
           const correctBox = typeof question.correct_answer === 'string' ? JSON.parse(question.correct_answer) : question.correct_answer;
           if (userBox && correctBox && typeof userBox === 'object' && typeof correctBox === 'object') {
-            // Calculate IoU (Intersection over Union)
             const x1 = Math.max(userBox.x, correctBox.x);
             const y1 = Math.max(userBox.y, correctBox.y);
-            const x2 = Math.min(userBox.x + userBox.w, correctBox.x + correctBox.w);
-            const y2 = Math.min(userBox.y + userBox.h, correctBox.y + correctBox.h);
-            const intersection = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+            const ix2 = Math.min(userBox.x + userBox.w, correctBox.x + correctBox.w);
+            const iy2 = Math.min(userBox.y + userBox.h, correctBox.y + correctBox.h);
+            const intersection = Math.max(0, ix2 - x1) * Math.max(0, iy2 - y1);
             const unionArea = (userBox.w * userBox.h) + (correctBox.w * correctBox.h) - intersection;
             const iou = unionArea > 0 ? intersection / unionArea : 0;
-            isCorrect = iou >= 0.3; // 30% overlap threshold
+            isCorrect = iou >= 0.3;
           }
         } catch { isCorrect = false; }
       } else if (question.type === 'jumbled_sequence') {
@@ -403,6 +420,12 @@ function initializeSocket(io) {
       // Update host with answer count
       const answeredCount = Array.from(session.participants.values()).filter(p => p.answers[questionIndex] !== undefined).length;
       io.to(session.id).emit('answer-count', { answered: answeredCount, total: session.participants.size });
+
+      // If all connected students have answered, transition automatically to results irrespective of the timer
+      if (session.participants.size > 0 && answeredCount === session.participants.size) {
+        clearSessionTimers(session);
+        emitQuestionResults(session);
+      }
     });
 
     // Teacher requests next question or skips
@@ -411,8 +434,16 @@ function initializeSocket(io) {
       if (!session || session.hostId !== socket.userId) return;
 
       clearSessionTimers(session);
-      emitQuestionResults(session);
-      sendNextQuestion(session);
+
+      // If results for the current question haven't been emitted yet,
+      // it means the host clicked "Skip to Results" while playing.
+      // In this case, we only want to emit the results, NOT advance to the next question.
+      if (session.resultsEmittedForQuestion !== session.currentQuestion) {
+        emitQuestionResults(session);
+      } else {
+        // Otherwise, we are on the leaderboard screen and advancing to the next question.
+        sendNextQuestion(session).catch(err => console.error(err));
+      }
     });
 
     socket.on('show-leaderboard', () => {

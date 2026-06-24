@@ -13,36 +13,26 @@ const router = express.Router();
 // Used by both POST / (manual create) and POST /import/confirm
 // Zero SQL duplication.
 
-function insertQuizWithQuestions(db, userId, quizData, questions) {
+async function insertQuizWithQuestions(sql, userId, quizData, questions) {
   const quizId = uuidv4();
-  db.prepare(`INSERT INTO quizzes (id, title, description, category, difficulty, unit, module, time_per_question, created_by, is_published, module_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    quizId,
-    quizData.title,
-    quizData.description || '',
-    quizData.category || 'General Nursing',
-    quizData.difficulty || 'medium',
-    quizData.unit || 1,
-    quizData.module || 'Module 1',
-    quizData.timePerQuestion || 30,
-    userId,
-    quizData.isPublished ? 1 : 0,
-    quizData.moduleId || null
-  );
+  await sql`
+    INSERT INTO quizzes (id, title, description, category, difficulty, unit, module, time_per_question, created_by, is_published, module_id)
+    VALUES (${quizId}, ${quizData.title}, ${quizData.description || ''}, ${quizData.category || 'General Nursing'}, ${quizData.difficulty || 'medium'}, ${quizData.unit === null ? null : (quizData.unit || 1)}, ${quizData.module || 'Module 1'}, ${quizData.timePerQuestion || 30}, ${userId}, ${quizData.isPublished ? 1 : 0}, ${quizData.moduleId || null})
+  `;
 
   if (questions && questions.length > 0) {
-    const insertQ = db.prepare(`INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-
-    questions.forEach((q, i) => {
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
       const matchingPairsJson = q.matchingPairs && (Array.isArray(q.matchingPairs) ? q.matchingPairs.length > 0 : true) ? JSON.stringify(q.matchingPairs) : null;
-      insertQ.run(
-        uuidv4(), quizId, q.type, q.questionText, q.mediaUrl || null,
-        JSON.stringify(q.options || []), q.correctAnswer, q.explanation || '', q.points || 1000, i,
-        q.sliderMin || null, q.sliderMax || null, q.sliderStep || 1, q.sliderUnit || null, matchingPairsJson
-      );
-    });
+      await sql`
+        INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs)
+        VALUES (${uuidv4()}, ${quizId}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1000}, ${i}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
+      `;
+    }
   }
 
-  return db.prepare('SELECT * FROM quizzes WHERE id = ?').get(quizId);
+  const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${quizId}`;
+  return quizzes[0];
 }
 
 // ─── Scoped Multer for Import (memory storage, 10MB max) ────────────
@@ -98,13 +88,11 @@ router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => 
       let mediaFiles = {}; // filename → buffer, for ZIP bundles
 
       if (fileType === 'pdf') {
-        // Lazy-require to avoid pdf-parse startup side-effect
         const pdfParse = require('pdf-parse');
         const pdfData = await pdfParse(buffer);
         text = pdfData.text;
 
       } else if (fileType === 'zip') {
-        // Could be a DOCX or a ZIP bundle with document + media/
         const AdmZip = require('adm-zip');
         const zip = new AdmZip(buffer);
         const entries = zip.getEntries();
@@ -113,7 +101,6 @@ router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => 
         const isDocx = entries.some(e => e.entryName === 'word/document.xml');
 
         if (isDocx) {
-          // Parse as DOCX using mammoth
           const mammoth = require('mammoth');
           const result = await mammoth.extractRawText({ buffer });
           text = result.value;
@@ -126,7 +113,6 @@ router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => 
               if (name.endsWith('.docx') || name.endsWith('.pdf') || name.endsWith('.txt')) {
                 if (!docEntry) docEntry = entry;
               } else if (name.startsWith('media/') || name.includes('/media/')) {
-                // Media file
                 const filename = path.basename(entry.entryName);
                 mediaFiles[filename] = entry.getData();
               }
@@ -164,11 +150,9 @@ router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => 
       const { questions, warnings } = parseQuizText(text);
 
       // Resolve media references from ZIP bundle
-      const resolvedMediaUrls = {};
       if (Object.keys(mediaFiles).length > 0) {
         for (const q of questions) {
           if (q._mediaRef && mediaFiles[q._mediaRef]) {
-            // Push through the existing media upload path
             const mediaBuffer = mediaFiles[q._mediaRef];
             const ext = path.extname(q._mediaRef).toLowerCase();
             let folder = 'uploads/images';
@@ -176,22 +160,24 @@ router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => 
             else if (['.mp3', '.wav', '.ogg', '.m4a'].includes(ext)) folder = 'uploads/audio';
 
             const filename = uuidv4() + ext;
-            const fullPath = path.join(__dirname, '..', folder, filename);
+            const basePath = path.resolve(__dirname, '..', folder);
+            const fullPath = path.normalize(path.join(basePath, filename));
 
-            // Ensure directory exists
+            if (!fullPath.startsWith(basePath)) {
+              throw new Error('Invalid upload path');
+            }
+
             const dir = path.dirname(fullPath);
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
             fs.writeFileSync(fullPath, mediaBuffer);
             const url = `/${folder}/${filename}`;
             q.mediaUrl = url;
-            resolvedMediaUrls[q._mediaRef] = url;
             delete q._mediaRef;
           }
         }
       }
 
-      // Clean up _mediaRef flags (for questions where media wasn't resolved)
       for (const q of questions) {
         if (q._mediaRef) {
           q._unresolvedMedia = q._mediaRef;
@@ -199,7 +185,6 @@ router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => 
         }
       }
 
-      // Derive a title from the filename
       const originalName = req.file.originalname || 'Imported Quiz';
       const suggestedTitle = originalName.replace(/\.(pdf|docx|zip|txt)$/i, '').replace(/[_-]/g, ' ');
 
@@ -220,7 +205,7 @@ router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => 
 // ─── POST /import/confirm — Save previewed import ───────────────────
 // Accepts edited preview, validates, and persists using insertQuizWithQuestions.
 
-router.post('/import/confirm', authenticateToken, requireRole('teacher'), (req, res) => {
+router.post('/import/confirm', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
     const { title, description, category, difficulty, unit, timePerQuestion, questions, moduleId } = req.body;
 
@@ -231,7 +216,6 @@ router.post('/import/confirm', authenticateToken, requireRole('teacher'), (req, 
       return res.status(400).json({ error: 'At least one question is required.' });
     }
 
-    // Per-type validation — uses normalize() to match grading logic
     const validTypes = ['mcq', 'image', 'video', 'audio', 'jumbled_letters', 'jumbled_sequence', 'slider', 'matching', 'captcha'];
     const errors = [];
 
@@ -248,7 +232,6 @@ router.post('/import/confirm', authenticateToken, requireRole('teacher'), (req, 
         return;
       }
 
-      // Type-specific validation
       switch (q.type) {
         case 'mcq':
         case 'image':
@@ -259,12 +242,10 @@ router.post('/import/confirm', authenticateToken, requireRole('teacher'), (req, 
             errors.push(`${qLabel}: Needs at least 2 options.`);
             break;
           }
-          // Normalized matching — same as grading in scores.js
           const hasMatch = opts.some(o => normalize(o) === normalize(q.correctAnswer));
           if (!hasMatch) {
             errors.push(`${qLabel}: Answer "${q.correctAnswer}" does not match any option.`);
           }
-          // Media types must have a URL
           if (['image', 'video', 'audio'].includes(q.type) && !q.mediaUrl) {
             errors.push(`${qLabel}: ${q.type} question requires a media file. Please attach one.`);
           }
@@ -314,7 +295,6 @@ router.post('/import/confirm', authenticateToken, requireRole('teacher'), (req, 
           if (!q.mediaUrl) {
             errors.push(`${qLabel}: Captcha requires an image. Please attach one.`);
           }
-          // Box is always editable in preview, but warn if empty
           if (!q.correctAnswer || q.correctAnswer === '' || q.correctAnswer === '{}') {
             errors.push(`${qLabel}: Captcha requires a correct region (box). Please draw one.`);
           }
@@ -327,9 +307,8 @@ router.post('/import/confirm', authenticateToken, requireRole('teacher'), (req, 
       return res.status(400).json({ error: 'Validation failed.', details: errors });
     }
 
-    // All valid — persist using the shared insert function
-    const db = getDB();
-    const quiz = insertQuizWithQuestions(db, req.user.id, {
+    const sql = getDB();
+    const quiz = await insertQuizWithQuestions(sql, req.user.id, {
       title, description, category, difficulty, unit, timePerQuestion, moduleId, isPublished: false,
     }, questions);
 
@@ -343,17 +322,25 @@ router.post('/import/confirm', authenticateToken, requireRole('teacher'), (req, 
 
 // ─── GET /my-quizzes — Teacher's own quizzes ────────────────────────
 
-router.get('/my-quizzes', authenticateToken, requireRole('teacher'), (req, res) => {
+router.get('/my-quizzes', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
-    const db = getDB();
-    const quizzes = db.prepare(`
+    const sql = getDB();
+    const quizzesResult = await sql`
       SELECT q.*, m.title as module_title,
         (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count,
         (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = q.id) as attempt_count,
         (SELECT COALESCE(AVG(score * 100.0 / NULLIF(total_points, 0)), 0) FROM quiz_attempts WHERE quiz_id = q.id) as avg_score
       FROM quizzes q LEFT JOIN modules m ON q.module_id = m.id
-      WHERE q.created_by = ? ORDER BY q.created_at DESC
-    `).all(req.user.id);
+      WHERE q.created_by = ${req.user.id} ORDER BY q.created_at DESC
+    `;
+
+    const quizzes = quizzesResult.map(q => ({
+      ...q,
+      question_count: parseInt(q.question_count || 0, 10),
+      attempt_count: parseInt(q.attempt_count || 0, 10),
+      avg_score: parseFloat(q.avg_score || 0),
+    }));
+
     res.json(quizzes);
   } catch (err) {
     console.error('Get my quizzes error:', err);
@@ -363,37 +350,50 @@ router.get('/my-quizzes', authenticateToken, requireRole('teacher'), (req, res) 
 
 // ─── GET / — All published quizzes ──────────────────────────────────
 
-router.get('/', authenticateToken, (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const db = getDB();
+    const sql = getDB();
     const { unit, category, difficulty, module_id } = req.query;
     
-    let query = `SELECT q.*, u.name as creator_name, m.title as module_title, m.icon as module_icon, m.color as module_color,
-      (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count
+    const unitVal = unit ? parseInt(unit, 10) : null;
+    const catVal = category || null;
+    const diffVal = difficulty || null;
+    const modVal = module_id || null;
+
+    const quizzesResult = await sql`
+      SELECT q.*, u.name as creator_name, m.title as module_title, m.icon as module_icon, m.color as module_color,
+        (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count
       FROM quizzes q JOIN users u ON q.created_by = u.id
       LEFT JOIN modules m ON q.module_id = m.id
-      WHERE q.is_published = 1`;
-    const params = [];
-
-    if (unit) { query += ' AND q.unit = ?'; params.push(unit); }
-    if (category) { query += ' AND q.category = ?'; params.push(category); }
-    if (difficulty) { query += ' AND q.difficulty = ?'; params.push(difficulty); }
-    if (module_id) { query += ' AND q.module_id = ?'; params.push(module_id); }
-
-    query += ' ORDER BY q.created_at DESC';
+      WHERE q.is_published = 1
+        AND (${unitVal}::integer IS NULL OR q.unit = ${unitVal})
+        AND (${catVal}::text IS NULL OR q.category = ${catVal})
+        AND (${diffVal}::text IS NULL OR q.difficulty = ${diffVal})
+        AND (${modVal}::text IS NULL OR q.module_id = ${modVal})
+      ORDER BY q.created_at DESC
+    `;
     
-    const quizzes = db.prepare(query).all(...params);
+    const quizzes = quizzesResult.map(q => ({
+      ...q,
+      question_count: parseInt(q.question_count || 0, 10)
+    }));
     
     // Add attempt info for students
     if (req.user.role === 'student') {
-      quizzes.forEach(quiz => {
-        const attempt = db.prepare(`
+      for (const quiz of quizzes) {
+        const attemptResult = await sql`
           SELECT score, total_points, correct_count, total_questions, completed_at
-          FROM quiz_attempts WHERE quiz_id = ? AND user_id = ?
+          FROM quiz_attempts WHERE quiz_id = ${quiz.id} AND user_id = ${req.user.id}
           ORDER BY completed_at DESC LIMIT 1
-        `).get(quiz.id, req.user.id);
-        quiz.lastAttempt = attempt || null;
-      });
+        `;
+        quiz.lastAttempt = attemptResult[0] || null;
+
+        const bestAttemptResult = await sql`
+          SELECT MAX(correct_count * 100.0 / total_questions) as max_score_pct
+          FROM quiz_attempts WHERE quiz_id = ${quiz.id} AND user_id = ${req.user.id}
+        `;
+        quiz.bestScorePercent = bestAttemptResult[0] ? parseFloat(bestAttemptResult[0].max_score_pct || 0) : 0;
+      }
     }
 
     res.json(quizzes);
@@ -405,17 +405,36 @@ router.get('/', authenticateToken, (req, res) => {
 
 // ─── GET /:id — Single quiz with questions ──────────────────────────
 
-router.get('/:id', authenticateToken, (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const db = getDB();
-    const quiz = db.prepare(`
+    const sql = getDB();
+    const quizzes = await sql`
       SELECT q.*, u.name as creator_name FROM quizzes q
-      JOIN users u ON q.created_by = u.id WHERE q.id = ?
-    `).get(req.params.id);
+      JOIN users u ON q.created_by = u.id WHERE q.id = ${req.params.id}
+    `;
+    const quiz = quizzes[0];
 
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
 
-    const questions = db.prepare('SELECT * FROM questions WHERE quiz_id = ? ORDER BY order_index').all(req.params.id);
+    // Enforce lock validation for students on Unit-Based learning path
+    if (req.user.role === 'student' && quiz.unit && quiz.unit > 1 && quiz.unit <= 11) {
+      const prevQuizzes = await sql`
+        SELECT id, unit FROM quizzes WHERE unit < ${quiz.unit} AND is_published = 1 ORDER BY unit DESC LIMIT 1
+      `;
+      const prevQuiz = prevQuizzes[0];
+      if (prevQuiz) {
+        const bestAttempts = await sql`
+          SELECT MAX(correct_count * 100.0 / total_questions) as max_score_pct 
+          FROM quiz_attempts WHERE quiz_id = ${prevQuiz.id} AND user_id = ${req.user.id}
+        `;
+        const scorePct = bestAttempts[0] ? parseFloat(bestAttempts[0].max_score_pct || 0) : 0;
+        if (scorePct < 75) {
+          return res.status(403).json({ error: `Unit ${quiz.unit} is locked. You must score at least 75% on Unit ${prevQuiz.unit} to unlock.` });
+        }
+      }
+    }
+
+    const questions = await sql`SELECT * FROM questions WHERE quiz_id = ${req.params.id} ORDER BY order_index`;
     
     // Parse JSON fields
     questions.forEach(q => {
@@ -434,11 +453,12 @@ router.get('/:id', authenticateToken, (req, res) => {
 
 router.get('/:id/export', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
-    const db = getDB();
-    const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND created_by = ?').get(req.params.id, req.user.id);
+    const sql = getDB();
+    const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id} AND created_by = ${req.user.id}`;
+    const quiz = quizzes[0];
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
 
-    const questions = db.prepare('SELECT * FROM questions WHERE quiz_id = ? ORDER BY order_index').all(req.params.id);
+    const questions = await sql`SELECT * FROM questions WHERE quiz_id = ${req.params.id} ORDER BY order_index`;
     questions.forEach(q => {
       q.options = JSON.parse(q.options || '[]');
       q.matching_pairs = JSON.parse(q.matching_pairs || '[]');
@@ -453,23 +473,20 @@ router.get('/:id/export', authenticateToken, requireRole('teacher'), async (req,
       return res.json({ quiz, questions });
     }
 
-    // Generate text using shared FORMAT constants
     const textContent = quizToText(questions);
 
     if (format === 'zip') {
-      // ZIP bundle: DOCX + media files
       const AdmZip = require('adm-zip');
       const zip = new AdmZip();
 
-      // Generate DOCX for the quiz text
       const docxBuffer = await generateDocxBuffer(quiz.title, textContent);
       zip.addFile('quiz.docx', docxBuffer);
 
-      // Add media files
+      const uploadsDir = path.resolve(__dirname, '..', 'uploads');
       for (const q of questions) {
         if (q.media_url && q.media_url.startsWith('/uploads/')) {
-          const filePath = path.join(__dirname, '..', q.media_url);
-          if (fs.existsSync(filePath)) {
+          const filePath = path.normalize(path.join(__dirname, '..', q.media_url));
+          if (filePath.startsWith(uploadsDir) && fs.existsSync(filePath)) {
             const filename = path.basename(filePath);
             zip.addFile(`media/${filename}`, fs.readFileSync(filePath));
           }
@@ -482,7 +499,6 @@ router.get('/:id/export', authenticateToken, requireRole('teacher'), async (req,
       return res.send(zipBuffer);
     }
 
-    // Default: DOCX
     const docxBuffer = await generateDocxBuffer(quiz.title, textContent);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename="${safeTitle}.docx"`);
@@ -504,10 +520,9 @@ async function generateDocxBuffer(title, textContent) {
       text: title,
       heading: HeadingLevel.HEADING_1,
     }),
-    new Paragraph({ text: '' }), // blank line
+    new Paragraph({ text: '' }),
   ];
 
-  // Convert each line of text content into a paragraph
   const lines = textContent.split('\n');
   for (const line of lines) {
     paragraphs.push(new Paragraph({
@@ -527,12 +542,12 @@ async function generateDocxBuffer(title, textContent) {
 
 // ─── POST / — Create quiz (teacher only) ────────────────────────────
 
-router.post('/', authenticateToken, requireRole('teacher'), (req, res) => {
+router.post('/', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
     const { title, description, category, difficulty, unit, module, timePerQuestion, questions, moduleId } = req.body;
-    const db = getDB();
+    const sql = getDB();
 
-    const quiz = insertQuizWithQuestions(db, req.user.id, {
+    const quiz = await insertQuizWithQuestions(sql, req.user.id, {
       title, description, category, difficulty, unit, module, timePerQuestion, moduleId, isPublished: false,
     }, questions);
 
@@ -545,35 +560,40 @@ router.post('/', authenticateToken, requireRole('teacher'), (req, res) => {
 
 // ─── PUT /:id — Update quiz ─────────────────────────────────────────
 
-router.put('/:id', authenticateToken, requireRole('teacher'), (req, res) => {
+router.put('/:id', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
     const { title, description, category, difficulty, unit, module, timePerQuestion, isPublished, questions, moduleId } = req.body;
-    const db = getDB();
+    const sql = getDB();
 
-    const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND created_by = ?').get(req.params.id, req.user.id);
+    const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id} AND created_by = ${req.user.id}`;
+    const quiz = quizzes[0];
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
 
-    db.prepare(`UPDATE quizzes SET title = ?, description = ?, category = ?, difficulty = ?, unit = ?, module = ?, time_per_question = ?, is_published = ?, module_id = ? WHERE id = ?`).run(
-      title || quiz.title, description ?? quiz.description, category || quiz.category,
-      difficulty || quiz.difficulty, unit || quiz.unit, module || quiz.module,
-      timePerQuestion || quiz.time_per_question, isPublished !== undefined ? (isPublished ? 1 : 0) : quiz.is_published,
-      moduleId !== undefined ? (moduleId || null) : quiz.module_id,
-      req.params.id
-    );
+    await sql`
+      UPDATE quizzes 
+      SET title = ${title || quiz.title}, 
+          description = ${description ?? quiz.description}, 
+          category = ${category || quiz.category}, 
+          difficulty = ${difficulty || quiz.difficulty}, 
+          unit = ${unit === null ? null : (unit || quiz.unit)}, 
+          module = ${module || quiz.module}, 
+          time_per_question = ${timePerQuestion || quiz.time_per_question}, 
+          is_published = ${isPublished !== undefined ? (isPublished ? 1 : 0) : quiz.is_published}, 
+          module_id = ${moduleId !== undefined ? (moduleId || null) : quiz.module_id} 
+      WHERE id = ${req.params.id}
+    `;
 
     // Update questions if provided
     if (questions) {
-      db.prepare('DELETE FROM questions WHERE quiz_id = ?').run(req.params.id);
-      const insertQ = db.prepare(`INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      
-      questions.forEach((q, i) => {
+      await sql`DELETE FROM questions WHERE quiz_id = ${req.params.id}`;
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
         const matchingPairsJson = q.matchingPairs && q.matchingPairs.length > 0 ? JSON.stringify(q.matchingPairs) : null;
-        insertQ.run(
-          uuidv4(), req.params.id, q.type, q.questionText, q.mediaUrl || null,
-          JSON.stringify(q.options || []), q.correctAnswer, q.explanation || '', q.points || 1000, i,
-          q.sliderMin || null, q.sliderMax || null, q.sliderStep || 1, q.sliderUnit || null, matchingPairsJson
-        );
-      });
+        await sql`
+          INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs) 
+          VALUES (${uuidv4()}, ${req.params.id}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1000}, ${i}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
+        `;
+      }
     }
 
     res.json({ success: true });
@@ -585,15 +605,16 @@ router.put('/:id', authenticateToken, requireRole('teacher'), (req, res) => {
 
 // ─── DELETE /:id — Delete quiz ──────────────────────────────────────
 
-router.delete('/:id', authenticateToken, requireRole('teacher'), (req, res) => {
+router.delete('/:id', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
-    const db = getDB();
-    const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ? AND created_by = ?').get(req.params.id, req.user.id);
+    const sql = getDB();
+    const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id} AND created_by = ${req.user.id}`;
+    const quiz = quizzes[0];
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
 
-    db.prepare('DELETE FROM questions WHERE quiz_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM quiz_attempts WHERE quiz_id = ?').run(req.params.id);
-    db.prepare('DELETE FROM quizzes WHERE id = ?').run(req.params.id);
+    await sql`DELETE FROM questions WHERE quiz_id = ${req.params.id}`;
+    await sql`DELETE FROM quiz_attempts WHERE quiz_id = ${req.params.id}`;
+    await sql`DELETE FROM quizzes WHERE id = ${req.params.id}`;
 
     res.json({ success: true });
   } catch (err) {

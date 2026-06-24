@@ -7,10 +7,10 @@ const { generateToken, authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 
 // Register
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   try {
     const { email, password, name, role, avatarConfig } = req.body;
-    const db = getDB();
+    const sql = getDB();
 
     if (!email || !password || !name || !role) {
       return res.status(400).json({ error: 'All fields are required' });
@@ -21,19 +21,18 @@ router.post('/register', (req, res) => {
     }
 
     // Check if email already exists
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-    if (existing) {
+    const existingUsers = await sql`SELECT id FROM users WHERE email = ${email}`;
+    if (existingUsers.length > 0) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
     const hashedPassword = bcrypt.hashSync(password, 10);
     const id = uuidv4();
 
-    db.prepare(`INSERT INTO users (id, email, password, name, role, avatar_config) VALUES (?, ?, ?, ?, ?, ?)`).run(
-      id, email, hashedPassword, name, role, JSON.stringify(avatarConfig || {})
-    );
+    await sql`INSERT INTO users (id, email, password, name, role, avatar_config) VALUES (${id}, ${email}, ${hashedPassword}, ${name}, ${role}, ${JSON.stringify(avatarConfig || {})})`;
 
-    const user = db.prepare('SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ?').get(id);
+    const users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${id}`;
+    const user = users[0];
     const token = generateToken(user);
 
     res.status(201).json({
@@ -50,16 +49,17 @@ router.post('/register', (req, res) => {
 });
 
 // Login
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const db = getDB();
+    const sql = getDB();
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const users = await sql`SELECT * FROM users WHERE email = ${email}`;
+    const user = users[0];
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -70,7 +70,7 @@ router.post('/login', (req, res) => {
     }
 
     // Update last_active
-    db.prepare("UPDATE users SET last_active = datetime('now') WHERE id = ?").run(user.id);
+    await sql`UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
 
     const token = generateToken(user);
 
@@ -94,28 +94,37 @@ router.post('/login', (req, res) => {
 });
 
 // Get current user profile
-router.get('/me', authenticateToken, (req, res) => {
+router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const db = getDB();
-    const user = db.prepare('SELECT id, email, name, role, avatar_config, xp, level, streak, created_at FROM users WHERE id = ?').get(req.user.id);
+    const sql = getDB();
+    const users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak, created_at FROM users WHERE id = ${req.user.id}`;
+    const user = users[0];
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     // Get achievements
-    const achievements = db.prepare(`
+    const achievements = await sql`
       SELECT a.*, ua.earned_at FROM user_achievements ua
       JOIN achievements a ON a.id = ua.achievement_id
-      WHERE ua.user_id = ?
-    `).all(req.user.id);
+      WHERE ua.user_id = ${req.user.id}
+    `;
 
     // Get quiz stats
-    const stats = db.prepare(`
+    const statsResult = await sql`
       SELECT 
         COUNT(*) as quizzes_taken,
         COALESCE(AVG(score * 100.0 / NULLIF(total_points, 0)), 0) as avg_score,
         COALESCE(MAX(streak_max), 0) as best_streak,
         COALESCE(SUM(score), 0) as total_score
-      FROM quiz_attempts WHERE user_id = ?
-    `).get(req.user.id);
+      FROM quiz_attempts WHERE user_id = ${req.user.id}
+    `;
+    
+    const statsRow = statsResult[0] || {};
+    const stats = {
+      quizzes_taken: parseInt(statsRow.quizzes_taken || 0, 10),
+      avg_score: parseFloat(statsRow.avg_score || 0),
+      best_streak: parseInt(statsRow.best_streak || 0, 10),
+      total_score: parseInt(statsRow.total_score || 0, 10)
+    };
 
     res.json({
       ...user,
@@ -130,11 +139,11 @@ router.get('/me', authenticateToken, (req, res) => {
 });
 
 // Update avatar
-router.put('/avatar', authenticateToken, (req, res) => {
+router.put('/avatar', authenticateToken, async (req, res) => {
   try {
     const { avatarConfig } = req.body;
-    const db = getDB();
-    db.prepare('UPDATE users SET avatar_config = ? WHERE id = ?').run(JSON.stringify(avatarConfig), req.user.id);
+    const sql = getDB();
+    await sql`UPDATE users SET avatar_config = ${JSON.stringify(avatarConfig)} WHERE id = ${req.user.id}`;
     res.json({ success: true, avatarConfig });
   } catch (err) {
     console.error('Avatar update error:', err);

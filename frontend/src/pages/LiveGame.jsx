@@ -1,10 +1,14 @@
-import { useState, useEffect, memo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, memo, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
 import { quizAPI } from '../api';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
+import { gsap } from 'gsap';
+import { Flip } from 'gsap/Flip';
+
+gsap.registerPlugin(Flip);
 
 let socket = null;
 
@@ -83,6 +87,144 @@ const renderCorrectAnswer = (correctVal) => {
   // Fallback for plain text
   return <span className="font-display font-bold text-on-surface text-lg">{parsed.toString()}</span>;
 };
+
+const RankingsList = memo(({ rankings, variant = 'sidebar', currentUserId }) => {
+  const containerRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+    
+    // Capture the current layout state of all ranking items
+    const state = Flip.getState(containerRef.current.querySelectorAll('.ranking-item'), {
+      props: "transform,opacity",
+      simple: true
+    });
+    
+    // Run the flip animation from the previous state
+    Flip.from(state, {
+      duration: 0.5,
+      ease: "power2.out",
+      absolute: true,
+      scale: false,
+    });
+  }, [rankings]);
+
+  if (variant === 'sidebar') {
+    return (
+      <div ref={containerRef} className="space-y-2 relative">
+        {rankings.slice(0, 10).map((r, i) => {
+          const isMe = r.id === currentUserId;
+          const topColors = ['bg-[#FFD700]', 'bg-[#C0C0C0]', 'bg-[#CD7F32]'];
+          const topTextColors = ['text-[#FFD700]', 'text-[#C0C0C0]', 'text-[#CD7F32]'];
+          const rankColor = i < 3 ? topColors[i] : 'bg-surface-variant';
+          const rankTextColor = i < 3 ? topTextColors[i] : 'text-on-surface-variant';
+
+          return (
+            <div 
+              key={r.id} 
+              data-flip-id={r.id}
+              className={`ranking-item flex items-center p-3 rounded-lg relative overflow-hidden transition-all ${isMe ? 'bg-surface-variant/50 border border-primary/30 shadow-[0_0_12px_rgba(0,229,255,0.15)] my-4' : 'bg-surface-container hover:bg-surface-container-high'}`}
+            >
+              <div className={`absolute left-0 top-0 bottom-0 w-1 ${isMe ? 'bg-primary' : rankColor}`}></div>
+              <div className={`w-8 font-mono text-sm pl-2 ${isMe ? 'text-primary font-bold' : rankTextColor}`}>
+                {i + 1 < 10 ? `0${i + 1}` : i + 1}
+              </div>
+              <div className={`flex-1 font-body text-sm truncate ${isMe ? 'font-bold text-primary' : 'font-medium text-on-surface'} flex items-center gap-2`}>
+                <span className="truncate">{r.name} {isMe && '(You)'}</span>
+                {r.streak > 1 && (
+                  <span className="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-1.5 py-0.5 rounded text-[9px] font-black flex items-center gap-0.5 animate-pulse shrink-0">
+                    🔥 {r.streak}
+                  </span>
+                )}
+              </div>
+              <div className={`font-mono text-sm mr-3 shrink-0 ${isMe ? 'text-primary' : 'text-on-surface-variant'}`}>
+                {r.score?.toLocaleString() || 0}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (variant === 'interim') {
+    return (
+      <div ref={containerRef} className="w-full max-w-3xl flex flex-col gap-4 z-10 relative">
+        {rankings.slice(0, 5).map((r, i) => {
+          const isMe = r.id === currentUserId;
+          const topColors = ['bg-[#FFD700]', 'bg-[#C0C0C0]', 'bg-[#CD7F32]'];
+          const rankColor = i < 3 ? topColors[i] : 'bg-surface-variant';
+
+          return (
+            <div 
+              key={r.id} 
+              data-flip-id={r.id}
+              className={`ranking-item flex items-center p-4 rounded-xl border transition-all ${isMe ? 'bg-primary/10 border-primary/50 shadow-[0_0_20px_rgba(0,229,255,0.2)] scale-[1.02]' : 'bg-surface-container border-outline-variant/20'}`}
+            >
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center font-display font-black text-xl mr-4 shrink-0 ${isMe ? 'bg-primary text-on-primary' : (i < 3 ? `${rankColor} text-surface-container-lowest` : 'bg-surface-variant text-on-surface')}`}>
+                {i + 1}
+              </div>
+              <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-surface-container-high bg-surface-container-lowest mr-4 shrink-0">
+                <Avatar config={r.avatarConfig} size={48} showBg={false} />
+              </div>
+              <div className={`flex-1 font-display text-xl truncate ${isMe ? 'font-bold text-primary' : 'font-semibold text-on-surface'} flex items-center gap-3`}>
+                <span className="truncate">{r.name}</span>
+                {isMe && <span className="text-xs bg-primary text-on-primary px-2 py-0.5 rounded-sm uppercase tracking-widest shrink-0">You</span>}
+                {r.streak > 1 && (
+                  <span className="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded text-xs font-black flex items-center gap-1 animate-pulse shrink-0">
+                    🔥 {r.streak}
+                  </span>
+                )}
+              </div>
+              <div className={`font-mono text-2xl ml-4 shrink-0 ${isMe ? 'text-primary font-bold drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]' : 'text-on-surface-variant'}`}>
+                {r.score?.toLocaleString()}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (variant === 'final') {
+    return (
+      <div ref={containerRef} className="w-full max-w-4xl flex flex-col gap-4 z-10 relative">
+        {rankings.map((r, i) => {
+          const isMe = r.id === currentUserId;
+          const medals = ['🥇', '🥈', '🥉'];
+
+          return (
+            <div 
+              key={r.id} 
+              data-flip-id={r.id}
+              className={`ranking-item flex items-center p-5 rounded-2xl border transition-all ${isMe ? 'bg-primary/10 border-primary/50 shadow-[0_0_20px_rgba(0,229,255,0.2)] scale-[1.02]' : 'bg-surface-container border-outline-variant/20'}`}
+            >
+              <div className="w-16 font-display text-3xl text-center shrink-0">
+                {i < 3 ? medals[i] : <span className="text-xl font-mono text-on-surface-variant">#{i+1}</span>}
+              </div>
+              <div className={`w-14 h-14 rounded-full overflow-hidden border-2 bg-surface-container-lowest mr-6 shrink-0 ${i === 0 ? 'border-[#FFD700]' : i === 1 ? 'border-[#C0C0C0]' : i === 2 ? 'border-[#CD7F32]' : 'border-surface-container-high'}`}>
+                <Avatar config={r.avatarConfig} size={56} showBg={true} />
+              </div>
+              <div className={`flex-1 font-display text-2xl truncate ${isMe ? 'font-bold text-primary' : 'font-semibold text-on-surface'} flex items-center gap-3`}>
+                <span className="truncate">{r.name}</span>
+                {r.streak > 1 && (
+                  <span className="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded text-sm font-black flex items-center gap-1 animate-pulse shrink-0">
+                    🔥 {r.streak}
+                  </span>
+                )}
+              </div>
+              <div className={`font-mono text-3xl ml-4 shrink-0 ${i === 0 ? 'text-[#FFD700] font-bold drop-shadow-[0_0_8px_rgba(255,215,0,0.5)]' : isMe ? 'text-primary font-bold' : 'text-on-surface-variant'}`}>
+                {r.score?.toLocaleString()} <span className="text-sm opacity-50">PTS</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return null;
+});
 
 export default function LiveGame() {
   const { user } = useAuth();
@@ -1158,26 +1300,7 @@ export default function LiveGame() {
               <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-1 rounded">{participants.length} PLYRS</span>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {activeRankings.slice(0, 10).map((r, i) => {
-                const isMe = r.id === user?.id;
-                const topColors = ['bg-[#FFD700]', 'bg-[#C0C0C0]', 'bg-[#CD7F32]'];
-                const rankColor = i < 3 ? topColors[i] : 'bg-surface-variant';
-                
-                return (
-                  <div key={r.id} className={`flex items-center p-3 rounded-lg relative overflow-hidden transition-all ${isMe ? 'bg-surface-variant/50 border border-primary/30 shadow-[0_0_12px_rgba(0,229,255,0.15)] my-4' : 'bg-surface-container hover:bg-surface-container-high'}`}>
-                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${isMe ? 'bg-primary' : rankColor}`}></div>
-                    <div className={`w-8 font-mono text-sm pl-2 ${isMe ? 'text-primary font-bold' : (i < 3 ? `text-[${rankColor.replace('bg-[', '').replace(']', '')}]` : 'text-on-surface-variant')}`}>
-                      {i + 1 < 10 ? `0${i + 1}` : i + 1}
-                    </div>
-                    <div className={`flex-1 font-body text-sm truncate ${isMe ? 'font-bold text-primary' : 'font-medium text-on-surface'}`}>
-                      {r.name} {isMe && '(You)'}
-                    </div>
-                    <div className={`font-mono text-sm mr-3 ${isMe ? 'text-primary' : 'text-on-surface-variant'}`}>
-                      {r.score?.toLocaleString() || 0}
-                    </div>
-                  </div>
-                );
-              })}
+              <RankingsList rankings={activeRankings} variant="sidebar" currentUserId={user?.id} />
             </div>
           </aside>
         </main>
@@ -1206,72 +1329,105 @@ export default function LiveGame() {
   if (phase === 'answer-reveal' && answerRevealData) {
     const { correctAnswer, distribution } = answerRevealData;
     const isStudent = !isTeacher;
+    const activeRankings = answerRevealData.rankings || [];
 
     return (
       <div className="bg-surface-container-lowest text-on-surface font-body min-h-screen flex flex-col overflow-hidden">
         <TopBar />
-        <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 relative overflow-y-auto w-full">
-          <div className="max-w-4xl w-full flex flex-col gap-8">
-            <div className="text-center">
-              <h1 className="text-3xl md:text-5xl font-display font-black text-primary drop-shadow-[0_0_10px_rgba(0,229,255,0.4)] mb-2">Answer Reveal</h1>
-              <p className="text-on-surface-variant font-mono">Let's see how everyone did</p>
-            </div>
-
-            <div className="bg-surface-container p-8 rounded-2xl border border-outline-variant/30 text-center relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-2 bg-tertiary-fixed-dim"></div>
-              <h2 className="font-headline text-sm tracking-widest text-on-surface-variant uppercase mb-4">Correct Answer</h2>
-              <div className="text-2xl md:text-4xl font-display font-bold text-on-surface">
-                {renderCorrectAnswer(correctAnswer)}
+        <main className="flex-1 flex overflow-hidden">
+          {/* Main Answer Reveal (Left) */}
+          <section className="flex-[7] flex flex-col p-6 lg:p-12 gap-8 overflow-y-auto relative z-10 w-full">
+            <div className="max-w-4xl w-full mx-auto flex flex-col gap-8">
+              <div className="text-center">
+                <h1 className="text-3xl md:text-5xl font-display font-black text-primary drop-shadow-[0_0_10px_rgba(0,229,255,0.4)] mb-2">Answer Reveal</h1>
+                <p className="text-on-surface-variant font-mono">Let's see how everyone did</p>
               </div>
-            </div>
 
-            {isTeacher && (
-              <div className="bg-surface-variant/30 p-8 rounded-2xl border border-outline-variant/20">
-                <h3 className="font-headline text-lg font-bold text-on-surface mb-6 uppercase tracking-wider">Class Responses</h3>
-                <div className="flex flex-col gap-4">
-                  {Object.entries(distribution || {}).map(([ans, count]) => {
-                    const pct = Math.max(0, (count / Math.max(1, answerCount.total)) * 100);
-                    const isCorrect = typeof correctAnswer === 'string' ? ans === correctAnswer : false; // simplified
-                    return (
-                      <div key={ans} className="flex flex-col gap-1">
-                        <div className="flex justify-between text-sm font-mono text-on-surface-variant">
-                          <span className="truncate max-w-[70%]">{ans}</span>
-                          <span>{count} ({Math.round(pct)}%)</span>
+              <div className="bg-surface-container p-8 rounded-2xl border border-outline-variant/30 text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-tertiary-fixed-dim"></div>
+                <h2 className="font-headline text-sm tracking-widest text-on-surface-variant uppercase mb-4">Correct Answer</h2>
+                <div className="text-2xl md:text-4xl font-display font-bold text-on-surface">
+                  {renderCorrectAnswer(correctAnswer)}
+                </div>
+              </div>
+
+              {isTeacher && (
+                <div className="bg-surface-variant/30 p-8 rounded-2xl border border-outline-variant/20">
+                  <h3 className="font-headline text-lg font-bold text-on-surface mb-6 uppercase tracking-wider">Class Responses</h3>
+                  <div className="flex flex-col gap-4">
+                    {Object.entries(distribution || {}).map(([ans, count]) => {
+                      const pct = Math.max(0, (count / Math.max(1, answerCount.total)) * 100);
+                      const isCorrect = typeof correctAnswer === 'string' ? ans === correctAnswer : false; // simplified
+                      return (
+                        <div key={ans} className="flex flex-col gap-1">
+                          <div className="flex justify-between text-sm font-mono text-on-surface-variant">
+                            <span className="truncate max-w-[70%]">{ans}</span>
+                            <span>{count} ({Math.round(pct)}%)</span>
+                          </div>
+                          <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${isCorrect ? 'bg-tertiary-fixed-dim shadow-[0_0_8px_rgba(42,229,0,0.5)]' : 'bg-primary'}`} style={{ width: `${pct}%` }}></div>
+                          </div>
                         </div>
-                        <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${isCorrect ? 'bg-tertiary-fixed-dim shadow-[0_0_8px_rgba(42,229,0,0.5)]' : 'bg-primary'}`} style={{ width: `${pct}%` }}></div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                  <div className="mt-10 flex justify-center">
+                    <button className="bg-primary text-on-primary px-8 py-4 rounded-full font-headline font-bold tracking-widest uppercase hover:bg-primary-container transition-colors shadow-[0_0_15px_rgba(0,229,255,0.4)]" onClick={showLeaderboard}>
+                      Show Leaderboard
+                    </button>
+                  </div>
                 </div>
-                <div className="mt-10 flex justify-center">
-                  <button className="bg-primary text-on-primary px-8 py-4 rounded-full font-headline font-bold tracking-widest uppercase hover:bg-primary-container transition-colors shadow-[0_0_15px_rgba(0,229,255,0.4)]" onClick={showLeaderboard}>
-                    Show Leaderboard
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
 
-            {isStudent && answerResult && (
-              <div className={`p-8 rounded-2xl border flex flex-col items-center justify-center text-center animate-bounceIn ${answerResult.isCorrect ? 'bg-tertiary-fixed-dim/10 border-tertiary-fixed-dim/30 shadow-[0_0_30px_rgba(42,229,0,0.1)]' : 'bg-error/10 border-error/30 shadow-[0_0_30px_rgba(255,180,171,0.1)]'}`}>
-                <h2 className={`text-4xl font-display font-black mb-4 ${answerResult.isCorrect ? 'text-tertiary-fixed-dim' : 'text-error'}`}>
-                  {answerResult.isCorrect ? 'Correct! 🌟' : 'Incorrect ❌'}
-                </h2>
-                {!answerResult.tooLate && answerResult.isCorrect && (
-                  <p className="text-xl font-mono text-on-surface mb-2">+{answerResult.scoreBreakdown?.totalScore} Points</p>
-                )}
-                {answerResult.streak > 1 && (
-                  <p className="text-[#FFD700] font-headline font-bold text-lg mb-4">🔥 Streak: {answerResult.streak}</p>
-                )}
-                <div className="mt-4 bg-surface-container-highest px-6 py-3 rounded-xl border border-outline-variant/30">
-                  <span className="text-sm font-mono text-on-surface-variant mr-3 uppercase">Total Score</span>
-                  <span className="text-2xl font-mono font-bold text-primary">{answerResult.totalScore?.toLocaleString()}</span>
+              {isStudent && answerResult && (
+                <div className={`p-8 rounded-2xl border flex flex-col items-center justify-center text-center animate-bounceIn ${answerResult.isCorrect ? 'bg-tertiary-fixed-dim/10 border-tertiary-fixed-dim/30 shadow-[0_0_30px_rgba(42,229,0,0.1)]' : 'bg-error/10 border-error/30 shadow-[0_0_30px_rgba(255,180,171,0.1)]'}`}>
+                  <h2 className={`text-4xl font-display font-black mb-4 ${answerResult.isCorrect ? 'text-tertiary-fixed-dim' : 'text-error'}`}>
+                    {answerResult.isCorrect ? 'Correct! 🌟' : 'Incorrect ❌'}
+                  </h2>
+                  {!answerResult.tooLate && answerResult.isCorrect && (
+                    <p className="text-xl font-mono text-on-surface mb-2">+{answerResult.scoreBreakdown?.totalScore} Points</p>
+                  )}
+                  {answerResult.streak > 1 && (
+                    <p className="text-[#FFD700] font-headline font-bold text-lg mb-4">🔥 Streak: {answerResult.streak}</p>
+                  )}
+                  <div className="mt-4 bg-surface-container-highest px-6 py-3 rounded-xl border border-outline-variant/30">
+                    <span className="text-sm font-mono text-on-surface-variant mr-3 uppercase">Total Score</span>
+                    <span className="text-2xl font-mono font-bold text-primary">{answerResult.totalScore?.toLocaleString()}</span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          </section>
+
+          {/* Sidebar Scoreboard (Right) */}
+          <aside className="flex-[3] bg-surface-container-low border-l border-surface-container-high flex flex-col z-20 hidden lg:flex">
+            <div className="p-6 border-b border-surface-container-high flex items-center justify-between">
+              <h3 className="font-headline font-bold text-sm tracking-widest text-on-surface uppercase">LIVE RANKINGS</h3>
+              <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-1 rounded">{participants.length} PLYRS</span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              <RankingsList rankings={activeRankings} variant="sidebar" currentUserId={user?.id} />
+            </div>
+          </aside>
+        </main>
+
+        {/* Bottom Status Bar */}
+        <footer className="h-10 bg-surface-container-lowest border-t border-surface-container-high flex items-center justify-between px-6 shrink-0 z-50 text-xs font-mono text-on-surface-variant">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <span className="text-on-surface opacity-50">ROOM:</span>
+              <span className="text-primary tracking-widest">{sessionInfo?.joinCode || '----'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[14px]">groups</span>
+              <span>{participants.length} PLAYERS</span>
+            </div>
           </div>
-        </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-tertiary-fixed-dim shadow-[0_0_6px_#2ae500] animate-pulse"></div>
+            <span>CONNECTED</span>
+          </div>
+        </footer>
       </div>
     );
   }
@@ -1288,30 +1444,7 @@ export default function LiveGame() {
           <h1 className="text-3xl md:text-5xl font-display font-black text-primary drop-shadow-[0_0_10px_rgba(0,229,255,0.4)] mb-2 text-center uppercase tracking-widest">Current Standings</h1>
           <p className="text-on-surface-variant font-mono mb-12">Top 5 Players</p>
           
-          <div className="w-full max-w-3xl flex flex-col gap-4 z-10">
-            {rankings.slice(0, 5).map((r, i) => {
-              const isMe = r.id === user?.id;
-              const topColors = ['bg-[#FFD700]', 'bg-[#C0C0C0]', 'bg-[#CD7F32]'];
-              const rankColor = i < 3 ? topColors[i] : 'bg-surface-variant';
-              
-              return (
-                <div key={r.id} className={`flex items-center p-4 rounded-xl border transition-all animate-fadeInUp ${isMe ? 'bg-primary/10 border-primary/50 shadow-[0_0_20px_rgba(0,229,255,0.2)] scale-[1.02]' : 'bg-surface-container border-outline-variant/20'}`} style={{ animationDelay: `${i*0.1}s` }}>
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-display font-black text-xl mr-4 ${isMe ? 'bg-primary text-on-primary' : (i < 3 ? `${rankColor} text-surface-container-lowest` : 'bg-surface-variant text-on-surface')}`}>
-                    {i + 1}
-                  </div>
-                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-surface-container-high bg-surface-container-lowest mr-4 shrink-0">
-                    <Avatar config={r.avatarConfig} size={48} showBg={false} />
-                  </div>
-                  <div className={`flex-1 font-display text-xl truncate ${isMe ? 'font-bold text-primary' : 'font-semibold text-on-surface'}`}>
-                    {r.name} {isMe && <span className="text-xs ml-2 bg-primary text-on-primary px-2 py-0.5 rounded-sm uppercase tracking-widest">You</span>}
-                  </div>
-                  <div className={`font-mono text-2xl ml-4 ${isMe ? 'text-primary font-bold drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]' : 'text-on-surface-variant'}`}>
-                    {r.score?.toLocaleString()}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <RankingsList rankings={rankings} variant="interim" currentUserId={user?.id} />
 
           {isTeacher && (
             <div className="mt-16 z-10">
@@ -1337,30 +1470,7 @@ export default function LiveGame() {
         <h1 className="text-4xl md:text-6xl font-display font-black text-[#FFD700] drop-shadow-[0_0_15px_rgba(255,215,0,0.5)] mb-4 text-center uppercase tracking-widest animate-bounceIn">Final Rankings</h1>
         <p className="text-on-surface-variant font-mono mb-12 text-lg">The Arena has concluded!</p>
         
-        {/* Top 3 Podium (simplified for list) */}
-        <div className="w-full max-w-4xl flex flex-col gap-4 z-10">
-          {rankings.map((r, i) => {
-            const isMe = r.id === user?.id;
-            const medals = ['🥇', '🥈', '🥉'];
-            
-            return (
-              <div key={r.id} className={`flex items-center p-5 rounded-2xl border transition-all animate-fadeInUp ${isMe ? 'bg-primary/10 border-primary/50 shadow-[0_0_20px_rgba(0,229,255,0.2)] scale-[1.02]' : 'bg-surface-container border-outline-variant/20'}`} style={{ animationDelay: `${Math.min(i*0.1, 1)}s` }}>
-                <div className="w-16 font-display text-3xl text-center shrink-0">
-                  {i < 3 ? medals[i] : <span className="text-xl font-mono text-on-surface-variant">#{i+1}</span>}
-                </div>
-                <div className={`w-14 h-14 rounded-full overflow-hidden border-2 bg-surface-container-lowest mr-6 shrink-0 ${i === 0 ? 'border-[#FFD700]' : i === 1 ? 'border-[#C0C0C0]' : i === 2 ? 'border-[#CD7F32]' : 'border-surface-container-high'}`}>
-                  <Avatar config={r.avatarConfig} size={56} showBg={true} />
-                </div>
-                <div className={`flex-1 font-display text-2xl truncate ${isMe ? 'font-bold text-primary' : 'font-semibold text-on-surface'}`}>
-                  {r.name}
-                </div>
-                <div className={`font-mono text-3xl ml-4 ${i === 0 ? 'text-[#FFD700] font-bold drop-shadow-[0_0_8px_rgba(255,215,0,0.5)]' : isMe ? 'text-primary font-bold' : 'text-on-surface-variant'}`}>
-                  {r.score?.toLocaleString()} <span className="text-sm opacity-50">PTS</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <RankingsList rankings={rankings} variant="final" currentUserId={user?.id} />
 
         <div className="mt-16 z-10">
           <button className="bg-surface-variant text-on-surface border border-outline-variant/30 px-10 py-4 rounded-full font-headline font-bold tracking-widest uppercase hover:bg-surface-container-high transition-colors flex items-center gap-3" onClick={() => navigate(isTeacher ? '/teacher' : user ? '/student' : '/')}>

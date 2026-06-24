@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { userAPI, quizAPI, moduleAPI } from '../api';
+import { userAPI, quizAPI } from '../api';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import ImportQuizModal from '../components/ImportQuizModal';
@@ -12,7 +12,6 @@ export default function TeacherDashboard() {
   const [stats, setStats] = useState(null);
   const [quizzes, setQuizzes] = useState([]);
   const [students, setStudents] = useState([]);
-  const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
   const [activeExportQuizId, setActiveExportQuizId] = useState(null);
@@ -26,8 +25,19 @@ export default function TeacherDashboard() {
   }, []);
 
   useEffect(() => {
-    Promise.all([userAPI.getDashboardStats(), quizAPI.getMyQuizzes(), userAPI.getStudents(), moduleAPI.getAll()])
-      .then(([s, q, st, m]) => { setStats(s); setQuizzes(q); setStudents(st); setModules(m); })
+    Promise.all([userAPI.getDashboardStats(), quizAPI.getMyQuizzes(), userAPI.getStudents()])
+      .then(([s, q, st]) => { 
+        setStats(s); 
+        // Sort quizzes: units first (ascending), then standalone quizzes
+        const sorted = (q || []).sort((a, b) => {
+          if (a.unit === null && b.unit !== null) return 1;
+          if (a.unit !== null && b.unit === null) return -1;
+          if (a.unit === null && b.unit === null) return 0;
+          return a.unit - b.unit;
+        });
+        setQuizzes(sorted); 
+        setStudents(st); 
+      })
       .catch(console.error).finally(() => setLoading(false));
   }, []);
 
@@ -69,13 +79,6 @@ export default function TeacherDashboard() {
           
           <div className="flex items-center gap-3 relative z-10">
             <button 
-              className="w-full md:w-auto px-6 py-4 bg-surface-variant/50 backdrop-blur-md border border-outline-variant/30 text-primary rounded-xl font-headline font-bold uppercase tracking-widest hover:bg-surface-variant transition-all flex items-center justify-center gap-2 active:scale-95"
-              onClick={() => navigate('/modules')}
-            >
-              <span className="material-symbols-outlined text-xl">view_module</span>
-              Manage Modules
-            </button>
-            <button 
               className="w-full md:w-auto px-6 py-4 bg-surface-variant/50 backdrop-blur-md border border-outline-variant/30 text-tertiary rounded-xl font-headline font-bold uppercase tracking-widest hover:bg-surface-variant transition-all flex items-center justify-center gap-2 active:scale-95"
               onClick={() => setShowImportModal(true)}
               id="import-quiz-btn"
@@ -116,42 +119,12 @@ export default function TeacherDashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           
-          {/* Modules Overview */}
+          {/* Quizzes Section */}
           <div className="xl:col-span-2 space-y-6">
             <div className="flex items-center justify-between border-b border-white/5 pb-4">
               <h2 className="text-2xl font-headline font-bold text-on-surface flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">view_module</span>
-                My Modules
-              </h2>
-              <button onClick={() => navigate('/modules')} className="text-xs font-bold text-primary hover:text-primary-container transition-colors">
-                Manage All →
-              </button>
-            </div>
-
-            {/* Modules Grid */}
-            {modules.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {modules.map(mod => (
-                  <div key={mod.id} className="bg-surface-container-low/80 backdrop-blur-md rounded-2xl p-5 border border-outline-variant/20 hover:border-primary/50 transition-all cursor-pointer group shadow-lg" onClick={() => navigate('/modules')}>
-                    <div className="flex items-center gap-4 mb-3">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: (mod.color || '#b76dff') + '20' }}>
-                        <span className="material-symbols-outlined text-xl" style={{ color: mod.color || '#b76dff' }}>{mod.icon || 'school'}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-headline font-bold text-on-surface truncate">{mod.title}</h3>
-                        <p className="text-xs text-slate-400">{mod.quiz_count || 0} quizzes · {mod.is_published ? '✓ Published' : 'Draft'}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            {/* My Quizzes */}
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-              <h2 className="text-xl font-headline font-bold text-on-surface flex items-center gap-2">
-                <span className="material-symbols-outlined text-tertiary">library_books</span>
-                All Quizzes
+                <span className="material-symbols-outlined text-primary">library_books</span>
+                Quizzes ({quizzes.length})
               </h2>
             </div>
             
@@ -173,7 +146,7 @@ export default function TeacherDashboard() {
                         {quiz.is_published ? 'Published' : 'Draft'}
                       </span>
                       <span className="text-[10px] font-black uppercase tracking-widest bg-surface-container-highest text-on-surface-variant px-2 py-1 rounded">
-                        Unit {quiz.unit}
+                        {quiz.unit ? `Unit ${quiz.unit}` : 'Standalone'}
                       </span>
                     </div>
                     <span className="text-xs font-bold text-slate-400 bg-surface-container-highest px-2 py-1 rounded-md">

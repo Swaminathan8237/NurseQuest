@@ -1,0 +1,11 @@
+{
+  "ignore": [
+    "backend/db/*.db",
+    "backend/db/*.db-wal",
+    "backend/db/*.db-shm",
+    "backend/db/nursequest.db*",
+    "backend/uploads/*",
+    "frontend/*",
+    "node_modules/*"
+  ]
+}

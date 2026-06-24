@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { quizAPI, moduleAPI } from '../api';
+import { quizAPI } from '../api';
 import Navbar from '../components/Navbar';
 
 /* ─── Captcha Bounding-Box Editor (Teacher draws the correct region) ─── */
@@ -240,10 +240,9 @@ export default function QuizBuilder() {
   const navigate = useNavigate();
   const location = useLocation();
   const [saving, setSaving] = useState(false);
-  const [quiz, setQuiz] = useState({ title: '', description: '', category: 'Patient Care', difficulty: 'medium', unit: 1, timePerQuestion: 30, moduleId: location.state?.preselectedModuleId || '' });
+  const [quiz, setQuiz] = useState({ title: '', description: '', category: 'Patient Care', difficulty: 'medium', unit: 1, timePerQuestion: 30 });
   const [questions, setQuestions] = useState([createEmptyQuestion()]);
   const [activeQ, setActiveQ] = useState(0);
-  const [modules, setModules] = useState([]);
   const [uploading, setUploading] = useState(false);
 
   // Upload media file to server
@@ -277,7 +276,7 @@ export default function QuizBuilder() {
           description: data.description || '',
           category: data.category || 'Patient Care',
           difficulty: data.difficulty || 'medium',
-          unit: data.unit || 1,
+          unit: data.unit !== undefined ? data.unit : 1,
           timePerQuestion: data.time_per_question || 30,
           moduleId: data.module_id || ''
         });
@@ -304,9 +303,7 @@ export default function QuizBuilder() {
     }
   }, [editId]);
 
-  useEffect(() => {
-    moduleAPI.getAll().then(data => setModules(data)).catch(console.error);
-  }, []);
+
 
   function createEmptyQuestion() {
     return { type: 'mcq', questionText: '', mediaUrl: '', options: ['', '', '', ''], correctAnswer: '', explanation: '', points: 1000, sliderMin: 0, sliderMax: 100, sliderStep: 1, sliderUnit: '', matchingPairs: ['', '', '', ''] };
@@ -337,7 +334,7 @@ export default function QuizBuilder() {
     }
     setSaving(true);
     try {
-      const data = { ...quiz, questions, isPublished: publish, moduleId: quiz.moduleId || null };
+      const data = { ...quiz, questions, isPublished: publish };
       if (editId) await quizAPI.update(editId, data);
       else await quizAPI.create(data);
       navigate('/teacher');
@@ -433,22 +430,22 @@ export default function QuizBuilder() {
                   </div>
                 </div>
 
-                {/* Module Selector */}
+                {/* Unit Selector */}
                 <div>
-                  <label className="block text-sm font-label font-semibold text-slate-400 mb-1 uppercase tracking-wider">Module</label>
+                  <label className="block text-sm font-label font-semibold text-slate-400 mb-1 uppercase tracking-wider">Unit</label>
                   <select 
                     className="w-full bg-surface-container-high border border-outline-variant/30 rounded-lg px-4 py-3 text-on-surface font-body focus:border-primary outline-none appearance-none"
-                    value={quiz.moduleId || ''} 
-                    onChange={e => setQuiz({...quiz, moduleId: e.target.value})}
+                    value={quiz.unit === null ? 'standalone' : quiz.unit} 
+                    onChange={e => setQuiz({...quiz, unit: e.target.value === 'standalone' ? null : (parseInt(e.target.value) || 1)})}
                   >
-                    <option value="">No Module (Standalone Quiz)</option>
-                    {modules.map(m => (
-                      <option key={m.id} value={m.id}>{m.title}</option>
+                    <option value="standalone">None (Standalone / Practice Quiz)</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(u => (
+                      <option key={u} value={u}>Unit {u}</option>
                     ))}
                   </select>
                   <p className="text-xs text-primary/70 mt-1 flex items-center gap-1">
                     <span className="material-symbols-outlined text-[14px]">info</span>
-                    Assign this quiz to a module for organized learning paths.
+                    Select which unit this quiz belongs to, or None for a standalone/practice quiz.
                   </p>
                 </div>
               </div>

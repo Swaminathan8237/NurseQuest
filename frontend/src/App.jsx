@@ -11,8 +11,7 @@ import QuizBuilder from './pages/QuizBuilder';
 import Leaderboard from './pages/Leaderboard';
 import LiveGame from './pages/LiveGame';
 import NursingMiniGame from './pages/NursingMiniGame';
-import ModuleManager from './pages/ModuleManager';
-import ModuleView from './pages/ModuleView';
+import Units from './pages/Units';
 import './App.css';
 
 function ProtectedRoute({ children, role }) {
@@ -49,8 +48,7 @@ function AppRoutes() {
       <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
       <Route path="/live/:code" element={<LiveGame />} />
       <Route path="/live" element={<LiveGame />} />
-      <Route path="/modules" element={<ProtectedRoute role="teacher"><ModuleManager /></ProtectedRoute>} />
-      <Route path="/modules/:id" element={<ProtectedRoute><ModuleView /></ProtectedRoute>} />
+      <Route path="/units" element={<ProtectedRoute><Units /></ProtectedRoute>} />
       <Route path="/mini-game" element={<ProtectedRoute role="student"><NursingMiniGame /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

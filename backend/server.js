@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -32,9 +33,10 @@ const { v4: uuidv4 } = require('uuid');
 
 // Ensure upload directories exist
 const uploadDirs = ['uploads/images', 'uploads/videos', 'uploads/audio'];
+const uploadsBase = path.resolve(__dirname, 'uploads');
 uploadDirs.forEach(dir => {
-  const fullPath = path.join(__dirname, dir);
-  if (!fs.existsSync(fullPath)) {
+  const fullPath = path.normalize(path.join(__dirname, dir));
+  if (fullPath.startsWith(uploadsBase) && !fs.existsSync(fullPath)) {
     fs.mkdirSync(fullPath, { recursive: true });
     console.log(`📁 Created upload directory: ${dir}`);
   }
@@ -129,8 +131,11 @@ initializeSocket(io);
 
 // Create uploads directories
 ['uploads/images', 'uploads/videos', 'uploads/audio'].forEach(dir => {
-  const fullPath = path.join(__dirname, dir);
-  if (!fs.existsSync(fullPath)) fs.mkdirSync(fullPath, { recursive: true });
+  const fullPath = path.normalize(path.join(__dirname, dir));
+  const uploadsBase = path.resolve(__dirname, 'uploads');
+  if (fullPath.startsWith(uploadsBase) && !fs.existsSync(fullPath)) {
+    fs.mkdirSync(fullPath, { recursive: true });
+  }
 });
 
 // Health check
@@ -146,10 +151,17 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`\n🏥 ═══════════════════════════════════════════`);
   console.log(`   NurseQuest API Server`);
   console.log(`   Running on http://localhost:${PORT}`);
   console.log(`   Socket.IO ready for real-time games`);
   console.log(`🏥 ═══════════════════════════════════════════\n`);
+  
+  try {
+    const { initializeDB } = require('./db/init');
+    await initializeDB();
+  } catch (err) {
+    console.error('❌ Failed to initialize database:', err);
+  }
 });

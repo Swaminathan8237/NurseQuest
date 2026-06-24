@@ -1,4 +1,4 @@
--- NurseQuest Database Schema
+-- NurseQuest Database Schema for PostgreSQL
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -11,8 +11,8 @@ CREATE TABLE IF NOT EXISTS users (
   xp INTEGER DEFAULT 0,
   level INTEGER DEFAULT 1,
   streak INTEGER DEFAULT 0,
-  last_active TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
+  last_active TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Modules table
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS modules (
   order_index INTEGER DEFAULT 0,
   created_by TEXT NOT NULL,
   is_published INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
   is_published INTEGER DEFAULT 0,
   is_live INTEGER DEFAULT 0,
   live_code TEXT,
-  created_at TEXT DEFAULT (datetime('now')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (created_by) REFERENCES users(id),
   FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE SET NULL
 );
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS questions (
   type TEXT NOT NULL CHECK(type IN ('mcq', 'image', 'video', 'audio', 'jumbled_letters', 'jumbled_sequence', 'slider', 'matching', 'captcha')),
   question_text TEXT NOT NULL,
   media_url TEXT,
-  options TEXT, -- JSON array for MCQ options
+  options TEXT, -- JSON array for MCQ options (stored as string for code compatibility)
   correct_answer TEXT NOT NULL,
   explanation TEXT,
   points INTEGER DEFAULT 1000,
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   total_questions INTEGER DEFAULT 0,
   streak_max INTEGER DEFAULT 0,
   time_taken INTEGER DEFAULT 0,
-  completed_at TEXT DEFAULT (datetime('now')),
+  completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (quiz_id) REFERENCES quizzes(id),
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
@@ -106,9 +106,9 @@ CREATE TABLE IF NOT EXISTS live_sessions (
   join_code TEXT UNIQUE NOT NULL,
   status TEXT DEFAULT 'waiting' CHECK(status IN ('waiting', 'active', 'finished')),
   current_question INTEGER DEFAULT 0,
-  started_at TEXT,
-  ended_at TEXT,
-  created_at TEXT DEFAULT (datetime('now')),
+  started_at TIMESTAMP,
+  ended_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (quiz_id) REFERENCES quizzes(id),
   FOREIGN KEY (host_id) REFERENCES users(id)
 );
@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS user_achievements (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   achievement_id TEXT NOT NULL,
-  earned_at TEXT DEFAULT (datetime('now')),
+  earned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (achievement_id) REFERENCES achievements(id),
   UNIQUE(user_id, achievement_id)

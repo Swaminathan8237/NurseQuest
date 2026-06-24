@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { userAPI, quizAPI, scoreAPI, moduleAPI } from '../api';
+import { userAPI, quizAPI, scoreAPI } from '../api';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 
@@ -15,7 +15,6 @@ export default function StudentDashboard() {
   const [stats, setStats] = useState(null);
   const [quizzes, setQuizzes] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
-  const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,12 +22,10 @@ export default function StudentDashboard() {
       userAPI.getDashboardStats(),
       quizAPI.getAll(),
       scoreAPI.getLeaderboard(),
-      moduleAPI.getAll(),
-    ]).then(([statsData, quizzesData, lbData, modulesData]) => {
+    ]).then(([statsData, quizzesData, lbData]) => {
       setStats(statsData);
       setQuizzes(quizzesData);
       setLeaderboard(lbData.leaderboard?.slice(0, 5) || []);
-      setModules(modulesData);
     }).catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -38,6 +35,14 @@ export default function StudentDashboard() {
   }
 
   const levelInfo = stats?.levelInfo || { level: 1, name: 'Nurse Intern', progress: 0, xpInLevel: 0, xpForNextLevel: 1000 };
+
+  // Calculate Unit-Based Learning stats
+  const unitQuizzes = quizzes.filter(q => q.unit >= 1 && q.unit <= 11);
+  const standaloneQuizzes = quizzes.filter(q => q.unit === null || q.unit === undefined || q.unit < 1 || q.unit > 11);
+  const totalUnits = 11;
+  const completedUnits = unitQuizzes.filter(q => q.bestScorePercent >= 75).length;
+  
+  const unitProgressPct = Math.round((completedUnits / totalUnits) * 100);
 
   return (
     <div className="min-h-screen pb-24 font-body">
@@ -97,135 +102,164 @@ export default function StudentDashboard() {
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Modules & Quizzes */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {/* Modules Section */}
-            {modules.length > 0 && (
-              <>
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-headline font-bold text-on-surface flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary">view_module</span> Learning Modules
-                  </h2>
-                  <span className="px-3 py-1 bg-surface-container-high rounded-full text-sm font-medium text-on-surface-variant">
-                    {modules.length} Modules
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {modules.map(mod => (
-                    <div
-                      key={mod.id}
-                      className="glass-card gradient-border rounded-2xl p-6 shadow-lg hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)] transition-all hover:-translate-y-1.5 cursor-pointer group relative overflow-hidden animate-slideUp"
-                      style={{ animationDelay: `${0.2 + modules.indexOf(mod) * 0.1}s` }}
-                      onClick={() => navigate(`/modules/${mod.id}`)}
-                    >
-                      {/* Background accent */}
-                      <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-[60px] opacity-15 pointer-events-none" style={{ backgroundColor: mod.color || '#b76dff' }}></div>
-                      
-                      <div className="flex items-center gap-4 mb-4 relative z-10">
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md" style={{ backgroundColor: (mod.color || '#b76dff') + '20' }}>
-                          <span className="material-symbols-outlined text-2xl" style={{ color: mod.color || '#b76dff' }}>{mod.icon || 'school'}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-headline font-bold text-on-surface truncate">{mod.title}</h3>
-                          <p className="text-sm text-on-surface-variant line-clamp-1">{mod.description}</p>
-                        </div>
-                      </div>
-
-                      {/* Stats row */}
-                      <div className="flex items-center justify-between mb-3 relative z-10">
-                        <div className="flex items-center gap-4 text-xs font-medium text-on-surface-variant">
-                          <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">quiz</span> {mod.quiz_count} Quizzes</span>
-                          <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span> {mod.completed_quizzes || 0} Done</span>
-                        </div>
-                      </div>
-
-                      {/* Progress bar */}
-                      <div className="relative z-10">
-                        <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-700"
-                            style={{
-                              width: `${mod.progress || 0}%`,
-                              background: `linear-gradient(90deg, ${mod.color || '#b76dff'}, ${mod.color || '#b76dff'}88)`,
-                              boxShadow: `0 0 10px ${(mod.color || '#b76dff')}40`
-                            }}
-                          ></div>
-                        </div>
-                        <div className="flex justify-between mt-1">
-                          <span className="text-[10px] text-slate-500 font-mono">{mod.progress || 0}% complete</span>
-                          <span className="text-[10px] font-bold group-hover:text-primary transition-colors" style={{ color: mod.color || '#b76dff' }}>Open Module →</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* Ungrouped Quizzes (not in any module) */}
-            {(() => {
-              const ungroupedQuizzes = quizzes.filter(q => !q.module_id);
-              if (ungroupedQuizzes.length === 0 && modules.length > 0) return null;
-              return (
-                <>
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-headline font-bold text-on-surface flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary">book</span> {modules.length > 0 ? 'Other Quizzes' : 'Available Quizzes'}
-                    </h2>
-                    <span className="px-3 py-1 bg-surface-container-high rounded-full text-sm font-medium text-on-surface-variant">
-                      {ungroupedQuizzes.length} Quizzes
-                    </span>
+          {/* Left Column: Learning Progress & Recent Activity */}
+          <div className="lg:col-span-2 flex flex-col gap-8">
+            
+            {/* Unit Path Card */}
+            <div className="glass-card gradient-border rounded-2xl p-8 shadow-xl relative overflow-hidden animate-slideUp">
+              <div className="absolute -right-16 -top-16 w-48 h-48 bg-primary/10 rounded-full blur-[60px] pointer-events-none"></div>
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-widest mb-1.5">
+                    <span className="material-symbols-outlined text-[16px]">school</span> Active Learning Curriculum
                   </div>
-                  
-                  <div className="flex flex-col gap-4">
-                    {ungroupedQuizzes.length === 0 ? (
-                      <div className="bg-surface-container rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 border-dashed">
-                        <span className="material-symbols-outlined text-4xl mb-2 opacity-50">inventory_2</span>
-                        <p>No quizzes available right now. Check back soon!</p>
-                      </div>
-                    ) : ungroupedQuizzes.map((quiz, i) => (
-                      <div key={quiz.id} className="glass-card gradient-border rounded-2xl p-6 shadow-lg hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)] transition-all hover:-translate-y-1.5 animate-slideUp" style={{ animationDelay: `${0.3 + i * 0.1}s` }}>
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex gap-2">
-                            <span className={`px-2 py-1 text-xs font-bold rounded uppercase ${quiz.difficulty === 'easy' ? 'bg-[#00504a] text-[#8ef4e9]' : quiz.difficulty === 'hard' ? 'bg-[#93000a] text-[#ffdad6]' : 'bg-[#604100] text-[#ffdead]'}`}>
-                              {quiz.difficulty}
+                  <h2 className="text-3xl font-headline font-black text-on-surface">Unit-Based Learning Path</h2>
+                  <p className="text-sm text-on-surface-variant mt-1.5">
+                    Progress through the 11 clinical units covering infection control, sterile protocols, and patient safety indicators.
+                  </p>
+                </div>
+                
+                <div className="text-right shrink-0">
+                  <div className="text-4xl font-display font-black text-primary">{completedUnits} / 11</div>
+                  <div className="text-[10px] font-label text-slate-500 uppercase tracking-widest mt-1">Units Passed</div>
+                </div>
+              </div>
+
+              {/* Progress Slider */}
+              <div className="space-y-3 bg-surface-container/30 p-5 rounded-xl border border-outline-variant/5">
+                <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
+                  <span>CURRICULUM MIGRATION DONE</span>
+                  <span className="font-mono text-primary">{unitProgressPct}% COMPLETE</span>
+                </div>
+                <div className="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-primary rounded-full transition-all duration-700 shadow-[0_0_10px_var(--primary-glow)]"
+                    style={{ width: `${unitProgressPct}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Launch CTA */}
+              <div className="mt-8 flex justify-end">
+                <button
+                  onClick={() => navigate('/units')}
+                  className="px-8 py-4 bg-gradient-primary text-white font-headline font-bold uppercase tracking-widest rounded-xl hover:shadow-[0_0_20px_var(--primary-glow)] hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2.5"
+                >
+                  <span>Go to Units Section</span>
+                  <span className="material-symbols-outlined">arrow_forward</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Standalone / Practice Quizzes */}
+            {standaloneQuizzes.length > 0 && (
+              <div className="flex flex-col gap-4">
+                <h2 className="text-2xl font-headline font-bold text-on-surface flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">menu_book</span> Standalone Practice Quizzes
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {standaloneQuizzes.map((quiz, i) => {
+                    const scorePercent = quiz.bestScorePercent !== undefined ? Math.round(quiz.bestScorePercent) : null;
+                    const hasAttempt = quiz.lastAttempt !== null;
+                    const passed = scorePercent >= 75;
+                    
+                    return (
+                      <div 
+                        key={quiz.id}
+                        onClick={() => navigate(`/quiz/${quiz.id}`)}
+                        className="glass-card gradient-border rounded-xl p-5 border border-outline-variant/20 hover:border-primary/50 hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 transition-all group flex flex-col justify-between h-full cursor-pointer relative overflow-hidden"
+                      >
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start gap-2 mb-2">
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 bg-surface-container px-2 py-0.5 rounded">
+                              {quiz.category || 'General Nursing'}
                             </span>
-                            <span className="px-2 py-1 text-xs font-bold rounded uppercase bg-surface-bright text-on-surface">
-                              Unit {quiz.unit}
-                            </span>
-                          </div>
-                          <span className="text-on-surface-variant text-sm font-medium">{quiz.question_count} Qs</span>
-                        </div>
-                        
-                        <h3 className="text-xl font-headline font-bold text-on-surface mb-2">{quiz.title}</h3>
-                        <p className="text-on-surface-variant text-sm mb-6 line-clamp-2">{quiz.description}</p>
-                        
-                        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-outline-variant/20">
-                          <div className="flex items-center gap-4 text-xs font-medium text-on-surface-variant">
-                            <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">timer</span> {quiz.time_per_question}s/Q</span>
-                            <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">folder</span> {quiz.category}</span>
-                          </div>
-                          <div className="flex items-center gap-3 w-full sm:w-auto">
-                            {quiz.lastAttempt && (
-                              <div className="text-sm font-bold text-tertiary bg-tertiary/10 px-3 py-1.5 rounded-lg">
-                                Last: {Math.round((quiz.lastAttempt.correct_count / quiz.lastAttempt.total_questions) * 100)}%
+                            {hasAttempt && (
+                              <div className={`flex items-center gap-1 text-xs font-bold ${passed ? 'text-success' : 'text-warning'}`}>
+                                <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>
+                                  {passed ? 'check_circle' : 'pending'}
+                                </span>
+                                <span>{scorePercent}%</span>
                               </div>
                             )}
-                            <button 
-                              onClick={() => navigate(`/quiz/${quiz.id}`)}
-                              className="flex-1 sm:flex-none bg-gradient-to-r from-primary-container to-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:shadow-[0_0_15px_rgba(221,183,255,0.4)] transition-all btn-glow active:scale-95"
-                            >
-                              {quiz.lastAttempt ? 'Retry' : 'Play Quiz'}
-                            </button>
+                          </div>
+                          <h3 className="text-lg font-headline font-bold text-on-surface mb-1 group-hover:text-primary transition-colors line-clamp-1">{quiz.title}</h3>
+                          <p className="text-xs text-on-surface-variant line-clamp-2 mb-4">{quiz.description}</p>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-outline-variant/10 pt-3 mt-auto">
+                          <span className="text-[10px] font-mono text-slate-500 font-bold uppercase tracking-wider">{quiz.difficulty}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/quiz/${quiz.id}`);
+                            }}
+                            className="px-4 py-2 bg-gradient-primary text-white text-xs font-headline font-bold uppercase tracking-wider rounded-lg shadow-md active:scale-95 transition-all flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-xs">{hasAttempt ? 'replay' : 'play_arrow'}</span>
+                            <span>{hasAttempt ? 'Retry' : 'Play'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Recent Activity List */}
+            <div className="flex flex-col gap-4">
+              <h2 className="text-2xl font-headline font-bold text-on-surface flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">history</span> Recent Attempts
+              </h2>
+
+              {(!stats?.recentAttempts || stats.recentAttempts.length === 0) ? (
+                <div className="bg-surface-container/50 rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/10 border-dashed">
+                  <span className="material-symbols-outlined text-4xl mb-2 opacity-50">history_edu</span>
+                  <p>No recent quiz attempts found. Start your learning path above!</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {stats.recentAttempts.map((attempt, i) => {
+                    const scorePct = Math.round((attempt.correct_count / attempt.total_questions) * 100);
+                    const passed = scorePct >= 75;
+                    return (
+                      <div 
+                        key={attempt.id || i}
+                        className={`glass-card rounded-xl p-5 border flex items-center justify-between gap-4 animate-slideUp ${passed ? 'border-success/20' : 'border-warning/20'}`}
+                        style={{ animationDelay: `${0.2 + i * 0.1}s` }}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${passed ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'}`}>
+                            <span className="material-symbols-outlined">
+                              {passed ? 'check_circle' : 'pending'}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="text-base font-bold text-on-surface leading-tight">{attempt.quiz_title}</h4>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant">
+                              <span className="font-mono bg-surface-container px-2 py-0.5 rounded">Unit {attempt.unit || 1}</span>
+                              <span>·</span>
+                              <span>{new Date(attempt.completed_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className={`text-xl font-display font-black ${passed ? 'text-success' : 'text-warning'}`}>
+                            {scorePct}%
+                          </div>
+                          <div className="text-[9px] font-label text-slate-500 uppercase tracking-widest">
+                            {passed ? 'Passed' : 'Failed'}
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </>
-              );
-            })()}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right Column */}

@@ -591,7 +591,7 @@ export default function LandingPage() {
             ].map((s, i) => (
               <div key={i} className="text-center">
                 <div className={`text-3xl md:text-4xl font-headline font-black ${s.special ? 'text-tertiary' : 'text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-primary'}`}>
-                  {s.special ? '0' : <AnimatedCount target={s.value} suffix={s.suffix} />}
+                  {s.special ? '0' : <AnimatedCount target={s.value} />}
                   {s.special ? '' : s.suffix}
                 </div>
                 <p className="text-xs font-mono text-on-surface-variant tracking-wider uppercase mt-1">{s.label}</p>

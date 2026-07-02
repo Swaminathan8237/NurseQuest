@@ -6,11 +6,20 @@ let sqlInstance = null;
 
 function getDB() {
   if (!sqlInstance) {
-    if (!process.env.DATABASE_URL) {
+    let dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) {
       throw new Error('DATABASE_URL is not defined in environment variables');
     }
-    const isLocal = process.env.DATABASE_URL.includes('localhost') || process.env.DATABASE_URL.includes('127.0.0.1');
-    sqlInstance = postgres(process.env.DATABASE_URL, {
+    
+    // Auto-rewrite direct Supabase IPv6 host to IPv4 Connection Pooler
+    if (dbUrl.includes('db.iqnovjmpubdiaooywfeh.supabase.co')) {
+      console.log('🔄 Detected direct Supabase IPv6 host. Rewriting to IPv4 Connection Pooler...');
+      dbUrl = dbUrl.replace('db.iqnovjmpubdiaooywfeh.supabase.co:5432', 'aws-0-ap-south-1.pooler.supabase.com:6543')
+                   .replace('://postgres:', '://postgres.iqnovjmpubdiaooywfeh:');
+    }
+
+    const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
+    sqlInstance = postgres(dbUrl, {
       ssl: isLocal ? false : { rejectUnauthorized: false }, // Disable SSL for local connections
       max: 10, // Connection pool limit
       idle_timeout: 20, // Close idle connections after 20s

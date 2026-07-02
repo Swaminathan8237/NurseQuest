@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: nursequest
+    env: node
+    buildCommand: npm run install:all && npm run build
+    startCommand: node backend/server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false

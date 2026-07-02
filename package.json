@@ -8,7 +8,7 @@
     "dev": "concurrently -n BE,FE -c blue,magenta \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && node server.js",
     "dev:frontend": "cd frontend && npx vite --port 5173",
-    "build": "cd frontend && npm run build",
+    "build": "npm run install:all && cd frontend && npm run build",
     "start": "cd frontend && npm run build && cd ../backend && node server.js",
     "seed": "cd backend && node db/seed.js"
   },

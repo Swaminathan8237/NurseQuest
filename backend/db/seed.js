@@ -1,6 +1,6 @@
 const { getDB } = require('./init');
 const { v4: uuidv4 } = require('uuid');
-const bcrypt = require('bcryptjs');
+// bcryptjs removed
 
 // Load environment variables
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
@@ -25,7 +25,7 @@ async function seed() {
   try {
     // Create demo teacher
     const teacherId = uuidv4();
-    const teacherPassword = bcrypt.hashSync('teacher123', 10);
+    const teacherPassword = null;
     await sql`INSERT INTO users (id, email, password, name, role) VALUES (${teacherId}, 'teacher@nursequest.com', ${teacherPassword}, 'Dr. Sarah Johnson', 'teacher')`;
 
     // Create demo students
@@ -44,7 +44,7 @@ async function seed() {
       const name = studentNames[i];
       const id = uuidv4();
       studentIds.push(id);
-      const password = bcrypt.hashSync('student123', 10);
+      const password = null;
       await sql`INSERT INTO users (id, email, password, name, role, avatar_config, xp, level, streak) VALUES (${id}, ${`student${i + 1}@nursequest.com`}, ${password}, ${name}, 'student', ${avatarConfigs[i]}, ${xps[i]}, ${Math.floor(xps[i] / 1000) + 1}, ${Math.floor(Math.random() * 10)})`;
     }
 

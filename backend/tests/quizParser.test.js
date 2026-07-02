@@ -215,12 +215,16 @@ test('Quiz Parser — Enforce question limit (Max 200)', () => {
 });
 
 test('Quiz Parser — Parses quiz_template.txt with no warnings', () => {
-  const baseDir = path.resolve(__dirname, '..', '..');
-  const templatePath = path.normalize(path.join(baseDir, 'quiz_template.txt'));
-  if (!templatePath.startsWith(baseDir)) {
-    throw new Error('Invalid test template path');
+  let text = '';
+  try {
+    text = fs.readFileSync('quiz_template.txt', 'utf8');
+  } catch (e) {
+    try {
+      text = fs.readFileSync('../quiz_template.txt', 'utf8');
+    } catch (e2) {
+      text = fs.readFileSync('../../quiz_template.txt', 'utf8');
+    }
   }
-  const text = fs.readFileSync(templatePath, 'utf8');
   const result = parseQuizText(text);
   assert.ok(result.questions.length >= 9, 'should parse at least 9 questions');
   assert.strictEqual(result.warnings.length, 0, 'should have no warnings');

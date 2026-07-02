@@ -14,8 +14,6 @@
   "license": "ISC",
   "dependencies": {
     "adm-zip": "^0.5.17",
-    "bcryptjs": "^3.0.2",
-    "better-sqlite3": "^11.10.0",
     "cors": "^2.8.5",
     "docx": "^9.7.1",
     "dotenv": "^16.5.0",

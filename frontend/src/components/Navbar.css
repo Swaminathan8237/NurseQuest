@@ -1,12 +1,20 @@
 .navbar {
   position: sticky;
-  top: 0;
+  top: 12px;
   z-index: 100;
-  background: rgba(10, 14, 23, 0.85);
+  margin: 0 auto;
+  max-width: 1200px;
+  background: var(--bg-surface);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  border: none;
   padding: 0 var(--space-lg);
+  box-shadow: var(--shadow-clay-raised);
+  margin-left: auto;
+  margin-right: auto;
+  left: 0;
+  right: 0;
 }
 
 .navbar-inner {
@@ -69,7 +77,9 @@
 
 .nav-link.active {
   color: var(--primary-light);
-  background: rgba(108, 92, 231, 0.12);
+  background: rgba(167, 139, 250, 0.15);
+  box-shadow: var(--shadow-clay-pressed);
+  border-radius: var(--radius-md);
 }
 
 .nav-icon {

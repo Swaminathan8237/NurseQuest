@@ -72,8 +72,8 @@ export default function Units() {
 
       <main className="max-w-7xl mx-auto px-6 flex flex-col gap-8 pb-12 animate-slideUp" style={{ paddingTop: '100px' }}>
         {/* Header and Progress Overview */}
-        <section className="w-full glass-card rounded-[2rem] p-8 relative overflow-hidden flex flex-col md:flex-row items-center gap-8 justify-between shadow-[0_10px_40px_rgba(0,0,0,0.2)]">
-          <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary-glow/20 rounded-full blur-[80px] pointer-events-none"></div>
+        <section className="w-full clay-card p-8 relative overflow-hidden flex flex-col md:flex-row items-center gap-8 justify-between">
+          <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary/20 rounded-full blur-[80px] pointer-events-none"></div>
           
           <div className="flex-1 space-y-2">
             <nav className="flex text-xs text-slate-400 font-label items-center gap-2">
@@ -91,14 +91,14 @@ export default function Units() {
             </p>
           </div>
 
-          <div className="bg-surface-container p-6 rounded-2xl w-full md:w-auto min-w-[320px] border border-outline-variant/10">
+          <div className="bg-brand-surface shadow-clay-inner p-6 rounded-2xl w-full md:w-auto min-w-0 md:min-w-[320px]">
             <div className="flex justify-between items-center mb-3">
               <span className="font-headline text-xs font-bold uppercase tracking-widest text-slate-400">Total Path Completion</span>
               <span className="font-mono text-sm font-bold text-primary">{completedUnits} / {totalUnits} Units</span>
             </div>
-            <div className="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden mb-2">
+            <div className="w-full h-4 bg-brand-elevated shadow-clay-sunken rounded-full overflow-hidden mb-2">
               <div 
-                className="h-full bg-gradient-primary rounded-full transition-all duration-700 shadow-[0_0_15px_var(--primary-glow)]" 
+                className="h-full bg-gradient-primary rounded-full transition-all duration-700" 
                 style={{ width: `${progressPercent}%` }}
               ></div>
             </div>
@@ -117,7 +117,7 @@ export default function Units() {
           </h2>
 
           {quizzes.length === 0 ? (
-            <div className="bg-surface-container rounded-2xl p-12 text-center text-on-surface-variant border border-outline-variant/20 border-dashed">
+            <div className="clay-card p-12 text-center text-on-surface-variant border-dashed">
               <span className="material-symbols-outlined text-5xl mb-3 opacity-30">inventory_2</span>
               <p className="text-lg">No unit quizzes imported yet. Please contact your instructor.</p>
             </div>
@@ -127,13 +127,13 @@ export default function Units() {
               {/* START NODE */}
               <div className="flex gap-6 md:gap-8 items-stretch">
                 <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/45 flex items-center justify-center text-primary shadow-[0_0_15px_rgba(0,229,255,0.4)] flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-brand-surface shadow-clay-outer border-2 border-primary/30 flex items-center justify-center text-primary flex-shrink-0">
                     <span className="material-symbols-outlined text-xl font-bold">flag</span>
                   </div>
-                  <div className="w-[4px] flex-1 my-2 bg-gradient-to-b from-primary to-primary shadow-[0_0_10px_var(--primary-glow)] rounded-full min-h-[40px]" />
+                  <div className="w-[4px] flex-1 my-2 bg-gradient-to-b from-primary to-primary rounded-full min-h-[40px]" />
                 </div>
                 <div className="flex-1 pb-8 animate-slideUp">
-                  <div className="glass-card rounded-2xl p-6 border border-primary/20 max-w-md shadow-md">
+                  <div className="clay-card p-6 max-w-md">
                     <h3 className="font-headline font-bold text-lg text-on-surface">Path Start</h3>
                     <p className="text-xs text-on-surface-variant mt-1 whitespace-normal">Begin your clinical journey here.</p>
                   </div>
@@ -192,10 +192,10 @@ export default function Units() {
                     <div className="flex flex-col items-center">
                       {/* Node Circle */}
                       <div 
-                        className={`w-12 h-12 rounded-full border flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+                        className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 bg-brand-surface border-2 ${
                           status === 'LOCKED'
-                            ? 'bg-surface-container text-slate-500 border-outline-variant/10'
-                            : 'bg-surface-container-high border-primary/30 shadow-[0_0_10px_rgba(0,229,255,0.1)] text-primary group-hover:scale-105'
+                            ? 'text-slate-500 border-brand-elevated/40 shadow-clay-sunken'
+                            : 'text-primary shadow-clay-outer group-hover:scale-110'
                         }`}
                         style={status !== 'LOCKED' ? { borderColor: `${color}40`, color: color } : {}}
                       >
@@ -209,18 +209,18 @@ export default function Units() {
                       {/* Connector Line */}
                       <div className={`w-[4px] flex-1 my-2 rounded-full transition-all duration-300 ${
                         nextUnlocked
-                          ? 'bg-gradient-to-b from-primary to-secondary shadow-[0_0_10px_var(--primary-glow)]'
-                          : 'bg-outline-variant/20 border-l border-dashed border-outline-variant/30'
+                          ? 'bg-gradient-to-b from-primary to-secondary'
+                          : 'bg-brand-surface shadow-clay-sunken border-l border-dashed border-brand-elevated/40'
                       }`} style={{ minHeight: '60px' }} />
                     </div>
 
                     {/* Right Column (Card) */}
                     <div className="flex-1 pb-8 animate-slideUp" style={{ animationDelay: `${i * 0.05}s` }}>
                       <div
-                        className={`glass-card gradient-border rounded-2xl p-6 shadow-lg transition-all relative overflow-hidden flex flex-col md:flex-row gap-6 justify-between items-center group max-w-3xl ${
+                        className={`clay-card p-6 flex flex-col md:flex-row gap-6 justify-between items-center group max-w-3xl cursor-pointer ${
                           status === 'LOCKED'
-                            ? 'opacity-55 cursor-not-allowed border-outline-variant/5'
-                            : 'hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] hover:-translate-y-1'
+                            ? 'opacity-55 cursor-not-allowed'
+                            : 'hover:scale-[1.01] hover:shadow-clay-hover'
                         }`}
                         onClick={() => {
                           if (status !== 'LOCKED') {
@@ -237,8 +237,7 @@ export default function Units() {
                         {/* Card Info */}
                         <div className="flex-1 flex gap-4 items-start w-full">
                           <div 
-                            className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 mt-1" 
-                            style={{ backgroundColor: `${color}20` }}
+                            className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 mt-1 bg-brand-surface shadow-clay-sunken" 
                           >
                             <span className="material-symbols-outlined text-xl" style={{ color: color }}>{icon}</span>
                           </div>
@@ -258,28 +257,28 @@ export default function Units() {
                         </div>
 
                         {/* Card Action / Status */}
-                        <div className="flex flex-col sm:flex-row items-center gap-4 flex-shrink-0 w-full md:w-auto border-t md:border-t-0 md:border-l border-outline-variant/10 pt-4 md:pt-0 md:pl-6">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 flex-shrink-0 w-full md:w-auto border-t md:border-t-0 md:border-l border-brand-elevated/20 pt-4 md:pt-0 md:pl-6">
                           <div className="flex flex-col items-center md:items-start gap-1">
                             {status === 'PASSED' && (
-                              <div className="flex items-center gap-1.5 px-3 py-1 bg-gradient-success-light text-success border border-success/35 rounded-full text-xs font-bold">
+                              <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-surface shadow-clay-sunken text-success rounded-full text-xs font-bold border-2 border-success/30">
                                 <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                                 <span>{scorePercent}% Passed</span>
                               </div>
                             )}
                             {status === 'IN_PROGRESS' && (
-                              <div className="flex items-center gap-1.5 px-3 py-1 bg-warning-light text-warning border border-warning/35 rounded-full text-xs font-bold">
+                              <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-surface shadow-clay-sunken text-warning rounded-full text-xs font-bold border-2 border-warning/30">
                                 <span className="material-symbols-outlined text-xs animate-pulse" style={{ fontVariationSettings: "'FILL' 1" }}>pending</span>
                                 <span>{scorePercent}% Retry</span>
                               </div>
                             )}
                             {status === 'NOT_STARTED' && (
-                              <div className="flex items-center gap-1.5 px-3 py-1 bg-surface-container-highest text-slate-400 border border-outline-variant/20 rounded-full text-xs font-bold">
+                              <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-surface shadow-clay-sunken text-primary rounded-full text-xs font-bold border-2 border-primary/30">
                                 <span className="material-symbols-outlined text-xs">radio_button_unchecked</span>
                                 <span>Unlocked</span>
                               </div>
                             )}
                             {status === 'LOCKED' && (
-                              <div className="flex items-center gap-1.5 px-3 py-1 bg-surface-container text-slate-500 border border-outline-variant/10 rounded-full text-xs font-bold">
+                              <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-surface shadow-clay-sunken text-slate-500 rounded-full text-xs font-bold border-2 border-brand-elevated/40">
                                 <span className="material-symbols-outlined text-xs">lock</span>
                                 <span>Locked</span>
                               </div>
@@ -294,14 +293,11 @@ export default function Units() {
                               }
                             }}
                             disabled={status === 'LOCKED'}
-                            className={`px-5 py-2.5 rounded-xl text-xs font-headline font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 w-full md:w-auto justify-center ${
+                            className={`px-5 py-2.5 clay-button text-xs font-headline font-bold uppercase tracking-wider flex items-center gap-1.5 w-full md:w-auto justify-center ${
                               status === 'LOCKED'
-                                ? 'bg-surface-container-highest text-slate-500 cursor-not-allowed border border-outline-variant/10'
-                                : 'btn-glow bg-gradient-primary text-white active:scale-95'
+                                ? 'clay-button-disabled opacity-50 cursor-not-allowed'
+                                : 'clay-button-primary'
                             }`}
-                            style={status !== 'LOCKED' ? {
-                              boxShadow: `0 4px 15px ${color}30`
-                            } : {}}
                           >
                             <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
                               {status === 'LOCKED' ? 'lock' : status === 'NOT_STARTED' ? 'play_arrow' : 'replay'}
@@ -318,26 +314,25 @@ export default function Units() {
               {/* END NODE */}
               <div className="flex gap-6 md:gap-8 items-stretch">
                 <div className="flex flex-col items-center">
-                  <div className={`w-12 h-12 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                  <div className={`w-12 h-12 rounded-full bg-brand-surface shadow-clay-outer flex items-center justify-center flex-shrink-0 ${
                     quizzes[quizzes.length - 1]?.bestScorePercent >= 75
-                      ? 'bg-secondary/20 border-secondary/45 text-secondary shadow-[0_0_15px_rgba(183,109,255,0.4)]'
-                      : 'bg-surface-container border-outline-variant/10 text-slate-500'
+                      ? 'text-secondary border-2 border-secondary/30'
+                      : 'text-slate-500'
                   }`}>
                     <span className="material-symbols-outlined text-xl font-bold">emoji_events</span>
                   </div>
                 </div>
                 <div className="flex-1 animate-slideUp" style={{ animationDelay: `${quizzes.length * 0.05}s` }}>
-                  <div className={`glass-card rounded-2xl p-6 border max-w-md ${
+                  <div className={`clay-card p-6 max-w-md ${
                     quizzes[quizzes.length - 1]?.bestScorePercent >= 75
-                      ? 'border-secondary/30 opacity-100'
-                      : 'border-outline-variant/10 opacity-50'
+                      ? 'opacity-100'
+                      : 'opacity-50'
                   }`}>
                     <h3 className="font-headline font-bold text-lg text-on-surface">Path Complete</h3>
                     <p className="text-xs text-on-surface-variant mt-1 whitespace-normal">Graduate from clinical training!</p>
                   </div>
                 </div>
               </div>
-
             </div>
           )}
         </section>

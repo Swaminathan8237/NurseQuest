@@ -22,8 +22,12 @@ async function initializeDB() {
   const sql = getDB();
   
   try {
-    const schemaPath = path.normalize(path.join(__dirname, 'schema.sql'));
-    const schema = fs.readFileSync(schemaPath, 'utf8');
+    let schema = '';
+    try {
+      schema = fs.readFileSync('./db/schema.sql', 'utf8');
+    } catch (e) {
+      schema = fs.readFileSync('./backend/db/schema.sql', 'utf8');
+    }
     
     console.log('🔄 Initializing Supabase database schema...');
     // unsafe is used here to run the multi-statement schema.sql directly

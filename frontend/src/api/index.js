@@ -36,8 +36,7 @@ async function request(endpoint, options = {}) {
 
 // Auth
 export const authAPI = {
-  login: (email, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  syncProfile: (data) => request('/auth/sync-profile', { method: 'POST', body: JSON.stringify(data) }),
   getProfile: () => request('/auth/me'),
   updateAvatar: (avatarConfig) => request('/auth/avatar', { method: 'PUT', body: JSON.stringify({ avatarConfig }) }),
 };
@@ -149,4 +148,18 @@ export const moduleAPI = {
   delete: (id) => request(`/modules/${id}`, { method: 'DELETE' }),
 };
 
-export default { authAPI, quizAPI, scoreAPI, userAPI, moduleAPI };
+// Admin & Request Workflow
+export const adminAPI = {
+  getUsers: () => request('/admin/users'),
+  updateUserRole: (id, role) => request(`/admin/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
+  getModules: () => request('/admin/modules'),
+  submitQuizRequest: (quizId, moduleId) => request('/admin/requests', { method: 'POST', body: JSON.stringify({ quizId, moduleId }) }),
+  getMyQuizRequests: () => request('/admin/my-requests'),
+  getAllQuizRequests: () => request('/admin/requests'),
+  processQuizRequest: (id, action, adminNotes) => request(`/admin/requests/${id}/action`, { method: 'POST', body: JSON.stringify({ action, adminNotes }) }),
+  getStats: () => request('/admin/stats'),
+  resetStatistics: () => request('/admin/reset-statistics', { method: 'POST' }),
+};
+
+export default { authAPI, quizAPI, scoreAPI, userAPI, moduleAPI, adminAPI };

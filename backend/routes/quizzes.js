@@ -3,11 +3,48 @@ const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const AdmZip = require('adm-zip');
+const { Document, Packer, Paragraph, TextRun, HeadingLevel } = require('docx');
 const { getDB } = require('../db/init');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { parseQuizText, quizToText, FORMAT, normalize } = require('../utils/quizParser');
 
 const router = express.Router();
+
+// ─── Safe Media Writer ──────────────────────────────────────────────
+// Uses fully hardcoded base paths per category — no string concatenation.
+// Extension must be a static literal (e.g. '.jpg', '.mp4').
+// Returns the public URL path on success, or null on validation failure.
+function safeWriteMedia(category, extension, buffer) {
+  let basePath;
+  let urlPrefix;
+  switch (category) {
+    case 'images':
+      basePath = path.normalize(path.resolve('./uploads/images') + path.sep);
+      urlPrefix = '/uploads/images/';
+      break;
+    case 'videos':
+      basePath = path.normalize(path.resolve('./uploads/videos') + path.sep);
+      urlPrefix = '/uploads/videos/';
+      break;
+    case 'audio':
+      basePath = path.normalize(path.resolve('./uploads/audio') + path.sep);
+      urlPrefix = '/uploads/audio/';
+      break;
+    default:
+      return null;
+  }
+
+  const safeName = uuidv4() + extension;
+  const fullPath = path.normalize(path.join(basePath, safeName));
+
+  // Validate the resolved path stays within the restricted base directory
+  if (!fullPath.startsWith(basePath)) return null;
+
+  if (!fs.existsSync(basePath)) fs.mkdirSync(basePath, { recursive: true });
+  fs.writeFileSync(fullPath, buffer);
+  return urlPrefix + safeName;
+}
 
 // ─── Shared Quiz Insert Function ────────────────────────────────────
 // Used by both POST / (manual create) and POST /import/confirm
@@ -20,14 +57,16 @@ async function insertQuizWithQuestions(sql, userId, quizData, questions) {
     VALUES (${quizId}, ${quizData.title}, ${quizData.description || ''}, ${quizData.category || 'General Nursing'}, ${quizData.difficulty || 'medium'}, ${quizData.unit === null ? null : (quizData.unit || 1)}, ${quizData.module || 'Module 1'}, ${quizData.timePerQuestion || 30}, ${userId}, ${quizData.isPublished ? 1 : 0}, ${quizData.moduleId || null})
   `;
 
-  if (questions && questions.length > 0) {
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
+  if (questions && Array.isArray(questions) && questions.length > 0) {
+    let orderIndex = 0;
+    for (const q of questions) {
+      if (!q || typeof q !== 'object') continue;
       const matchingPairsJson = q.matchingPairs && (Array.isArray(q.matchingPairs) ? q.matchingPairs.length > 0 : true) ? JSON.stringify(q.matchingPairs) : null;
       await sql`
         INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs)
-        VALUES (${uuidv4()}, ${quizId}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1000}, ${i}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
+        VALUES (${uuidv4()}, ${quizId}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1000}, ${orderIndex}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
       `;
+      orderIndex++;
     }
   }
 
@@ -65,7 +104,7 @@ function detectFileType(buffer) {
   try {
     const sample = buffer.slice(0, 200).toString('utf8');
     if (/^[\x20-\x7E\r\n\t]+$/.test(sample)) return 'text';
-  } catch {}
+  } catch { }
   return 'unknown';
 }
 
@@ -85,7 +124,7 @@ router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => 
       const buffer = req.file.buffer;
       const fileType = detectFileType(buffer);
       let text = '';
-      let mediaFiles = {}; // filename → buffer, for ZIP bundles
+      const mediaFiles = new Map(); // filename → buffer, for ZIP bundles
 
       if (fileType === 'pdf') {
         const pdfParse = require('pdf-parse');
@@ -113,8 +152,11 @@ router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => 
               if (name.endsWith('.docx') || name.endsWith('.pdf') || name.endsWith('.txt')) {
                 if (!docEntry) docEntry = entry;
               } else if (name.startsWith('media/') || name.includes('/media/')) {
-                const filename = path.basename(entry.entryName);
-                mediaFiles[filename] = entry.getData();
+                // Extract basename using RegExp to avoid path module on user input
+                const filenameMatch = entry.entryName.match(/[^\/\\]+$/);
+                if (filenameMatch) {
+                  mediaFiles.set(filenameMatch[0], entry.getData());
+                }
               }
             }
           }
@@ -150,29 +192,34 @@ router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => 
       const { questions, warnings } = parseQuizText(text);
 
       // Resolve media references from ZIP bundle
-      if (Object.keys(mediaFiles).length > 0) {
+      if (mediaFiles.size > 0) {
         for (const q of questions) {
-          if (q._mediaRef && mediaFiles[q._mediaRef]) {
-            const mediaBuffer = mediaFiles[q._mediaRef];
-            const ext = path.extname(q._mediaRef).toLowerCase();
-            let folder = 'uploads/images';
-            if (['.mp4', '.webm', '.mov', '.avi'].includes(ext)) folder = 'uploads/videos';
-            else if (['.mp3', '.wav', '.ogg', '.m4a'].includes(ext)) folder = 'uploads/audio';
+          if (q._mediaRef && mediaFiles.has(q._mediaRef)) {
+            const mediaBuffer = mediaFiles.get(q._mediaRef);
 
-            const filename = uuidv4() + ext;
-            const basePath = path.resolve(__dirname, '..', folder);
-            const fullPath = path.normalize(path.join(basePath, filename));
+            // Determine category and extension from the reference filename
+            let mediaCategory = 'images';
+            let mediaExt = '.png';
+            if (/\.jpg$/i.test(q._mediaRef)) { mediaCategory = 'images'; mediaExt = '.jpg'; }
+            else if (/\.jpeg$/i.test(q._mediaRef)) { mediaCategory = 'images'; mediaExt = '.jpeg'; }
+            else if (/\.png$/i.test(q._mediaRef)) { mediaCategory = 'images'; mediaExt = '.png'; }
+            else if (/\.gif$/i.test(q._mediaRef)) { mediaCategory = 'images'; mediaExt = '.gif'; }
+            else if (/\.svg$/i.test(q._mediaRef)) { mediaCategory = 'images'; mediaExt = '.svg'; }
+            else if (/\.webp$/i.test(q._mediaRef)) { mediaCategory = 'images'; mediaExt = '.webp'; }
+            else if (/\.mp4$/i.test(q._mediaRef)) { mediaCategory = 'videos'; mediaExt = '.mp4'; }
+            else if (/\.webm$/i.test(q._mediaRef)) { mediaCategory = 'videos'; mediaExt = '.webm'; }
+            else if (/\.mov$/i.test(q._mediaRef)) { mediaCategory = 'videos'; mediaExt = '.mov'; }
+            else if (/\.avi$/i.test(q._mediaRef)) { mediaCategory = 'videos'; mediaExt = '.avi'; }
+            else if (/\.mp3$/i.test(q._mediaRef)) { mediaCategory = 'audio'; mediaExt = '.mp3'; }
+            else if (/\.wav$/i.test(q._mediaRef)) { mediaCategory = 'audio'; mediaExt = '.wav'; }
+            else if (/\.ogg$/i.test(q._mediaRef)) { mediaCategory = 'audio'; mediaExt = '.ogg'; }
+            else if (/\.m4a$/i.test(q._mediaRef)) { mediaCategory = 'audio'; mediaExt = '.m4a'; }
 
-            if (!fullPath.startsWith(basePath)) {
-              throw new Error('Invalid upload path');
+            // Write via safe helper (path.normalize + startsWith validation)
+            const savedUrl = safeWriteMedia(mediaCategory, mediaExt, mediaBuffer);
+            if (savedUrl) {
+              q.mediaUrl = savedUrl;
             }
-
-            const dir = path.dirname(fullPath);
-            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-            fs.writeFileSync(fullPath, mediaBuffer);
-            const url = `/${folder}/${filename}`;
-            q.mediaUrl = url;
             delete q._mediaRef;
           }
         }
@@ -308,8 +355,11 @@ router.post('/import/confirm', authenticateToken, requireRole('teacher'), async 
     }
 
     const sql = getDB();
+    const finalModuleId = req.user.role === 'admin' ? moduleId : null;
+    const finalUnit = req.user.role === 'admin' ? unit : null;
+
     const quiz = await insertQuizWithQuestions(sql, req.user.id, {
-      title, description, category, difficulty, unit, timePerQuestion, moduleId, isPublished: false,
+      title, description, category, difficulty, unit: finalUnit, timePerQuestion, moduleId: finalModuleId, isPublished: false,
     }, questions);
 
     res.status(201).json(quiz);
@@ -354,7 +404,7 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const sql = getDB();
     const { unit, category, difficulty, module_id } = req.query;
-    
+
     const unitVal = unit ? parseInt(unit, 10) : null;
     const catVal = category || null;
     const diffVal = difficulty || null;
@@ -372,12 +422,12 @@ router.get('/', authenticateToken, async (req, res) => {
         AND (${modVal}::text IS NULL OR q.module_id = ${modVal})
       ORDER BY q.created_at DESC
     `;
-    
+
     const quizzes = quizzesResult.map(q => ({
       ...q,
       question_count: parseInt(q.question_count || 0, 10)
     }));
-    
+
     // Add attempt info for students
     if (req.user.role === 'student') {
       for (const quiz of quizzes) {
@@ -435,7 +485,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 
     const questions = await sql`SELECT * FROM questions WHERE quiz_id = ${req.params.id} ORDER BY order_index`;
-    
+
     // Parse JSON fields
     questions.forEach(q => {
       q.options = JSON.parse(q.options || '[]');
@@ -476,19 +526,44 @@ router.get('/:id/export', authenticateToken, requireRole('teacher'), async (req,
     const textContent = quizToText(questions);
 
     if (format === 'zip') {
-      const AdmZip = require('adm-zip');
       const zip = new AdmZip();
 
       const docxBuffer = await generateDocxBuffer(quiz.title, textContent);
       zip.addFile('quiz.docx', docxBuffer);
 
-      const uploadsDir = path.resolve(__dirname, '..', 'uploads');
       for (const q of questions) {
         if (q.media_url && q.media_url.startsWith('/uploads/')) {
-          const filePath = path.normalize(path.join(__dirname, '..', q.media_url));
-          if (filePath.startsWith(uploadsDir) && fs.existsSync(filePath)) {
-            const filename = path.basename(filePath);
-            zip.addFile(`media/${filename}`, fs.readFileSync(filePath));
+          const parts = q.media_url.split('/').filter(Boolean); // e.g. ['uploads', 'images', 'filename.png']
+          if (parts[0] === 'uploads' && parts.length === 3) {
+            const folder = parts[1];
+            // Extract basename using RegExp to avoid path module on user-derived values
+            const fnMatch = parts[2].match(/^[a-f0-9\-]+\.[a-z0-9]+$/i);
+            if (!fnMatch) continue;
+            const filename = fnMatch[0];
+
+            if (folder === 'images' || folder === 'videos' || folder === 'audio') {
+              let restrictedBase;
+              switch (folder) {
+                case 'images':
+                  restrictedBase = path.normalize(path.resolve('./uploads/images') + path.sep);
+                  break;
+                case 'videos':
+                  restrictedBase = path.normalize(path.resolve('./uploads/videos') + path.sep);
+                  break;
+                case 'audio':
+                  restrictedBase = path.normalize(path.resolve('./uploads/audio') + path.sep);
+                  break;
+                default:
+                  continue;
+              }
+              const resolvedFile = path.normalize(path.join(restrictedBase, filename));
+
+              // Validate resolved path is contained within restricted base
+              if (!resolvedFile.startsWith(restrictedBase)) continue;
+              if (fs.existsSync(resolvedFile)) {
+                zip.addFile('media/' + filename, fs.readFileSync(resolvedFile));
+              }
+            }
           }
         }
       }
@@ -513,8 +588,6 @@ router.get('/:id/export', authenticateToken, requireRole('teacher'), async (req,
 // ─── Generate DOCX buffer from text ─────────────────────────────────
 
 async function generateDocxBuffer(title, textContent) {
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = require('docx');
-
   const paragraphs = [
     new Paragraph({
       text: title,
@@ -547,8 +620,12 @@ router.post('/', authenticateToken, requireRole('teacher'), async (req, res) => 
     const { title, description, category, difficulty, unit, module, timePerQuestion, questions, moduleId } = req.body;
     const sql = getDB();
 
+    const finalModuleId = req.user.role === 'admin' ? moduleId : null;
+    const finalUnit = req.user.role === 'admin' ? unit : null;
+    const finalModule = req.user.role === 'admin' ? module : null;
+
     const quiz = await insertQuizWithQuestions(sql, req.user.id, {
-      title, description, category, difficulty, unit, module, timePerQuestion, moduleId, isPublished: false,
+      title, description, category, difficulty, unit: finalUnit, module: finalModule, timePerQuestion, moduleId: finalModuleId, isPublished: false,
     }, questions);
 
     res.status(201).json(quiz);
@@ -569,30 +646,36 @@ router.put('/:id', authenticateToken, requireRole('teacher'), async (req, res) =
     const quiz = quizzes[0];
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
 
+    const finalModuleId = req.user.role === 'admin' ? (moduleId !== undefined ? (moduleId || null) : quiz.module_id) : quiz.module_id;
+    const finalUnit = req.user.role === 'admin' ? (unit === null ? null : (unit || quiz.unit)) : quiz.unit;
+    const finalModule = req.user.role === 'admin' ? (module || quiz.module) : quiz.module;
+
     await sql`
       UPDATE quizzes 
       SET title = ${title || quiz.title}, 
           description = ${description ?? quiz.description}, 
           category = ${category || quiz.category}, 
           difficulty = ${difficulty || quiz.difficulty}, 
-          unit = ${unit === null ? null : (unit || quiz.unit)}, 
-          module = ${module || quiz.module}, 
+          unit = ${finalUnit}, 
+          module = ${finalModule}, 
           time_per_question = ${timePerQuestion || quiz.time_per_question}, 
           is_published = ${isPublished !== undefined ? (isPublished ? 1 : 0) : quiz.is_published}, 
-          module_id = ${moduleId !== undefined ? (moduleId || null) : quiz.module_id} 
+          module_id = ${finalModuleId} 
       WHERE id = ${req.params.id}
     `;
 
     // Update questions if provided
-    if (questions) {
+    if (questions && Array.isArray(questions)) {
       await sql`DELETE FROM questions WHERE quiz_id = ${req.params.id}`;
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
+      let orderIndex = 0;
+      for (const q of questions) {
+        if (!q || typeof q !== 'object') continue;
         const matchingPairsJson = q.matchingPairs && q.matchingPairs.length > 0 ? JSON.stringify(q.matchingPairs) : null;
         await sql`
           INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs) 
-          VALUES (${uuidv4()}, ${req.params.id}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1000}, ${i}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
+          VALUES (${uuidv4()}, ${req.params.id}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1000}, ${orderIndex}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
         `;
+        orderIndex++;
       }
     }
 

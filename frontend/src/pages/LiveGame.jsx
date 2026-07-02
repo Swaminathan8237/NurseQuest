@@ -257,6 +257,7 @@ export default function LiveGame() {
   const [matchingSelections, setMatchingSelections] = useState({});
   const [selectedLeft, setSelectedLeft] = useState(null);
   const [shuffledRightItems, setShuffledRightItems] = useState([]);
+  const [showRankings, setShowRankings] = useState(false);
 
   // Captcha state
   const [captchaBox, setCaptchaBox] = useState(null);
@@ -1169,6 +1170,37 @@ export default function LiveGame() {
                   }}
                   onMouseUp={() => { setCaptchaDrawing(false); setCaptchaStartPt(null); setCaptchaPanning(false); }}
                   onMouseLeave={() => { setCaptchaDrawing(false); setCaptchaStartPt(null); setCaptchaPanning(false); }}
+                  onTouchStart={(e) => {
+                    if (answered || timeLeft <= 0 || e.touches.length > 1) return;
+                    const touch = e.touches[0];
+                    const rect = captchaContainerRef.current?.getBoundingClientRect();
+                    if (!rect) return;
+                    const imgX = (touch.clientX - rect.left - captchaPan.x) / (rect.width * captchaZoom);
+                    const imgY = (touch.clientY - rect.top - captchaPan.y) / (rect.height * captchaZoom);
+                    const pos = { x: Math.max(0, Math.min(1, imgX)), y: Math.max(0, Math.min(1, imgY)) };
+                    setCaptchaStartPt(pos);
+                    setCaptchaDrawing(true);
+                    setCaptchaBox(null);
+                  }}
+                  onTouchMove={(e) => {
+                    if (answered || timeLeft <= 0 || e.touches.length > 1) return;
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const rect = captchaContainerRef.current?.getBoundingClientRect();
+                    if (!rect) return;
+                    if (captchaDrawing && captchaStartPt) {
+                      const imgX = (touch.clientX - rect.left - captchaPan.x) / (rect.width * captchaZoom);
+                      const imgY = (touch.clientY - rect.top - captchaPan.y) / (rect.height * captchaZoom);
+                      const pos = { x: Math.max(0, Math.min(1, imgX)), y: Math.max(0, Math.min(1, imgY)) };
+                      setCaptchaBox({
+                        x: Math.min(captchaStartPt.x, pos.x),
+                        y: Math.min(captchaStartPt.y, pos.y),
+                        w: Math.abs(pos.x - captchaStartPt.x),
+                        h: Math.abs(pos.y - captchaStartPt.y),
+                      });
+                    }
+                  }}
+                  onTouchEnd={() => { setCaptchaDrawing(false); setCaptchaStartPt(null); setCaptchaPanning(false); }}
                 >
                   <div style={{
                     transform: `scale(${captchaZoom}) translate(${captchaPan.x / captchaZoom}px, ${captchaPan.y / captchaZoom}px)`,
@@ -1217,8 +1249,8 @@ export default function LiveGame() {
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div className="bg-surface/80 backdrop-blur-sm px-5 py-3 rounded-xl border border-outline-variant/30 text-center shadow-xl">
                         <span className="material-symbols-outlined text-primary text-3xl block mb-1">center_focus_strong</span>
-                        <p className="text-sm font-medium text-on-surface">Click & drag to select</p>
-                        <p className="text-xs text-on-surface-variant">Scroll to zoom</p>
+                        <p className="text-sm font-medium text-on-surface">Drag to select the region</p>
+                        <p className="text-xs text-on-surface-variant">Scroll/pinch to zoom</p>
                       </div>
                     </div>
                   )}
@@ -1399,8 +1431,8 @@ export default function LiveGame() {
             </div>
           </section>
 
-          {/* Sidebar Scoreboard (Right) */}
-          <aside className="flex-[3] bg-surface-container-low border-l border-surface-container-high flex flex-col z-20 hidden lg:flex">
+          {/* Sidebar Scoreboard (Right) — Desktop */}
+          <aside className="flex-[3] bg-surface-container-low border-l border-surface-container-high flex-col z-20 hidden lg:flex">
             <div className="p-6 border-b border-surface-container-high flex items-center justify-between">
               <h3 className="font-headline font-bold text-sm tracking-widest text-on-surface uppercase">LIVE RANKINGS</h3>
               <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-1 rounded">{participants.length} PLYRS</span>
@@ -1409,8 +1441,38 @@ export default function LiveGame() {
               <RankingsList rankings={activeRankings} variant="sidebar" currentUserId={user?.id} />
             </div>
           </aside>
+
+          {/* Mobile Rankings Toggle */}
+          <button
+            className="lg:hidden fixed bottom-20 right-4 z-30 w-14 h-14 rounded-full bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-[0_0_20px_rgba(0,229,255,0.4)] flex items-center justify-center active:scale-90 transition-transform"
+            onClick={() => setShowRankings(true)}
+          >
+            <span className="material-symbols-outlined text-2xl">leaderboard</span>
+          </button>
         </main>
 
+        {/* Mobile Rankings Bottom Sheet */}
+        {showRankings && (
+          <div className="fixed inset-0 z-[70] lg:hidden">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowRankings(false)} />
+            <div className="absolute bottom-0 left-0 right-0 max-h-[60vh] bg-surface-container-low rounded-t-2xl border-t border-white/10 shadow-2xl flex flex-col animate-slideUp">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">leaderboard</span>
+                  <span className="font-bold text-on-surface font-['Manrope']">LIVE RANKINGS</span>
+                  <span className="font-mono text-xs text-primary bg-primary/10 px-2 py-0.5 rounded">{participants.length}</span>
+                </div>
+                <button className="p-1 rounded-full hover:bg-surface-container transition-all" onClick={() => setShowRankings(false)}>
+                  <span className="material-symbols-outlined text-on-surface-variant">close</span>
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                <RankingsList rankings={activeRankings} variant="sidebar" currentUserId={user?.id} />
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Bottom Status Bar */}
         <footer className="h-10 bg-surface-container-lowest border-t border-surface-container-high flex items-center justify-between px-6 shrink-0 z-50 text-xs font-mono text-on-surface-variant">
           <div className="flex items-center gap-6">

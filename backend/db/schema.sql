@@ -4,9 +4,9 @@
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL,
+  password TEXT,
   name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('student', 'teacher')),
+  role TEXT NOT NULL CHECK(role IN ('student', 'teacher', 'admin')),
   avatar_config TEXT DEFAULT '{}',
   xp INTEGER DEFAULT 0,
   level INTEGER DEFAULT 1,
@@ -146,6 +146,21 @@ CREATE TABLE IF NOT EXISTS user_achievements (
   UNIQUE(user_id, achievement_id)
 );
 
+-- Quiz Requests table
+CREATE TABLE IF NOT EXISTS quiz_requests (
+  id TEXT PRIMARY KEY,
+  quiz_id TEXT NOT NULL,
+  module_id TEXT NOT NULL,
+  teacher_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected')),
+  admin_notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
+  FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE,
+  FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON quiz_attempts(user_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz ON quiz_attempts(quiz_id);
@@ -154,3 +169,32 @@ CREATE INDEX IF NOT EXISTS idx_live_sessions_code ON live_sessions(join_code);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_quizzes_module ON quizzes(module_id);
 CREATE INDEX IF NOT EXISTS idx_modules_created_by ON modules(created_by);
+CREATE INDEX IF NOT EXISTS idx_quiz_requests_teacher ON quiz_requests(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_requests_status ON quiz_requests(status);
+
+-- ─── Supabase Auth Auto-Sync Trigger ───
+-- Automatically synchronizes newly registered users in auth.users to public.users table
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.users (id, email, name, role, avatar_config)
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    COALESCE(new.raw_user_meta_data->>'role', 'student'),
+    '{}'
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    name = CASE WHEN public.users.name = 'New User' OR public.users.name = '' THEN EXCLUDED.name ELSE public.users.name END;
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create the trigger
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

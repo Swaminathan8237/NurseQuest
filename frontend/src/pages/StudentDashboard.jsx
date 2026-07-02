@@ -49,15 +49,15 @@ export default function StudentDashboard() {
       <Navbar />
       <main className="max-w-7xl mx-auto px-6 flex flex-col gap-8 lg:gap-12 pb-12" style={{ paddingTop: '100px' }}>
         {/* Welcome Banner */}
-        <section className="w-full glass-card rounded-[2rem] p-8 relative overflow-hidden flex flex-col md:flex-row items-center gap-6 justify-between shadow-[0_10px_40px_rgba(0,0,0,0.2)] animate-slideUp">
+        <section className="w-full clay-card p-8 relative overflow-hidden flex flex-col md:flex-row items-center gap-6 justify-between animate-slideUp">
           <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary-container/20 rounded-full blur-[80px] pointer-events-none"></div>
           
           <div className="flex items-center gap-6 z-10">
             <div className="relative cursor-pointer" onClick={() => navigate('/avatar-setup')}>
-              <div className="w-20 h-20 rounded-full bg-surface-container p-1 border-2 border-primary shadow-[0_0_20px_rgba(183,109,255,0.4)] overflow-hidden flex justify-center items-center">
+              <div className="w-20 h-20 rounded-full bg-brand-surface p-1 border-2 border-primary shadow-clay-outer overflow-hidden flex justify-center items-center">
                 <Avatar config={user?.avatar_config} size={72} showBg={false} />
               </div>
-              <div className="absolute -bottom-2 right-0 bg-surface-container-highest px-2 py-1 rounded-full border border-primary text-xs font-bold text-primary flex items-center gap-1 shadow-lg">
+              <div className="absolute -bottom-2 right-0 bg-brand-surface shadow-clay-outer px-2 py-1 rounded-full border-2 border-primary text-xs font-bold text-primary flex items-center gap-1">
                 <span className="material-symbols-outlined text-[10px]" style={{fontVariationSettings: "'FILL' 1"}}>star</span> {levelInfo.level}
               </div>
             </div>
@@ -69,13 +69,13 @@ export default function StudentDashboard() {
             </div>
           </div>
           
-          <div className="z-10 bg-surface-container p-4 rounded-2xl w-full md:w-auto min-w-[280px]">
+          <div className="z-10 bg-brand-surface shadow-clay-inner p-4 rounded-2xl w-full md:w-auto min-w-0 md:min-w-[280px]">
             <div className="flex justify-between items-center mb-2">
               <span className="font-body text-sm font-semibold text-tertiary">⭐ {LEVEL_NAMES[levelInfo.level] || 'Nurse Intern'}</span>
               <span className="font-body text-xs text-on-surface-variant">{levelInfo.xpInLevel} / {levelInfo.xpForNextLevel} XP</span>
             </div>
-            <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-tertiary to-primary rounded-r-full shadow-[0_0_10px_rgba(113,215,205,0.5)]" style={{ width: `${levelInfo.progress}%` }}></div>
+            <div className="w-full h-3 bg-brand-elevated shadow-clay-sunken rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-tertiary to-primary rounded-full" style={{ width: `${levelInfo.progress}%` }}></div>
             </div>
           </div>
         </section>
@@ -83,13 +83,13 @@ export default function StudentDashboard() {
         {/* Stats Grid */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
           {[
-            { label: 'Quizzes Taken', value: stats?.quizzesTaken || 0, icon: 'quiz', color: 'text-primary', bg: 'bg-primary/20', glow: 'group-hover:shadow-[0_0_20px_rgba(108,92,231,0.15)]' },
-            { label: 'Average Score', value: `${Math.round(stats?.avgScore || 0)}%`, icon: 'analytics', color: 'text-tertiary', bg: 'bg-tertiary/20', glow: 'group-hover:shadow-[0_0_20px_rgba(113,215,205,0.15)]' },
-            { label: 'Best Streak', value: `${stats?.bestStreak || 0}`, icon: 'local_fire_department', color: 'text-[#fabc4e]', bg: 'bg-[#fabc4e]/20', glow: 'group-hover:shadow-[0_0_20px_rgba(250,188,78,0.15)]' },
-            { label: 'Total XP', value: stats?.xp?.toLocaleString() || '0', icon: 'bolt', color: 'text-primary-container', bg: 'bg-primary-container/20', glow: 'group-hover:shadow-[0_0_20px_rgba(183,109,255,0.15)]' },
+            { label: 'Quizzes Taken', value: stats?.quizzesTaken || 0, icon: 'quiz', color: 'text-primary' },
+            { label: 'Average Score', value: `${Math.round(stats?.avgScore || 0)}%`, icon: 'analytics', color: 'text-tertiary' },
+            { label: 'Best Streak', value: `${stats?.bestStreak || 0}`, icon: 'local_fire_department', color: 'text-[#fabc4e]' },
+            { label: 'Total XP', value: stats?.xp?.toLocaleString() || '0', icon: 'bolt', color: 'text-primary-container' },
           ].map((stat, i) => (
-            <div key={i} className={`glass-card rounded-2xl p-6 flex flex-col gap-4 group animate-slideUp cursor-default`} style={{ animationDelay: `${0.1 + i * 0.1}s` }}>
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.bg} group-hover:scale-110 transition-transform duration-300 ${stat.glow}`}>
+            <div key={i} className="clay-card p-6 flex flex-col gap-4 group cursor-default" style={{ animationDelay: `${0.1 + i * 0.1}s` }}>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-brand-surface shadow-clay-sunken group-hover:scale-110 transition-transform duration-300">
                 <span className={`material-symbols-outlined ${stat.color}`} style={{fontVariationSettings: "'FILL' 1"}}>{stat.icon}</span>
               </div>
               <div>
@@ -100,13 +100,11 @@ export default function StudentDashboard() {
           ))}
         </section>
 
-        {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column: Learning Progress & Recent Activity */}
           <div className="lg:col-span-2 flex flex-col gap-8">
-            
             {/* Unit Path Card */}
-            <div className="glass-card gradient-border rounded-2xl p-8 shadow-xl relative overflow-hidden animate-slideUp">
+            <div className="clay-card p-8 relative overflow-hidden animate-slideUp">
               <div className="absolute -right-16 -top-16 w-48 h-48 bg-primary/10 rounded-full blur-[60px] pointer-events-none"></div>
               
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
@@ -127,14 +125,14 @@ export default function StudentDashboard() {
               </div>
 
               {/* Progress Slider */}
-              <div className="space-y-3 bg-surface-container/30 p-5 rounded-xl border border-outline-variant/5">
+              <div className="space-y-3 bg-brand-surface shadow-clay-inner p-5 rounded-xl">
                 <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
                   <span>CURRICULUM MIGRATION DONE</span>
                   <span className="font-mono text-primary">{unitProgressPct}% COMPLETE</span>
                 </div>
-                <div className="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden">
+                <div className="w-full h-4 bg-brand-elevated shadow-clay-sunken rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-gradient-primary rounded-full transition-all duration-700 shadow-[0_0_10px_var(--primary-glow)]"
+                    className="h-full bg-gradient-primary rounded-full transition-all duration-700"
                     style={{ width: `${unitProgressPct}%` }}
                   ></div>
                 </div>
@@ -144,7 +142,7 @@ export default function StudentDashboard() {
               <div className="mt-8 flex justify-end">
                 <button
                   onClick={() => navigate('/units')}
-                  className="px-8 py-4 bg-gradient-primary text-white font-headline font-bold uppercase tracking-widest rounded-xl hover:shadow-[0_0_20px_var(--primary-glow)] hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2.5"
+                  className="px-8 py-4 clay-button clay-button-primary font-headline font-bold uppercase tracking-widest flex items-center gap-2.5"
                 >
                   <span>Go to Units Section</span>
                   <span className="material-symbols-outlined">arrow_forward</span>
@@ -168,11 +166,11 @@ export default function StudentDashboard() {
                       <div 
                         key={quiz.id}
                         onClick={() => navigate(`/quiz/${quiz.id}`)}
-                        className="glass-card gradient-border rounded-xl p-5 border border-outline-variant/20 hover:border-primary/50 hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 transition-all group flex flex-col justify-between h-full cursor-pointer relative overflow-hidden"
+                        className="clay-card p-5 group flex flex-col justify-between h-full cursor-pointer relative overflow-hidden transition-all duration-300"
                       >
                         <div className="flex-1">
                           <div className="flex justify-between items-start gap-2 mb-2">
-                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 bg-surface-container px-2 py-0.5 rounded">
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 bg-brand-surface shadow-clay-sunken px-2 py-0.5 rounded">
                               {quiz.category || 'General Nursing'}
                             </span>
                             {hasAttempt && (
@@ -188,14 +186,14 @@ export default function StudentDashboard() {
                           <p className="text-xs text-on-surface-variant line-clamp-2 mb-4">{quiz.description}</p>
                         </div>
 
-                        <div className="flex items-center justify-between border-t border-outline-variant/10 pt-3 mt-auto">
+                        <div className="flex items-center justify-between border-t border-brand-elevated/40 pt-3 mt-auto">
                           <span className="text-[10px] font-mono text-slate-500 font-bold uppercase tracking-wider">{quiz.difficulty}</span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate(`/quiz/${quiz.id}`);
                             }}
-                            className="px-4 py-2 bg-gradient-primary text-white text-xs font-headline font-bold uppercase tracking-wider rounded-lg shadow-md active:scale-95 transition-all flex items-center gap-1"
+                            className="px-4 py-2 clay-button clay-button-primary text-xs font-headline font-bold uppercase tracking-wider flex items-center gap-1"
                           >
                             <span className="material-symbols-outlined text-xs">{hasAttempt ? 'replay' : 'play_arrow'}</span>
                             <span>{hasAttempt ? 'Retry' : 'Play'}</span>
@@ -215,7 +213,7 @@ export default function StudentDashboard() {
               </h2>
 
               {(!stats?.recentAttempts || stats.recentAttempts.length === 0) ? (
-                <div className="bg-surface-container/50 rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/10 border-dashed">
+                <div className="clay-card p-8 text-center text-on-surface-variant border-dashed">
                   <span className="material-symbols-outlined text-4xl mb-2 opacity-50">history_edu</span>
                   <p>No recent quiz attempts found. Start your learning path above!</p>
                 </div>
@@ -227,11 +225,11 @@ export default function StudentDashboard() {
                     return (
                       <div 
                         key={attempt.id || i}
-                        className={`glass-card rounded-xl p-5 border flex items-center justify-between gap-4 animate-slideUp ${passed ? 'border-success/20' : 'border-warning/20'}`}
+                        className={`clay-card p-5 flex items-center justify-between gap-4 animate-slideUp border-2 ${passed ? 'border-success/30' : 'border-warning/30'}`}
                         style={{ animationDelay: `${0.2 + i * 0.1}s` }}
                       >
                         <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${passed ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'}`}>
+                          <div className={`w-10 h-10 bg-brand-surface shadow-clay-sunken rounded-xl flex items-center justify-center ${passed ? 'text-success' : 'text-warning'}`}>
                             <span className="material-symbols-outlined">
                               {passed ? 'check_circle' : 'pending'}
                             </span>
@@ -239,7 +237,7 @@ export default function StudentDashboard() {
                           <div>
                             <h4 className="text-base font-bold text-on-surface leading-tight">{attempt.quiz_title}</h4>
                             <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant">
-                              <span className="font-mono bg-surface-container px-2 py-0.5 rounded">Unit {attempt.unit || 1}</span>
+                              <span className="font-mono bg-brand-surface shadow-clay-sunken px-2 py-0.5 rounded">Unit {attempt.unit || 1}</span>
                               <span>·</span>
                               <span>{new Date(attempt.completed_at).toLocaleDateString()}</span>
                             </div>
@@ -265,8 +263,8 @@ export default function StudentDashboard() {
           {/* Right Column */}
           <div className="flex flex-col gap-8">
             {/* Mini Game Promo */}
-            <div className="bg-gradient-to-br from-surface-container-high to-surface-container-lowest rounded-2xl p-6 border border-primary/30 relative overflow-hidden animate-slideUp" style={{ animationDelay: '0.4s' }}>
-              <div className="absolute -right-10 -bottom-10 opacity-10">
+            <div className="clay-card p-6 border-2 border-primary/30 relative overflow-hidden animate-slideUp" style={{ animationDelay: '0.4s' }}>
+              <div className="absolute -right-16 -bottom-16 opacity-10">
                 <span className="material-symbols-outlined text-[120px]">vaccines</span>
               </div>
               <h2 className="text-xl font-headline font-bold text-on-surface mb-2 relative z-10 flex items-center gap-2">
@@ -277,14 +275,14 @@ export default function StudentDashboard() {
               </p>
               <button 
                 onClick={() => navigate('/mini-game')}
-                className="w-full bg-surface-variant/50 backdrop-blur-md border border-outline-variant/30 text-primary font-bold px-4 py-2 rounded-xl hover:bg-surface-variant transition-all relative z-10"
+                className="w-full clay-button clay-button-outline font-bold px-4 py-2 relative z-10"
               >
                 Launch Lab
               </button>
             </div>
 
             {/* Leaderboard Preview */}
-            <div className="bg-surface-container-low rounded-2xl p-6 shadow-lg border border-outline-variant/10 animate-slideUp" style={{ animationDelay: '0.5s' }}>
+            <div className="clay-card p-6 animate-slideUp" style={{ animationDelay: '0.5s' }}>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-lg font-headline font-bold text-on-surface flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#fabc4e]">emoji_events</span> Top Students
@@ -295,11 +293,11 @@ export default function StudentDashboard() {
               </div>
               <div className="flex flex-col gap-3">
                 {leaderboard.map((entry, i) => (
-                  <div key={entry.id} className={`flex items-center gap-3 p-2 rounded-xl ${entry.id === user?.id ? 'bg-primary/10 border border-primary/20' : 'hover:bg-surface-container'}`}>
+                  <div key={entry.id} className={`flex items-center gap-3 p-2 rounded-xl ${entry.id === user?.id ? 'bg-brand-surface shadow-clay-sunken text-primary border-2 border-primary/30' : 'hover:scale-[1.02] transition-transform'}`}>
                     <div className="w-6 text-center font-bold text-sm text-on-surface-variant">
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                     </div>
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-container-highest border border-outline-variant/30">
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-brand-surface shadow-clay-sunken">
                       <Avatar config={entry.avatar_config} size={32} showBg={false} />
                     </div>
                     <div className="flex-1 text-sm font-semibold text-on-surface truncate">{entry.name}</div>
@@ -310,13 +308,13 @@ export default function StudentDashboard() {
             </div>
 
             {/* Achievements */}
-            <div className="bg-surface-container-low rounded-2xl p-6 shadow-lg border border-outline-variant/10 animate-slideUp" style={{ animationDelay: '0.6s' }}>
+            <div className="clay-card p-6 animate-slideUp" style={{ animationDelay: '0.6s' }}>
               <h2 className="text-lg font-headline font-bold text-on-surface mb-6 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">military_tech</span> Achievements
               </h2>
               <div className="grid grid-cols-4 gap-3">
                 {(stats?.achievements || []).map((ach, i) => (
-                  <div key={i} className="aspect-square bg-surface-container-highest rounded-xl flex flex-col items-center justify-center p-2 text-center border border-outline-variant/10 gradient-border cursor-help transition-all duration-300 hover:scale-105 group" title={`${ach.name}: ${ach.description}`}>
+                  <div key={i} className="aspect-square bg-brand-surface shadow-clay-outer rounded-xl flex flex-col items-center justify-center p-2 text-center cursor-help transition-all duration-300 hover:scale-110 group" title={`${ach.name}: ${ach.description}`}>
                     {ach.icon && ach.icon.length <= 2 ? (
                       <span className="text-2xl mb-1 group-hover:scale-125 transition-transform">{ach.icon}</span>
                     ) : (
@@ -338,8 +336,8 @@ export default function StudentDashboard() {
       </main>
 
       {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-6 pb-8 pt-4 lg:hidden bg-[#0b1326]/80 backdrop-blur-xl rounded-t-[2.5rem] border-t border-outline-variant/20 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] font-body text-[10px] uppercase tracking-widest">
-        <div className="flex flex-col items-center justify-center bg-primary/20 text-primary rounded-full p-3 px-5 shadow-[0_0_15px_rgba(183,109,255,0.2)]">
+      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-6 pb-8 pt-4 lg:hidden bg-brand-surface shadow-[0_-6px_14px_rgba(10,10,25,0.4)] rounded-t-[2.5rem] font-body text-[10px] uppercase tracking-widest">
+        <div className="flex flex-col items-center justify-center bg-brand-elevated text-primary rounded-full p-3 px-5 shadow-clay-outer">
           <span className="material-symbols-outlined mb-1" style={{fontVariationSettings: "'FILL' 1"}}>dashboard</span>
           <span>Home</span>
         </div>

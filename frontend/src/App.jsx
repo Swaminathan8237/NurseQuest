@@ -12,13 +12,18 @@ import Leaderboard from './pages/Leaderboard';
 import LiveGame from './pages/LiveGame';
 import NursingMiniGame from './pages/NursingMiniGame';
 import Units from './pages/Units';
+import AdminDashboard from './pages/AdminDashboard';
 import './App.css';
 
 function ProtectedRoute({ children, role }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="loading-screen"><div className="spinner" /><p>Loading NurseQuest...</p></div>;
   if (!user) return <Navigate to="/auth" />;
-  if (role && user.role !== role) return <Navigate to={user.role === 'teacher' ? '/teacher' : '/student'} />;
+  if (user.needProfileSetup) return <Navigate to="/auth" />;
+  if (role && user.role !== role) {
+    if (user.role === 'admin') return <Navigate to="/admin" />;
+    return <Navigate to={user.role === 'teacher' ? '/teacher' : '/student'} />;
+  }
   return children;
 }
 
@@ -38,10 +43,11 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/auth" element={user ? <Navigate to={user.role === 'teacher' ? '/teacher' : '/student'} /> : <AuthPage />} />
+      <Route path="/auth" element={user && !user.needProfileSetup ? <Navigate to={user.role === 'admin' ? '/admin' : (user.role === 'teacher' ? '/teacher' : '/student')} /> : <AuthPage />} />
       <Route path="/avatar-setup" element={<ProtectedRoute role="student"><AvatarSetup /></ProtectedRoute>} />
       <Route path="/student" element={<ProtectedRoute role="student"><StudentDashboard /></ProtectedRoute>} />
       <Route path="/teacher" element={<ProtectedRoute role="teacher"><TeacherDashboard /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
       <Route path="/quiz/:id" element={<ProtectedRoute><QuizPlayer /></ProtectedRoute>} />
       <Route path="/quiz-builder" element={<ProtectedRoute role="teacher"><QuizBuilder /></ProtectedRoute>} />
       <Route path="/quiz-builder/:id" element={<ProtectedRoute role="teacher"><QuizBuilder /></ProtectedRoute>} />

@@ -1,14 +1,18 @@
 <!doctype html>
 <html lang="en">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="NurseQuest - Gamified Interactive Learning Platform for Nursing Education" />
     <title>NurseQuest | Gamified Nursing Education</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -61,7 +65,9 @@
                         "primary": "#6C5CE7",
                         "on-primary-fixed": "#2c0051",
                         "surface-container-high": "var(--bg-elevated)",
-                        "on-tertiary": "#003733"
+                        "on-tertiary": "#003733",
+                        "brand-surface": "var(--bg-surface)",
+                        "brand-elevated": "var(--bg-elevated)"
                     },
                     "borderRadius": {
                         "DEFAULT": "1rem",
@@ -79,9 +85,11 @@
             }
         }
     </script>
-  </head>
-  <body class="font-body text-on-background bg-background min-h-screen">
+</head>
+
+<body class="font-body text-on-background bg-background min-h-screen">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-  </body>
+</body>
+
 </html>

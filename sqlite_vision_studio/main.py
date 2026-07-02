@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
 import sys
+import os
 
 # Local modules
 import theme
@@ -72,7 +73,7 @@ class LuminaDbStudioApp:
         if logo_path.exists():
             try:
                 # Try loading with Pillow first for robust PNG compatibility
-                from PIL import Image, ImageTk
+                from PIL import Image, ImageTk  # type: ignore
                 self.logo_pil = Image.open(logo_path)
                 self.logo_img = ImageTk.PhotoImage(self.logo_pil)
                 self.root.iconphoto(True, self.logo_img)
@@ -262,9 +263,11 @@ class LuminaDbStudioApp:
                     self.recent_dbs = []
                     for p in raw_paths:
                         try:
-                            resolved_path = Path(p).resolve()
+                            # Resolve and validate path using os.path.realpath to prevent path traversal
+                            resolved_path_str = os.path.realpath(p)
+                            resolved_path = Path(resolved_path_str)
                             if resolved_path.exists() and resolved_path.is_file():
-                                self.recent_dbs.append(str(resolved_path))
+                                self.recent_dbs.append(resolved_path_str)
                         except Exception:
                             pass
             except Exception:
@@ -278,7 +281,8 @@ class LuminaDbStudioApp:
             self.logger.error(f"Failed saving settings file: {str(e)}")
 
     def add_to_recent(self, db_path: str):
-        path_str = str(Path(db_path).resolve())
+        # Resolve path using os.path.realpath to prevent path traversal
+        path_str = os.path.realpath(db_path)
         if path_str in self.recent_dbs:
             self.recent_dbs.remove(path_str)
         self.recent_dbs.insert(0, path_str)
@@ -322,6 +326,7 @@ class LuminaDbStudioApp:
             self.connect_to_db(file_path)
 
     def connect_to_db(self, db_path: str):
+        db_path = os.path.realpath(db_path)
         self.logger.info(f"Connecting to database: {db_path}...")
         try:
             self.db.connect(db_path)

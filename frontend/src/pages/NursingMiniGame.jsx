@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import lottie from 'lottie-web';
 import Navbar from '../components/Navbar';
 import monitorPulse from '../assets/lottie/monitorPulse.json';
+import confetti from 'canvas-confetti';
 
 const TOTAL_ROUNDS = 10;
 const TARGET_CENTER = 0.52;
@@ -77,6 +78,10 @@ export default function NursingMiniGame() {
       setBestScore(storedBest);
       setFeedback(`Shift complete: ${finalScore} points. Review timing and run another simulation.`);
       setFeedbackTone('good');
+    }
+
+    if (finalScore > 0) {
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
     }
   }, []);
 
@@ -344,34 +349,34 @@ export default function NursingMiniGame() {
     perfect: 'bg-tertiary/20 text-tertiary border-tertiary/50',
     good: 'bg-primary/20 text-primary border-primary/50',
     miss: 'bg-error/20 text-error border-error/50',
-    neutral: 'bg-surface-container-highest text-slate-300 border-outline-variant/30'
+    neutral: 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30'
   };
 
   return (
     <div className="min-h-screen bg-background text-on-surface font-body flex flex-col pb-24">
       <Navbar />
-      
+
       <main className="flex-1 max-w-[1920px] w-full mx-auto p-4 lg:p-8 animate-fadeInUp" style={{ paddingTop: '100px' }}>
-        
+
         {/* Hero Section */}
         <section className="bg-surface-container-low/60 backdrop-blur-xl rounded-2xl border border-outline-variant/20 shadow-xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-8 mb-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none"></div>
-          
+
           <div className="flex-1 z-10">
             <p className="text-sm font-label font-bold text-tertiary uppercase tracking-widest mb-2">Nursing Mini-Game System</p>
             <h1 className="text-3xl md:text-5xl font-headline font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-primary mb-4">
               IV Stabilization Sprint
             </h1>
-            <p className="text-slate-300 font-medium max-w-2xl leading-relaxed">
+            <p className="text-on-surface-variant font-medium max-w-2xl leading-relaxed">
               Practice infusion timing under pressure. Watch the 3D drip chamber, sync your action,
               and keep patient vitals steady through a 10-round shift simulation.
             </p>
           </div>
-          
+
           <div className="bg-surface-container-highest rounded-xl p-4 border border-outline-variant/30 flex items-center gap-4 shadow-lg min-w-[240px] z-10">
             <div ref={lottieRef} className="w-16 h-16" aria-hidden="true" />
             <div>
-              <div className="text-xs font-label font-bold text-slate-400 uppercase tracking-widest">Monitor BPM</div>
+              <div className="text-xs font-label font-bold text-on-surface-variant uppercase tracking-widest">Monitor BPM</div>
               <div className={`text-3xl font-display font-black transition-transform duration-100 ${pulseBoost ? 'scale-125 text-rose-400 drop-shadow-[0_0_10px_rgba(251,113,133,0.5)]' : 'text-on-surface'}`}>
                 {heartRate}
               </div>
@@ -381,9 +386,9 @@ export default function NursingMiniGame() {
 
         {/* Game Grid */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* Main Simulation Panel */}
-          <div className="lg:col-span-2 bg-surface-container-low/60 backdrop-blur-xl rounded-2xl border border-outline-variant/20 shadow-xl overflow-hidden flex flex-col h-[600px] relative">
+          <div className="lg:col-span-2 bg-surface-container-low/60 backdrop-blur-xl rounded-2xl border border-outline-variant/20 shadow-xl overflow-hidden flex flex-col h-[50vh] lg:h-[600px] relative">
             <div className="p-4 border-b border-white/5 flex justify-between items-center bg-surface-container/50 backdrop-blur z-10">
               <h2 className="text-lg font-headline font-bold text-on-surface flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">view_in_ar</span>
@@ -400,18 +405,18 @@ export default function NursingMiniGame() {
             <div className="p-6 bg-surface-container/80 backdrop-blur-md border-t border-white/5 z-10">
               <div className="flex gap-4 mb-4">
                 <button
-                  className="flex-1 py-4 rounded-xl font-headline font-bold uppercase tracking-widest transition-all bg-surface-container-highest text-slate-300 hover:bg-white/10 active:scale-95"
+                  className="flex-1 py-4 rounded-xl font-headline font-bold uppercase tracking-widest transition-all bg-surface-container-highest text-on-surface-variant hover:bg-on-surface/5 active:scale-95"
                   onClick={startGame}
                 >
                   {gameStatus === 'running' ? 'Restart Shift' : 'Start Shift'}
                 </button>
 
                 <button
-                  className={`flex-[2] py-4 rounded-xl font-headline font-bold uppercase tracking-widest transition-all shadow-lg active:scale-95 flex justify-center items-center gap-2 ${gameStatus === 'running' ? 'bg-gradient-to-r from-tertiary-container to-tertiary text-on-tertiary-container shadow-[0_4px_20px_rgba(50,160,151,0.4)] hover:shadow-[0_4px_25px_rgba(50,160,151,0.6)] hover:brightness-110' : 'bg-surface-container-highest text-slate-500 cursor-not-allowed opacity-50'}`}
+                  className={`flex-[2] py-4 rounded-xl font-headline font-bold uppercase tracking-widest transition-all shadow-lg active:scale-95 flex justify-center items-center gap-2 ${gameStatus === 'running' ? 'bg-gradient-to-r from-tertiary-container to-tertiary text-on-tertiary-container shadow-[0_4px_20px_rgba(50,160,151,0.4)] hover:shadow-[0_4px_25px_rgba(50,160,151,0.6)] hover:brightness-110' : 'bg-surface-container-highest text-on-surface-variant/40 cursor-not-allowed opacity-50'}`}
                   onClick={stabilizeFlow}
                   disabled={gameStatus !== 'running'}
                 >
-                  <span className="material-symbols-outlined" style={{fontVariationSettings: "'FILL' 1"}}>vaccines</span>
+                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>vaccines</span>
                   Stabilize IV
                 </button>
               </div>
@@ -424,26 +429,26 @@ export default function NursingMiniGame() {
 
           {/* Stats Sidebar */}
           <aside className="space-y-6">
-            
+
             <div className="bg-surface-container-low/60 backdrop-blur-xl rounded-2xl border border-outline-variant/20 shadow-xl p-6">
-              <h3 className="text-sm font-label font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <h3 className="text-sm font-label font-bold text-on-surface-variant uppercase tracking-widest mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[18px]">scoreboard</span> Shift Scoreboard
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-surface-container-high rounded-xl p-4 text-center">
-                  <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Round</div>
-                  <div className="text-2xl font-display font-black text-on-surface">{Math.min(round, TOTAL_ROUNDS)} <span className="text-sm text-slate-500">/ {TOTAL_ROUNDS}</span></div>
+                  <div className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-1">Round</div>
+                  <div className="text-2xl font-display font-black text-on-surface">{Math.min(round, TOTAL_ROUNDS)} <span className="text-sm text-on-surface-variant/60">/ {TOTAL_ROUNDS}</span></div>
                 </div>
                 <div className="bg-surface-container-high rounded-xl p-4 text-center">
-                  <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Score</div>
+                  <div className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-1">Score</div>
                   <div className="text-2xl font-display font-black text-primary">{score}</div>
                 </div>
                 <div className="bg-surface-container-high rounded-xl p-4 text-center">
-                  <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Streak</div>
+                  <div className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-1">Streak</div>
                   <div className="text-2xl font-display font-black text-tertiary">{streak}</div>
                 </div>
                 <div className="bg-surface-container-high rounded-xl p-4 text-center">
-                  <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Accuracy</div>
+                  <div className="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-1">Accuracy</div>
                   <div className="text-2xl font-display font-black text-rose-400">{accuracy}%</div>
                 </div>
               </div>
@@ -451,31 +456,31 @@ export default function NursingMiniGame() {
 
             <div className="bg-surface-container-low/60 backdrop-blur-xl rounded-2xl border border-outline-variant/20 shadow-xl p-6 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-rose-400/10 rounded-full blur-[40px] pointer-events-none"></div>
-              
-              <h3 className="text-sm font-label font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+
+              <h3 className="text-sm font-label font-bold text-on-surface-variant uppercase tracking-widest mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[18px]">monitor_heart</span> Performance Pulse
               </h3>
-              
+
               <div className="h-8 bg-surface-container-highest rounded-full overflow-hidden relative mb-4">
                 <div className={`absolute top-0 left-0 h-full w-full bg-[linear-gradient(90deg,transparent,rgba(251,113,133,0.3),transparent)] -translate-x-full transition-transform duration-[2s] ease-linear ${gameStatus === 'running' ? 'animate-[slide_2s_linear_infinite]' : ''}`} />
                 <div className="absolute inset-0 border-t border-b border-rose-400/20" style={{ background: 'repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(251,113,133,0.1) 10px, rgba(251,113,133,0.1) 11px)' }}></div>
               </div>
-              
-              <div className="flex justify-between text-sm font-bold text-slate-300 mb-4">
+
+              <div className="flex justify-between text-sm font-bold text-on-surface-variant mb-4">
                 <span>Hits: {hits}</span>
                 <span>Attempts: {attempts}</span>
               </div>
-              
-              <div className={`text-center py-2 rounded-md text-xs font-bold uppercase tracking-widest ${gameStatus === 'running' ? 'bg-primary/20 text-primary animate-pulse' : gameStatus === 'finished' ? 'bg-tertiary/20 text-tertiary' : 'bg-surface-container-highest text-slate-400'}`}>
+
+              <div className={`text-center py-2 rounded-md text-xs font-bold uppercase tracking-widest ${gameStatus === 'running' ? 'bg-primary/20 text-primary animate-pulse' : gameStatus === 'finished' ? 'bg-tertiary/20 text-tertiary' : 'bg-surface-container-highest text-on-surface-variant/60'}`}>
                 {gameStatus === 'running' ? 'Shift in progress' : gameStatus === 'finished' ? 'Shift complete' : 'Awaiting shift start'}
               </div>
             </div>
 
             <div className="bg-surface-container-low/60 backdrop-blur-xl rounded-2xl border border-outline-variant/20 shadow-xl p-6">
-              <h3 className="text-sm font-label font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <h3 className="text-sm font-label font-bold text-on-surface-variant uppercase tracking-widest mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[18px]">lightbulb</span> Training Notes
               </h3>
-              <ul className="space-y-3 text-sm text-slate-300 mb-6 font-medium">
+              <ul className="space-y-3 text-sm text-on-surface-variant mb-6 font-medium">
                 <li className="flex items-start gap-2">
                   <span className="material-symbols-outlined text-primary text-[18px] mt-0.5">check_circle</span>
                   Tap only when the droplet passes through the ring zone.
@@ -489,18 +494,19 @@ export default function NursingMiniGame() {
                   Keep BPM controlled to mimic calm intervention.
                 </li>
               </ul>
-              
+
               <div className="pt-4 border-t border-white/5 flex justify-between items-center text-sm">
-                <span className="font-bold text-slate-400">Best Shift Score</span>
+                <span className="font-bold text-on-surface-variant">Best Shift Score</span>
                 <span className="font-display font-black text-primary text-xl">{bestScore}</span>
               </div>
             </div>
-            
+
           </aside>
         </section>
       </main>
-      
-      <style dangerouslySetInnerHTML={{__html: `
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes slide {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }

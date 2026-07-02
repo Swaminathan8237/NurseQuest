@@ -144,7 +144,7 @@ export default function AvatarSetup() {
                     {SKIN_TONES.map((color, i) => (
                       <button 
                         key={i} 
-                        className={`w-10 h-10 rounded-full transition-all ${config.skin === i ? 'ring-2 ring-offset-2 ring-offset-surface ring-primary scale-110 shadow-[0_0_10px_rgba(221,183,255,0.5)]' : 'hover:scale-110 shadow-sm'}`}
+                        className={`w-11 h-11 rounded-full transition-all ${config.skin === i ? 'ring-2 ring-offset-2 ring-offset-surface ring-primary scale-110 shadow-[0_0_10px_rgba(221,183,255,0.5)]' : 'hover:scale-110 shadow-sm'}`}
                         style={{ backgroundColor: color }}
                         onClick={() => update('skin', i)}
                       ></button>
@@ -183,7 +183,7 @@ export default function AvatarSetup() {
                     {HAIR_COLORS.map((color, i) => (
                       <button 
                         key={i} 
-                        className={`w-10 h-10 rounded-full transition-all ${config.hairColor === color ? 'ring-2 ring-offset-2 ring-offset-surface ring-primary scale-110 shadow-[0_0_10px_rgba(221,183,255,0.5)]' : 'hover:scale-110 shadow-sm'}`}
+                        className={`w-11 h-11 rounded-full transition-all ${config.hairColor === color ? 'ring-2 ring-offset-2 ring-offset-surface ring-primary scale-110 shadow-[0_0_10px_rgba(221,183,255,0.5)]' : 'hover:scale-110 shadow-sm'}`}
                         style={{ backgroundColor: color }}
                         onClick={() => update('hairColor', color)}
                       ></button>

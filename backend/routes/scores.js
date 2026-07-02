@@ -33,7 +33,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
       if (!question) return;
 
       let isCorrect = false;
-      
+
       // Check correctness based on question type
       if (question.type === 'jumbled_sequence') {
         try {
@@ -271,7 +271,7 @@ router.get('/history', authenticateToken, async (req, res) => {
 router.get('/analytics/:quizId', authenticateToken, async (req, res) => {
   try {
     const sql = getDB();
-    
+
     const statsResult = await sql`
       SELECT 
         COUNT(*) as total_attempts,

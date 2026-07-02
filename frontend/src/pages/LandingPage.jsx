@@ -340,10 +340,10 @@ export default function LandingPage() {
 
   // Quiz showcase states
   const [activeQuizType, setActiveQuizType] = useState('mcq');
-  
+
   // MCQ Demo state
   const [selectedMcqOption, setSelectedMcqOption] = useState(null);
-  
+
   // Sequence Demo state
   const [sequenceItems, setSequenceItems] = useState([
     { id: 'item-1', text: 'C - Perform high-quality chest compressions', correctOrder: 0 },
@@ -466,26 +466,28 @@ export default function LandingPage() {
           </div>
 
           {/* Right actions */}
-          <div className="flex items-center gap-6">
-            <button
-              onClick={() => setShowJoinModal(true)}
-              className="text-sm font-bold text-on-surface hover:text-primary transition-colors cursor-pointer"
-            >
-              Enter code
-            </button>
-            <button
-              onClick={() => navigate('/auth', { state: { tab: 'signin' } })}
-              className="text-sm font-bold text-on-surface hover:text-primary transition-colors cursor-pointer"
-            >
-              Log in
-            </button>
-            <button
-              onClick={() => navigate('/auth', { state: { tab: 'signup' } })}
-              className="px-6 py-2.5 rounded-xl font-headline font-bold text-sm tracking-wide transition-all active:scale-95 shadow-[0_4px_15px_rgba(255,59,147,0.3)] hover:shadow-[0_4px_20px_rgba(255,59,147,0.5)] hover:scale-[1.03] cursor-pointer"
-              style={{ backgroundColor: '#ff3b93', color: 'white' }}
-            >
-              Sign up
-            </button>
+          <div className="flex items-center gap-3 md:gap-6">
+            <div className="hidden md:flex items-center gap-6">
+              <button
+                onClick={() => setShowJoinModal(true)}
+                className="text-sm font-bold text-on-surface hover:text-primary transition-colors cursor-pointer"
+              >
+                Enter code
+              </button>
+              <button
+                onClick={() => navigate('/auth', { state: { tab: 'signin' } })}
+                className="text-sm font-bold text-on-surface hover:text-primary transition-colors cursor-pointer"
+              >
+                Log in
+              </button>
+              <button
+                onClick={() => navigate('/auth', { state: { tab: 'signup' } })}
+                className="px-6 py-2.5 rounded-xl font-headline font-bold text-sm tracking-wide transition-all active:scale-95 shadow-[0_4px_15px_rgba(255,59,147,0.3)] hover:shadow-[0_4px_20px_rgba(255,59,147,0.5)] hover:scale-[1.03] cursor-pointer"
+                style={{ backgroundColor: '#ff3b93', color: 'white' }}
+              >
+                Sign up
+              </button>
+            </div>
             <button
               onClick={toggleTheme}
               className="p-2.5 rounded-xl border border-outline-variant/20 text-on-surface-variant hover:text-primary hover:border-primary/30 transition-all cursor-pointer"
@@ -619,9 +621,9 @@ export default function LandingPage() {
           </div>
 
           <div className="flex flex-col lg:flex-row items-center justify-center gap-16 lg:gap-24">
-            
+
             {/* Circular Orbit Console */}
-            <div 
+            <div
               className="relative orbit-container"
               onMouseEnter={() => setAutoplay(false)}
               onMouseLeave={() => setAutoplay(true)}
@@ -635,7 +637,7 @@ export default function LandingPage() {
                 <span className="material-symbols-outlined text-primary text-3xl mb-2 opacity-85" style={{ fontVariationSettings: "'FILL' 1" }}>
                   format_quote
                 </span>
-                <p className="text-xs md:text-sm text-on-surface italic line-clamp-4 leading-relaxed px-2">
+                <p className="text-xs md:text-sm text-on-surface italic line-clamp-6 leading-relaxed px-2">
                   "{DOCTORS[activeDocIndex].quote}"
                 </p>
                 <div className="flex gap-0.5 mt-3 text-amber-400">
@@ -710,7 +712,7 @@ export default function LandingPage() {
               </h3>
               <p className="text-sm font-semibold text-on-surface mb-0.5">{DOCTORS[activeDocIndex].role}</p>
               <p className="text-xs font-mono text-on-surface-variant uppercase tracking-wider mb-5">{DOCTORS[activeDocIndex].specialty}</p>
-              
+
               <div className="border-t border-outline-variant/20 pt-4 flex gap-4 items-center">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                   <span className="material-symbols-outlined">verified_user</span>
@@ -845,7 +847,7 @@ export default function LandingPage() {
           </div>
 
           <div className="grid lg:grid-cols-12 gap-12 items-center">
-            
+
             {/* Left - Tabs & Selection */}
             <div className="lg:col-span-5 flex flex-col gap-4">
               {[
@@ -890,11 +892,10 @@ export default function LandingPage() {
                       setSliderSubmitted(false);
                       resetMatching();
                     }}
-                    className={`w-full text-left p-5 rounded-2xl border transition-all duration-300 flex items-start gap-4 ${
-                      isActive 
-                        ? 'bg-surface-container border-primary shadow-[0_4px_20px_rgba(108,92,231,0.15)] translate-x-2' 
+                    className={`w-full text-left p-5 rounded-2xl border transition-all duration-300 flex items-start gap-4 ${isActive
+                        ? 'bg-surface-container border-primary shadow-[0_4px_20px_rgba(108,92,231,0.15)] translate-x-2'
                         : 'bg-surface-container-low/40 border-outline-variant/20 hover:border-outline-variant/40 hover:bg-surface-container/30'
-                    }`}
+                      }`}
                   >
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isActive ? 'bg-primary/15 text-primary' : 'bg-surface-container-high text-on-surface-variant'}`}>
                       <span className="material-symbols-outlined text-xl">{tab.icon}</span>
@@ -911,7 +912,7 @@ export default function LandingPage() {
             {/* Right - Live Interactive Device Mockup */}
             <div className="lg:col-span-7 flex justify-center">
               <div className="quiz-preview-device w-full max-w-md bg-surface-container border border-outline-variant/30 rounded-[2.5rem] shadow-2xl p-6 relative">
-                
+
                 {/* Mock Phone Notch */}
                 <div className="flex justify-center -mt-2 mb-6">
                   <div className="w-24 h-5 bg-surface-container-high rounded-full border border-outline-variant/20 flex items-center justify-center">
@@ -972,21 +973,20 @@ export default function LandingPage() {
                     </div>
 
                     {selectedMcqOption !== null && (
-                      <div className={`mt-5 p-4 rounded-xl border animate-fadeInScale text-xs leading-relaxed ${
-                        selectedMcqOption === 1 
-                          ? 'bg-success-light/10 border-success/30 text-success' 
+                      <div className={`mt-5 p-4 rounded-xl border animate-fadeInScale text-xs leading-relaxed ${selectedMcqOption === 1
+                          ? 'bg-success-light/10 border-success/30 text-success'
                           : 'bg-danger-light/10 border-danger/30 text-danger'
-                      }`}>
+                        }`}>
                         <p className="font-bold flex items-center gap-1.5 mb-1">
                           <span className="material-symbols-outlined text-sm">{selectedMcqOption === 1 ? 'verified' : 'info'}</span>
                           {selectedMcqOption === 1 ? 'Correct Answer!' : 'Incorrect Choice'}
                         </p>
                         <p className="text-on-surface-variant">
-                          {selectedMcqOption === 1 
+                          {selectedMcqOption === 1
                             ? 'Excellent job! Standard protocols demand 30 mL/kg crystalloids within the first 3 hours of sepsis diagnosis.'
                             : 'Not quite. Standard clinical sepsis protocol targets rapid crystalloid infusion (like 0.9% Normal Saline) to restore intravascular volume.'}
                         </p>
-                        <button 
+                        <button
                           onClick={() => setSelectedMcqOption(null)}
                           className="mt-3 text-[10px] font-mono text-primary font-bold hover:underline"
                         >
@@ -1015,15 +1015,15 @@ export default function LandingPage() {
                             <span className="text-xs font-semibold text-on-surface">{item.text}</span>
                           </div>
                           <div className="flex gap-1">
-                            <button 
-                              disabled={idx === 0} 
+                            <button
+                              disabled={idx === 0}
                               onClick={() => moveSequenceItem(idx, 'up')}
                               className="sequence-btn"
                             >
                               <span className="material-symbols-outlined text-xs">arrow_upward</span>
                             </button>
-                            <button 
-                              disabled={idx === sequenceItems.length - 1} 
+                            <button
+                              disabled={idx === sequenceItems.length - 1}
                               onClick={() => moveSequenceItem(idx, 'down')}
                               className="sequence-btn"
                             >
@@ -1127,9 +1127,8 @@ export default function LandingPage() {
                     </div>
 
                     {matchingMessage && (
-                      <p className={`mt-4 text-center text-xs font-bold py-1.5 rounded-lg ${
-                        matchingMessage.includes('Correct') ? 'text-success bg-success-light/5 border border-success/20' : 'text-danger bg-danger-light/5 border border-danger/20'
-                      }`}>
+                      <p className={`mt-4 text-center text-xs font-bold py-1.5 rounded-lg ${matchingMessage.includes('Correct') ? 'text-success bg-success-light/5 border border-success/20' : 'text-danger bg-danger-light/5 border border-danger/20'
+                        }`}>
                         {matchingMessage}
                       </p>
                     )}
@@ -1202,15 +1201,14 @@ export default function LandingPage() {
                     </button>
 
                     {sliderSubmitted && (
-                      <div className={`mt-4 p-4 rounded-xl border animate-fadeInScale text-xs ${
-                        sliderSuccess ? 'bg-success-light/10 border-success/30 text-success' : 'bg-danger-light/10 border-danger/30 text-danger'
-                      }`}>
+                      <div className={`mt-4 p-4 rounded-xl border animate-fadeInScale text-xs ${sliderSuccess ? 'bg-success-light/10 border-success/30 text-success' : 'bg-danger-light/10 border-danger/30 text-danger'
+                        }`}>
                         <p className="font-bold flex items-center gap-1.5 mb-1">
                           <span className="material-symbols-outlined text-sm">{sliderSuccess ? 'verified' : 'cancel'}</span>
                           {sliderSuccess ? 'Perfect Dosage!' : 'Dosage Error Alert'}
                         </p>
                         <p className="text-on-surface-variant">
-                          {sliderSuccess 
+                          {sliderSuccess
                             ? 'Excellent! 20 kg * 15 mg/kg = exactly 300 mg. Safe and therapeutic dosage calculated.'
                             : `Incorrect. At ${sliderVal} mg, this is ${parseInt(sliderVal) > 300 ? 'an overdose' : 'sub-therapeutic'}. Remember: Weight (20 kg) × Dose (15 mg/kg) = Required Dose.`}
                         </p>
@@ -1291,7 +1289,7 @@ export default function LandingPage() {
 
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-            
+
             {/* Left - Contact Details */}
             <div className="lg:col-span-5">
               <span className="text-xs font-mono font-bold text-primary tracking-[0.2em] uppercase">Get In Touch</span>
@@ -1300,7 +1298,7 @@ export default function LandingPage() {
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-tertiary"> Academic Team</span>
               </h2>
               <p className="text-on-surface-variant text-base leading-relaxed mb-8">
-                Interested in implementing NurseQuest within your hospital, nursing school, or residency program? 
+                Interested in implementing NurseQuest within your hospital, nursing school, or residency program?
                 Reach out to schedule a private walkthrough or custom integration assessment.
               </p>
 
@@ -1348,9 +1346,9 @@ export default function LandingPage() {
             <div className="lg:col-span-7 w-full">
               <div className="bg-surface-container-low/55 backdrop-blur-xl border border-outline-variant/20 rounded-3xl p-8 shadow-xl hover:border-primary/20 transition-all">
                 <h3 className="text-xl font-headline font-bold text-on-surface mb-6">Send an Inquiry</h3>
-                
+
                 <form onSubmit={handleContactSubmit} className="flex flex-col gap-6">
-                  
+
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="contact-input-wrapper">
                       <input
@@ -1479,7 +1477,7 @@ export default function LandingPage() {
       {showJoinModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 animate-fadeIn px-4">
           <div className="bg-surface-container-low border border-outline-variant/30 max-w-md w-full rounded-3xl p-8 relative shadow-2xl animate-bounceIn">
-            <button 
+            <button
               onClick={() => { setShowJoinModal(false); setModalError(''); }}
               className="absolute top-6 right-6 text-on-surface-variant hover:text-primary transition-colors"
             >
@@ -1495,7 +1493,7 @@ export default function LandingPage() {
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-mono text-on-surface-variant uppercase tracking-widest pl-1">Room Code</label>
-                <input 
+                <input
                   type="text"
                   placeholder="XXXXXX"
                   maxLength={6}
@@ -1508,7 +1506,7 @@ export default function LandingPage() {
               <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center pl-1">
                   <label className="text-xs font-mono text-on-surface-variant uppercase tracking-widest">Nickname</label>
-                  <button 
+                  <button
                     onClick={() => {
                       setModalNickname(generateNickname());
                       setModalError('');
@@ -1518,7 +1516,7 @@ export default function LandingPage() {
                     🎲 Random
                   </button>
                 </div>
-                <input 
+                <input
                   type="text"
                   placeholder="Choose nickname..."
                   maxLength={16}

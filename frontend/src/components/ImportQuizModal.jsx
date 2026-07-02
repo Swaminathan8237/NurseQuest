@@ -214,7 +214,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
   const [error, setError] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [warnings, setWarnings] = useState([]);
-  
+
   // Quiz metadata
   const [quizMeta, setQuizMeta] = useState({
     title: '',
@@ -225,7 +225,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
     timePerQuestion: 30,
     moduleId: ''
   });
-  
+
   const [questions, setQuestions] = useState([]);
   const [activeQ, setActiveQ] = useState(0);
   const [modules, setModules] = useState([]);
@@ -274,14 +274,14 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
     if (!file) return;
     setStage('saving');
     setError('');
-    
+
     try {
       const data = await quizAPI.importFile(file);
       setQuizMeta(prev => ({
         ...prev,
         title: data.title || 'Imported Quiz'
       }));
-      
+
       // Standardize questions formats to ensure no missing fields
       const formattedQs = (data.questions || []).map(q => ({
         type: q.type || 'mcq',
@@ -314,7 +314,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
     setUploadingMedia(true);
     try {
       const data = await quizAPI.uploadMedia(fileObj);
-      
+
       setQuestions(prev => prev.map((q, idx) => {
         if (idx !== qIndex) return q;
         const updated = { ...q, mediaUrl: data.url };
@@ -373,7 +373,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
     if (!q.questionText || !q.questionText.trim()) {
       errors.push('Question text is required.');
     }
-    
+
     switch (q.type) {
       case 'mcq':
       case 'image':
@@ -407,7 +407,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
         let steps = [];
         try {
           steps = typeof q.correctAnswer === 'string' ? JSON.parse(q.correctAnswer) : q.correctAnswer;
-        } catch {}
+        } catch { }
         if (!Array.isArray(steps)) {
           steps = q.options || [];
         }
@@ -506,7 +506,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl w-full max-w-5xl shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden animate-fadeInUp">
-        
+
         {/* Header */}
         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-surface-container/50">
           <div className="flex items-center gap-3">
@@ -549,7 +549,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
                 <p className="text-xs text-slate-400 mt-1">Accepts Word (.docx), PDF (.pdf), Text (.txt), or media ZIP (.zip) bundles</p>
               </div>
               <input id="import-file-selector" type="file" className="hidden" accept=".pdf,.docx,.txt,.zip" onChange={handleFileChange} />
-              
+
               {file ? (
                 <div className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-2 flex items-center gap-3 text-sm text-primary font-bold animate-pulse">
                   <span className="material-symbols-outlined text-lg">description</span>
@@ -561,7 +561,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
                 </button>
               )}
             </div>
-            
+
             <div className="flex items-center gap-3">
               <button className="btn btn-secondary rounded-xl px-6" onClick={onClose}>
                 Cancel
@@ -588,7 +588,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
 
             {/* Split Editor workspace */}
             <div className="flex-1 flex overflow-hidden min-h-0">
-              
+
               {/* Left sidebar: Questions navigation */}
               <div className="w-1/3 border-r border-white/5 bg-surface-container/20 flex flex-col overflow-y-auto">
                 <div className="p-4 border-b border-white/5 space-y-4">
@@ -596,7 +596,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
                   <div className="space-y-3">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Quiz Title *</label>
-                      <input 
+                      <input
                         className={`w-full bg-surface-container-high border rounded px-3 py-2 text-sm text-on-surface outline-none ${!quizMeta.title.trim() ? 'border-danger' : 'border-outline-variant/30'}`}
                         value={quizMeta.title}
                         onChange={e => setQuizMeta({ ...quizMeta, title: e.target.value })}
@@ -747,7 +747,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
                         Attach Media {activeQuestion.type === 'video' ? '(Video)' : activeQuestion.type === 'audio' ? '(Audio)' : '(Image)'}
                       </label>
-                      
+
                       {activeQuestion._unresolvedMedia && (
                         <div className="bg-warning-light border border-warning/20 text-warning text-xs font-bold p-3 rounded-lg flex items-center gap-2">
                           <span className="material-symbols-outlined text-[18px]">cloud_upload</span>

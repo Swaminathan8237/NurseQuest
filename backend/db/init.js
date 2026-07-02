@@ -9,8 +9,9 @@ function getDB() {
     if (!process.env.DATABASE_URL) {
       throw new Error('DATABASE_URL is not defined in environment variables');
     }
+    const isLocal = process.env.DATABASE_URL.includes('localhost') || process.env.DATABASE_URL.includes('127.0.0.1');
     sqlInstance = postgres(process.env.DATABASE_URL, {
-      ssl: { rejectUnauthorized: false }, // Necessary for connecting to Supabase
+      ssl: isLocal ? false : { rejectUnauthorized: false }, // Disable SSL for local connections
       max: 10, // Connection pool limit
       idle_timeout: 20, // Close idle connections after 20s
     });

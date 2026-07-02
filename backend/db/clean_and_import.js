@@ -7,17 +7,17 @@ const mammoth = require('mammoth');
 const DOCS_DIR = path.join(__dirname, '..', '..', 'fwdunit111newformatquestion_extracted');
 
 const DOC_FILES = [
-  'Unit1_HAI_15_Questions.docx',
-  'Unit2_Isolation_PPE_15_Questions.docx',
-  'Unit3_Hand_Hygiene_15_Questions.docx',
-  'Unit4_Disinfection_Sterilization_15_Questions.docx',
-  'Unit5_Specimen_Collection_15_Questions.docx',
-  'Unit6_Biomedical_Waste_15_Questions.docx',
-  'Unit7_Antibiotic_Stewardship_15_Questions (1).docx',
-  'Unit8_Patient_Safety_Indicators_15_Questions.docx',
-  'Unit9_IPSG_15_Questions.docx',
-  'Unit10_Safety_Protocol_15_Questions.docx',
-  'Unit11_Employee_Safety_15_Questions.docx',
+  'Unit1_HAI_15_Questions_Images.docx',
+  'Unit2_Isolation_PPE_15_Questions_Image.docx',
+  'Unit3_Hand_Hygiene_15_Questions_Image.docx',
+  'Unit4_Disinfection_Sterilization_15_Questions_Image.docx',
+  'Unit5_Specimen_Collection_15_Questions_Image.docx',
+  'Unit6_Biomedical_Waste_15_Questions_Images.docx',
+  'Unit7_Antibiotic_Stewardship_15_Questions_Images.docx',
+  'Unit8_Patient_Safety_Indicators_15_Questions_Image.docx',
+  'Unit9_IPSG_15_Questions_Image.docx',
+  'Unit10_Safety_Protocol_15_Questions_Image.docx',
+  'Unit11_Employee_Safety_15_Questions_Image.docx',
 ];
 
 const UNIT_TOPICS = {
@@ -309,50 +309,13 @@ async function cleanAndImport() {
   let importedQuizzes = [];
 
   for (const filename of DOC_FILES) {
-    let filePath = '';
-    if (filename === 'Unit 1 Assessment.docx') filePath = './docs/Unit 1 Assessment.docx';
-    else if (filename === 'Unit 2 Assessment.docx') filePath = './docs/Unit 2 Assessment.docx';
-    else if (filename === 'Unit 3 Assessment.docx') filePath = './docs/Unit 3 Assessment.docx';
-    else if (filename === 'Unit 4 Assessment.docx') filePath = './docs/Unit 4 Assessment.docx';
-    else if (filename === 'Unit 5 Assessment.docx') filePath = './docs/Unit 5 Assessment.docx';
-    else if (filename === 'Unit 6 Assessment.docx') filePath = './docs/Unit 6 Assessment.docx';
-    else if (filename === 'Unit 7 Assessment.docx') filePath = './docs/Unit 7 Assessment.docx';
-    else if (filename === 'Unit 8 Assessment.docx') filePath = './docs/Unit 8 Assessment.docx';
-    else if (filename === 'Unit 9 Assessment.docx') filePath = './docs/Unit 9 Assessment.docx';
-    else if (filename === 'Unit 10 Assessment.docx') filePath = './docs/Unit 10 Assessment.docx';
-    else if (filename === 'Unit 11 Assessment.docx') filePath = './docs/Unit 11 Assessment.docx';
-    else continue;
-
+    let filePath = path.join(DOCS_DIR, filename);
     let buffer;
     try {
       buffer = fs.readFileSync(filePath);
     } catch (e) {
-      // Fallback: try the ./backend/ prefix with fully hardcoded paths
-      let altPath = '';
-      switch (filePath) {
-        case './docs/Unit 1 Assessment.docx': altPath = './backend/docs/Unit 1 Assessment.docx'; break;
-        case './docs/Unit 2 Assessment.docx': altPath = './backend/docs/Unit 2 Assessment.docx'; break;
-        case './docs/Unit 3 Assessment.docx': altPath = './backend/docs/Unit 3 Assessment.docx'; break;
-        case './docs/Unit 4 Assessment.docx': altPath = './backend/docs/Unit 4 Assessment.docx'; break;
-        case './docs/Unit 5 Assessment.docx': altPath = './backend/docs/Unit 5 Assessment.docx'; break;
-        case './docs/Unit 6 Assessment.docx': altPath = './backend/docs/Unit 6 Assessment.docx'; break;
-        case './docs/Unit 7 Assessment.docx': altPath = './backend/docs/Unit 7 Assessment.docx'; break;
-        case './docs/Unit 8 Assessment.docx': altPath = './backend/docs/Unit 8 Assessment.docx'; break;
-        case './docs/Unit 9 Assessment.docx': altPath = './backend/docs/Unit 9 Assessment.docx'; break;
-        case './docs/Unit 10 Assessment.docx': altPath = './backend/docs/Unit 10 Assessment.docx'; break;
-        case './docs/Unit 11 Assessment.docx': altPath = './backend/docs/Unit 11 Assessment.docx'; break;
-        default: altPath = ''; break;
-      }
-      if (!altPath) {
-        console.warn(`⚠️ File not found on disk: ${filename}`);
-        continue;
-      }
-      try {
-        buffer = fs.readFileSync(altPath);
-      } catch (e2) {
-        console.warn(`⚠️ File not found on disk: ${filename}`);
-        continue;
-      }
+      console.warn(`⚠️ File not found on disk: ${filePath}`);
+      continue;
     }
     const result = await mammoth.extractRawText({ buffer });
     const rawText = result.value;

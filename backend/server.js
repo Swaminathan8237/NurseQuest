@@ -5,6 +5,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const cookieParser = require('cookie-parser');
 
 // Routes
 const authRoutes = require('./routes/auth');
@@ -20,11 +21,19 @@ const { initializeSocket } = require('./socket');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5050'], methods: ['GET', 'POST'] }
+  cors: { 
+    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5050'], 
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
 });
 
 // Middleware
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5050'] }));
+app.use(cookieParser());
+app.use(cors({ 
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5050'],
+  credentials: true 
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

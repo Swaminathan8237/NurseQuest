@@ -1,20 +1,15 @@
 const API_BASE = '/api';
 
-function getToken() {
-  return sessionStorage.getItem('nursequest_token');
-}
-
 function getHeaders() {
-  const token = getToken();
   return {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
 async function request(endpoint, options = {}) {
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
+    credentials: 'include',
     headers: { ...getHeaders(), ...options.headers },
   });
   
@@ -36,6 +31,10 @@ async function request(endpoint, options = {}) {
 
 // Auth
 export const authAPI = {
+  login: (email, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  setCookie: (token) => request('/auth/set-cookie', { method: 'POST', body: JSON.stringify({ token }) }),
   syncProfile: (data) => request('/auth/sync-profile', { method: 'POST', body: JSON.stringify(data) }),
   getProfile: () => request('/auth/me'),
   updateAvatar: (avatarConfig) => request('/auth/avatar', { method: 'PUT', body: JSON.stringify({ avatarConfig }) }),
@@ -55,10 +54,9 @@ export const quizAPI = {
   importFile: async (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    const token = getToken();
     const res = await fetch(`${API_BASE}/quizzes/import`, {
       method: 'POST',
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      credentials: 'include',
       body: formData,
     });
     const text = await res.text();
@@ -79,9 +77,8 @@ export const quizAPI = {
     body: JSON.stringify(data),
   }),
   exportQuiz: async (id, format = 'docx') => {
-    const token = getToken();
     const res = await fetch(`${API_BASE}/quizzes/${id}/export?format=${format}`, {
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      credentials: 'include',
     });
     if (!res.ok) {
       const text = await res.text();
@@ -109,10 +106,9 @@ export const quizAPI = {
   uploadMedia: async (file) => {
     const formData = new FormData();
     formData.append('media', file);
-    const token = getToken();
     const res = await fetch(`${API_BASE}/upload`, {
       method: 'POST',
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      credentials: 'include',
       body: formData,
     });
     const data = await res.json();

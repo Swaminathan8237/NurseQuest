@@ -251,10 +251,9 @@ export default function QuizBuilder() {
     try {
       const formData = new FormData();
       formData.append('media', file);
-      const token = localStorage.getItem('nursequest_token');
       const res = await fetch('/api/upload', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
         body: formData,
       });
       const data = await res.json();

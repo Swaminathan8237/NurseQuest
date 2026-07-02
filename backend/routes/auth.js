@@ -1,8 +1,228 @@
 const express = require('express');
 const { getDB } = require('../db/init');
 const { authenticateToken } = require('../middleware/auth');
+const { v4: uuidv4 } = require('uuid');
+const jwt = require('jsonwebtoken');
 
 const router = express.Router();
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+
+// POST /api/auth/login
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    let sessionData = null;
+    const sql = getDB();
+    const lowerEmail = email.toLowerCase();
+    
+    const demoAccounts = {
+      'teacher@nursequest.com': { role: 'teacher', pw: 'teacher123' },
+      'student1@nursequest.com': { role: 'student', pw: 'student123' },
+      'student2@nursequest.com': { role: 'student', pw: 'student123' },
+      'student3@nursequest.com': { role: 'student', pw: 'student123' },
+      'student4@nursequest.com': { role: 'student', pw: 'student123' },
+      'student5@nursequest.com': { role: 'student', pw: 'student123' },
+      'admin@nursequest.com': { role: 'admin', pw: 'admin123' }
+    };
+
+    const demo = demoAccounts[lowerEmail];
+    if (demo && password === demo.pw) {
+      console.log(`🔑 Auth: Logging in ${lowerEmail} using local fallback...`);
+      
+      // Look up user ID from database
+      let users = await sql`SELECT id FROM users WHERE email = ${lowerEmail}`;
+      let userId;
+      if (users.length > 0) {
+        userId = users[0].id;
+      } else {
+        userId = uuidv4();
+        const name = lowerEmail.split('@')[0];
+        await sql`INSERT INTO users (id, email, name, role) VALUES (${userId}, ${lowerEmail}, ${name}, ${demo.role})`;
+      }
+
+      const payload = {
+        sub: userId,
+        email: lowerEmail,
+        role: 'authenticated',
+        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 hours
+      };
+      const secret = process.env.SUPABASE_JWT_SECRET || 'fallback-secret-for-demo';
+      const token = jwt.sign(payload, secret);
+
+      sessionData = { access_token: token, user: { id: userId, email: lowerEmail } };
+    } else {
+      console.log(`🔑 Auth: Connecting to Supabase Auth for ${email}...`);
+      if (!SUPABASE_URL || !SUPABASE_KEY) {
+        return res.status(500).json({ error: 'Supabase credentials are not configured on the server' });
+      }
+      
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        return res.status(response.status).json({ error: data.error_description || data.error || 'Authentication failed' });
+      }
+
+      sessionData = { access_token: data.access_token, user: data.user };
+    }
+
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    };
+
+    res.cookie('nursequest_token', sessionData.access_token, cookieOptions);
+
+    const userId = sessionData.user.id;
+    let users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
+    
+    if (users.length === 0) {
+      const name = email.split('@')[0];
+      const role = email === 'admin@nursequest.com' ? 'admin' : (email === 'teacher@nursequest.com' ? 'teacher' : 'student');
+      await sql`INSERT INTO users (id, email, name, role) VALUES (${userId}, ${email}, ${name}, ${role})`;
+      users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
+    }
+
+    const user = users[0];
+    res.json({
+      user: {
+        ...user,
+        avatar_config: JSON.parse(user.avatar_config || '{}')
+      }
+    });
+
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+});
+
+// POST /api/auth/register
+router.post('/register', async (req, res) => {
+  const { email, password, name, role, avatarConfig } = req.body;
+  if (!email || !password || !name || !role) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  try {
+    let sessionData = null;
+    const sql = getDB();
+
+    console.log(`🔑 Auth: Registering ${email} in Supabase Auth...`);
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      return res.status(500).json({ error: 'Supabase credentials are not configured on the server' });
+    }
+
+    const signUpResponse = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    const signUpData = await signUpResponse.json();
+    if (!signUpResponse.ok) {
+      return res.status(signUpResponse.status).json({ error: signUpData.message || 'Registration failed' });
+    }
+
+    if (!signUpData.session) {
+      return res.status(201).json({
+        message: 'Registration successful! Please check your email for confirmation.',
+        emailVerificationPending: true
+      });
+    }
+
+    sessionData = { access_token: signUpData.session.access_token, user: signUpData.user };
+
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    };
+    res.cookie('nursequest_token', sessionData.access_token, cookieOptions);
+
+    const userId = sessionData.user.id;
+    await sql`
+      INSERT INTO users (id, email, name, role, avatar_config)
+      VALUES (${userId}, ${email}, ${name}, ${role}, ${JSON.stringify(avatarConfig || {})})
+      ON CONFLICT (id) DO UPDATE SET
+        email = EXCLUDED.email,
+        name = EXCLUDED.name,
+        role = EXCLUDED.role,
+        avatar_config = EXCLUDED.avatar_config
+    `;
+
+    const users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
+    const user = users[0];
+
+    res.status(201).json({
+      user: {
+        ...user,
+        avatar_config: JSON.parse(user.avatar_config || '{}')
+      }
+    });
+
+  } catch (err) {
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+});
+
+// POST /api/auth/logout
+router.post('/logout', async (req, res) => {
+  try {
+    res.clearCookie('nursequest_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Logout error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/auth/set-cookie
+router.post('/set-cookie', async (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: 'Token is required' });
+  }
+
+  try {
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    };
+
+    res.cookie('nursequest_token', token, cookieOptions);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Set cookie error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // Sync profile (called after sign-up / social login)
 router.post('/sync-profile', authenticateToken, async (req, res) => {

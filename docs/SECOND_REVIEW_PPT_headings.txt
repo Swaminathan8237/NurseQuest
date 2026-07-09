@@ -1,0 +1,246 @@
+=== SLIDE 1 ===
+Content:
+A Gamified Web based Quiz Platform for Interactive Nursing Education
+Content:
+Presenter
+G L Swaminathan (E0224033)
+Content:
+Project Guide 
+Dr. G. Jayanthi
+Content:
+CYB23IN201 Internship -II
+Content:
+Second Review
+   Date: 2.7.2026
+
+=== SLIDE 2 ===
+Title: INTRODUCTION
+Content:
+2
+Content:
+Applications:
+Interactive Learning
+Experience points-based level progression
+User centric customization
+Day to Day Leaderboard Update
+Different Question Modes
+Domain based Modules
+Live Quiz
+And more…
+Content:
+Need for the technology: 
+Domain based platforms are hard to find publicly on the Internet. Usually Interactive Quizzes and Quiz Platforms that are publicly available are general for all and that is user specific. But each domain, each department should have their own basic modules and questions that can be used irrespective of their syllabus. As I am Collaborating with SRIHER’s Nursing Department, this need of technology had fall into my eyes
+Content:
+7 July 2026
+Content:
+CYB23IN101 REVIEW – II
+
+=== SLIDE 3 ===
+Content:
+7 July 2026
+Content:
+INT500 REVIEW - II
+Content:
+3
+Content:
+Motivation behind the study:
+The Motivation is that a study on how the Gamified or interactive learning implies effective learning among students. As an existing Technology, Kahoot, way ground and Mentimeter gives various features and interactivity for students. This makes the learning heartful and easy to remember. So, this motivates to create a Module based quizzes and level-based progression to consistent incoming of specific Department students irrespective of their syllabus. Thus, Motivation is to study the effectiveness
+Content:
+Challenges to be addressed:
+Handling Multiple Users at once (Scaling)
+Creating Creative Question Modes
+Selecting Suitable UI
+Thinking of creative features to add
+Making it portable for Multi Device
+Designing User-centric customizations
+Implementing security measures for security of the website
+
+=== SLIDE 4 ===
+Title: REVIEW OF LITERATURE
+Content:
+4
+Content:
+7 July 2026
+Content:
+CYB23IN101 REVIEW - II
+
+=== SLIDE 5 ===
+Title: REVIEW OF LITERATURE
+Content:
+5
+Content:
+7 July 2026
+Content:
+CYB23IN101 REVIEW - II
+
+=== SLIDE 6 ===
+Title: REVIEW OF LITERATURE
+Content:
+7 July 2026
+Content:
+INT500 REVIEW - II
+Content:
+6
+
+=== SLIDE 7 ===
+Title: REVIEW OF EXISTING SYSTEM (S/W/H/W PRODUCTS, TOOLS)
+Content:
+7
+Content:
+7 July 2026
+Content:
+CYB23IN101 REVIEW - II
+
+=== SLIDE 8 ===
+Content:
+7 July 2026
+Content:
+INT500 REVIEW - II
+Content:
+8
+
+=== SLIDE 9 ===
+Title: PROBLEM STATEMENT
+Content:
+9
+Content:
+Traditional nursing education relies on passive learning methods (lectures, static PDFs, paper-based tests), leading to low student engagement, limited real-time assessment, and no personalized feedback — especially in clinical skill-building scenarios.
+Lack of engagement
+No competitive assessment
+Limited question formats
+Poor accessibility
+
+A full-stack web platform with gamified learning (XP, ranks, badges), real-time multiplayer quizzes via WebSockets, 6 multimedia question types, role-based access (Teacher/Student), and modular curriculum management — built with React 19, Node.js/Express 5, Socket.IO, and SQLite.
+
+To create a Web App or an Website for Quiz platform which includes Nursing specific question modules that any Nursing Student can attend irrespective of their Syllabus. 
+We’ve used React+vite and the middleware as Node+Express.js. RESTful API handles the routing, middleware routing, file uploads and DB operations.
+Using SQLite (better-sqlite) for serverless, lightweight use for Database.  
+Web Sockets to enable live, real-time multiplayerquiz sessions where a teacher hosts and students join via a game code.
+Content:
+7 July 2026
+Content:
+CYB23IN101 REVIEW - I
+
+=== SLIDE 10 ===
+Title: OBJECTIVES
+Content:
+10
+Content:
+Objective  - 1 :
+To design a full-stack gamified nursing education platform (React, Node.js, Express, SQLite) with role-based access control, interactive dashboards, and a comprehensive quiz management system. 
+Objective  - 2:
+To implement multimedia-rich question types — MCQ, image-based, video-based, audio-based, jumbled-letter, and sequence ordering — enabling varied and engaging assessments beyond traditional text-only quizzes.
+Objective  - 3:
+To integrate nursing-specific learning features including categorized clinical quizzes, module-based organization, scenario-based assessments, and domain-relevant gamification (XP, levels, streaks, badges).
+Objective  - 4:
+To enable real-time multiplayer quiz sessions via Socket.IO with multi-device access, instant scoring, live leaderboards, and synchronized question delivery.
+Objective  - 5:
+To ensure production-readiness through robust security (JWT, bcrypt, input validation), scalable single-server architecture, and real-world deployment
+Content:
+7 July 2026
+Content:
+CYB23IN101 REVIEW - II
+
+=== SLIDE 11 ===
+Title: WORKFLOW DIAGRAM
+Content:
+11
+Content:
+7 July 2026
+Content:
+CYB23IN101 REVIEW - I
+
+=== SLIDE 12 ===
+Title: MODULES
+Content:
+12
+Content:
+7 July 2026
+Content:
+CYB23IN101 REVIEW - II
+
+=== SLIDE 13 ===
+Title: RESULTS /OUTCOMES
+Content:
+CYB23IN101 REVIEW - II
+Content:
+7 July 2026
+Content:
+13
+
+=== SLIDE 14 ===
+Title: CONCLUSION
+Content:
+14
+Content:
+16 MAR – 21 MAR : Started collecting Literatures
+23 MAR – 4 JUNE : Started and Finished Website’s Prototype
+6 JUNE – 21 JUNE: Building a Production  Ready Weebsite for Data Collection
+23 JUNE – 1 JULY : Building a handheld App for Multi Disciplines
+
+Most Literature Review are summarized and identified the gaps and key findings with the help of AI
+Content:
+7 July 2026
+Content:
+CYB23IN101 REVIEW - II
+
+=== SLIDE 15 ===
+Title: REFERENCES
+Content:
+15
+Content:
+[1] R. Nguyen, "Advancing Nursing Education Through Gamification," Am. J. Nurs., vol. 126, no. 6, pp. 8-9, Jun 2026.
+[2] A. Azoulay and F. Lim, "The Impact of Gamification on Academic Performance: An Integrative Review," Nurs. Educ. Perspect., vol. 47, no. 3, pp. 160-167, May 2026.
+[3] S. Aalaei, et al., "Design and evaluation of a gamified mobile application for teaching cardiac rhythm interpretation," BMC Med. Educ., vol. 26, no. 1, p. 882, Apr 2026.
+[4] M. AlMekkawi, et al., "Game-based learning in undergraduate nursing education: A systematic review," Nurse Educ. Today, vol. 164, p. 107124, Sep 2026.
+[5] V. I. Bahar, et al., "Effectiveness of Serious Game Activities in Raising Palliative Care Awareness," Comput. Inform. Nurs., vol. 44, no. 6, pp. 14-22, Jun 2026.
+[6] K. McMillan, et al., "Gamification design and engagement in preregistration nurse education," BMJ Open, vol. 16, no. 1, p. e107037, Jan 2026.
+[7] M. Yang, et al., "Effectiveness of escape room in Chinese nursing education: A systematic review," BMC Nurs., vol. 25, no. 1, p. 201, Feb 2026.
+[8] Y. G. S. Barbalho, et al., "A Serious Game (Health Unit in Focus) for Older Adults' Health," JMIR Serious Games, vol. 13, no. 1, p. e66289, Nov 2025.
+[9] N. Aktaş and Y. Sazak, "Use of an escape room-based learning strategy to enhance pharmacology knowledge," BMC Nurs., vol. 25, no. 1, p. 106, Dec 2025.
+[10] M. White and T. Shellenbarger, "Gamification of nursing education with digital badges," Nurse Educator, vol. 43, no. 2, pp. 78-82, Mar 2018.
+[11] shivam kumar, Zafar hussain, Shaaz alfaiz and Aman shankar mandale (2026). "QuestMitra". INTERNATIONAL JOURNAL OF EMERGING TRENDS IN ENGINEERING AND DEVELOPMENT (IJETED), vol. 16, Issue 3, 2026, pp.9/1-9/5. DOI: 10.26808/RS.2026.c6be38.
+[12] A. Kumar, et al., "Design and Development of a Real-Time Gamified Quiz Application using React and Socket.IO," Int. J. Innov. Res. Comput. Commun. Eng., vol. 13, no. 8, pp. 14671-14678, Aug 2025.
+[13] J. Silva and M. Santos, "Comparing SQLite and Embedded Databases for Storage in Web-Based LMS," J. Softw. Eng. Appl., vol. 16, no. 4, pp. 112-120, Apr 2023.
+[14] L. Chen and X. Wang, "Full-Duplex Communication in Browser-Based Multiplayer Games: WebSockets vs. WebRTC," IEEE Trans. Games, vol. 17, no. 3, pp. 312-320, Sep 2024.
+[15] D. Jones and R. Smith, "Developing Interactive Single Page Applications for Medical Training: A React-Based Approach," Comput. Educ., vol. 188, p. 104581, Oct 2022.
+Content:
+7 July 2026
+Content:
+CYB23IN301 REVIEW - II
+
+=== SLIDE 16 ===
+Title: REFERENCES
+Content:
+16
+Content:
+WEB REFERENCES:
+	Youtube
+	AI Platforms(Gemini,ChatGPT,Claude,etc.,.)
+	AI Builders (Google AI Studio, Stitch.io,etc.,.)
+	Online Forums (Pinterest,Reddit)
+	Online Quiz Platforms (Kahoot, Wayground, Mentimeter,etc,.,)
+	Publishers (ResearchGate, ebc.uk.com, etc,.,)
+Content:
+7 July 2026
+Content:
+CYB23IN101 REVIEW - II
+
+=== SLIDE 17 ===
+Content:
+7 July 2026
+Content:
+INT500 REVIEW - I
+Content:
+17
+Content:
+https://www.researchgate.net/publication/405100802_Advancing_Nursing_Education_Through_Gamificationhttps://europepmc.org/article/med/41943200https://link.springer.com/article/10.1186/s12909-026-09138-2https://pubmed.ncbi.nlm.nih.gov/42048998/https://pubmed.ncbi.nlm.nih.gov/41498142/https://bmjopen.bmj.com/content/16/1/e107037https://pubmed.ncbi.nlm.nih.gov/41634701/https://games.jmir.org/2025/1/e66289/https://www.researchgate.net/publication/399253963_The_use_of_an_escape_room-based_learning_strategy_to_enhance_pharmacology_knowledge_among_nursing_studentshttps://pubmed.ncbi.nlm.nih.gov/28817476/https://rspublication.com/ijeted/2026/e3/9.html
+
+=== SLIDE 18 ===
+Title: Thank you
+Content:
+18
+Content:
+7 July 2026
+Content:
+CYB23IN101 REVIEW - II

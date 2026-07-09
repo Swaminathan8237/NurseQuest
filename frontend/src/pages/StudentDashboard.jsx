@@ -183,7 +183,19 @@ export default function StudentDashboard() {
                             )}
                           </div>
                           <h3 className="text-lg font-headline font-bold text-on-surface mb-1 group-hover:text-primary transition-colors line-clamp-1">{quiz.title}</h3>
-                          <p className="text-xs text-on-surface-variant line-clamp-2 mb-4">{quiz.description}</p>
+                          <p className="text-xs text-on-surface-variant line-clamp-2 mb-2">{quiz.description}</p>
+                          
+                          {/* Publisher & Subject Info */}
+                          <div className="flex flex-col gap-1 text-[11px] text-slate-400 font-mono mt-2 border-t border-brand-elevated/10 pt-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[14px] text-slate-500">person</span>
+                              <span>Publisher: <span className="text-primary font-bold">{quiz.creator_name || 'Instructor'}</span></span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[14px] text-slate-500">menu_book</span>
+                              <span>Subject: <span className="text-tertiary font-bold">{quiz.module_title || quiz.category || 'General Nursing'}</span></span>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="flex items-center justify-between border-t border-brand-elevated/40 pt-3 mt-auto">

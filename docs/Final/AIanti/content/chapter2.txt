@@ -1,0 +1,87 @@
+2.1 Literature Survey
+
+The literature survey for the NurseQuest project examines the dual foundations of nursing pedagogy (how students acquire clinical skills and decision-making capabilities) and full-stack software architectures (how real-time web technologies and embedded databases scale to support classroom environments). This literature survey bridges the gap between educational efficacy and data communication systems. The key findings, methodologies, and outcomes from fifteen primary peer-reviewed works are reviewed below.
+
+(Refer to Table 2.1 in the Landscape section for the structural comparison of the 15 works.)
+
+Detailed Discussions of Individual Works:
+
+1. R. Nguyen (2026) — "Advancing Nursing Education Through Gamification":
+   Nguyen conducted a systematic review and analysis of gamification elements (e.g., Experience Points, streaks, level progression, and digital badges) applied within undergraduate nursing syllabi. The study compiled secondary data from nursing institutions and concluded that game mechanics significantly elevate student engagement, motivation, and focus in learning. By changing passive reading into an active progression loop, students showed a greater willingness to repeat practice questions. The primary limitation identified in this work is the absence of primary empirical trials and a lack of discussion on technical system architectures or software implementation. NurseQuest directly bridges this gap by implementing a functional React-Express web platform with a custom gamification engine to test these theories.
+
+2. A. Azoulay & F. Lim (2026) — "The Impact of Gamification on Academic Performance":
+   This integrative review evaluated 22 peer-reviewed studies examining academic performance outcomes in nursing students using interactive learning tools. The aggregated dataset showed that students utilizing gamified quiz platforms scored an average of 18% higher on final academic exams compared to students exposed only to traditional didactic lectures. The study proved that gamification reinforces active recall and spaced repetition. However, the identified gap is that the reviewed studies used highly heterogeneous gamified elements, and lacked standardized assessment metrics. NurseQuest resolves this by structuring quizzes around specific curriculum modules and standardizing points and XP calculations.
+
+3. S. Aalaei et al. (2026) — "Design and Evaluation of a Gamified Mobile Application for Cardiac Rhythm Interpretation":
+   Aalaei et al. conducted a quasi-experimental pre-post test study evaluating a specialized mobile application designed to teach ECG and cardiac rhythm interpretation to 60 nursing students. The study demonstrated statistically significant post-intervention improvements in students' diagnostic accuracy and rhythm recognition speeds (p < 0.001). The researchers emphasized the importance of high-fidelity visual question formats in medical training. The primary limitation of this work is that the application was mobile-only, tested in a single institution, and lacked real-time multiplayer features or web-based accessibility. NurseQuest addresses this by providing a responsive web platform with Socket.IO live lobbies and dedicated ECG captcha question modes.
+
+4. M. AlMekkawi et al. (2026) — "Game-Based Learning in Undergraduate Nursing Education: A Systematic Review":
+   This systematic review and meta-analysis synthesized data from 18 randomized controlled trials (RCTs) and quasi-experimental studies representing over 1,200 nursing students. The study showed a statistically significant positive effect of serious games on clinical knowledge retention (Standardized Mean Difference, SMD = 0.72) and critical thinking. The authors argued that game-based learning encourages situational problem-solving. However, the gap is that most games evaluated were single-player desktop programs that lacked collaborative classroom features or real-time competition. NurseQuest bridges this by providing a Socket.IO multiplayer classroom mode.
+
+5. V. I. Bahar et al. (2026) — "Effectiveness of Serious Game Activities in Raising Palliative Care Awareness":
+   Bahar et al. conducted a descriptive, cross-sectional evaluation of a serious game designed to raise palliative care awareness among 85 third-year nursing students. The study reported a statistically significant increase in awareness scores (p < 0.05) and self-reported clinical empathy. The results proved that serious games are effective for specialized, sensitive medical topics. The limitation is that the game focused only on a single topic (palliative care) and lacked progression features like streaks, badges, or leaderboards. NurseQuest incorporates this topic-based structure into modular categories while maintaining a global leveling system.
+
+6. K. McMillan et al. (2026) — "Gamification Design and Engagement in Preregistration Nurse Education":
+   McMillan et al. established a scoping review protocol using Joanna Briggs Institute (JBI) methodology to map gamification design features in nursing curricula. The protocol mapped literature queries across CINAHL, MEDLINE, and PsycINFO, defining feedback loops, narrative progression, and leaderboards as the three key motivators for nurse learners. However, as it was a scoping protocol, it did not present primary empirical data or system implementation code. NurseQuest implements this design guidance by building real-time socket-based leaderboards and dynamic badges.
+
+7. N. Aktaş & Y. Sazak (2025) — "Escape Room-Based Learning Strategy for Nursing Pharmacology":
+   This study evaluated a physical escape room challenge designed to teach nursing pharmacology to 48 students. The intervention group scored significantly higher on post-test pharmacology assessments compared to the control group (p < 0.01) and reported high satisfaction. The study proved that interactive, puzzle-based challenges (e.g., ordering steps, matching terms) improve memory. The limitation is that the physical escape room format requires significant setup time and cannot scale. NurseQuest digitizes this concept by supporting sequence ordering and jumbled letters question formats.
+
+8. M. White & T. Shellenbarger (2018) — "Gamification of Nursing Education with Digital Badges":
+   This descriptive study evaluated the integration of digital badges as extrinsic motivators within undergraduate nursing courses across three consecutive semesters. The researchers found that earning badges correlated directly with higher assignment completion rates and sustained engagement. The limitation is that the badges were hosted on static, older learning management systems that lacked real-time feedback loops. NurseQuest implements a dynamic achievement engine that unlocks badges instantly during active user sessions.
+
+9. S. Mishra et al. (2026) — "QuestMitra: A Scalable Multiplayer Quiz Platform using Node.js and Socket.IO":
+   Mishra et al. presented the system design and load-testing of a multiplayer quiz platform. Synthetic load testing with 500 concurrent WebSocket connections demonstrated stable synchronization with average round-trip latencies under 100ms. This study provides technical validation for using Socket.IO in educational gaming. The limitation is that the platform is general-purpose, lacking clinical question formats, role authorization, or database schema designs for nursing modules. NurseQuest utilizes this WebSocket design to build a specialized nursing assessment platform.
+
+10. A. Kumar et al. (2025) — "Real-Time Gamified Quiz Application using React and Socket.IO":
+    This full-stack development study presented a general-purpose quiz framework using React and Socket.IO. The authors proved that the stack handles smooth room state transitions and responsive rendering. The limitation is that the system did not benchmark database query overheads or support role-based authorization. NurseQuest extends this architecture by incorporating strict JWT-based middleware and PostgreSQL connection pooling.
+
+11. J. Silva & M. Santos (2023) — "Comparing SQLite and Embedded Databases for Web-Based LMS":
+    This study benchmarked database query performance under simulated LMS workloads. SQLite outperformed traditional client-server databases in read-heavy, single-server workloads due to the elimination of network sockets overhead. The limitation is that SQLite does not support distributed replication or high-concurrency write-heavy applications. NurseQuest leverages this finding by supporting SQLite for lightweight, standalone local deployments while integrating PostgreSQL for cloud hosting.
+
+12. L. Chen & X. Wang (2024) — "WebSockets vs. WebRTC for Browser-Based Multiplayer Games":
+    This performance study measured latency, jitter, and packet loss in multiplayer environments. The results demonstrated that WebSockets (via Socket.IO) provide simpler room state management, lower protocol overhead, and more stable performance than peer-to-peer WebRTC. The limitation is that centralized WebSockets can become server bottlenecks under massive concurrent connections. NurseQuest adopts WebSockets for classroom-scoped lobbies, where user counts remain within optimal server limits.
+
+13. M. Yang et al. (2026) — "Escape Rooms in Chinese Nursing Education: A Systematic Review":
+    Yang et al. synthesized data from 12 studies representing 850 nursing students. The meta-analysis showed that escape room learning models led to significantly higher clinical reasoning scores (SMD = 0.61). The study validated time-pressured scenario challenges for clinical training. The limitation is that the studies focused only on physical rooms. NurseQuest addresses this by providing time-pressured digital sequence and matching challenges.
+
+14. Y. G. S. Barbalho et al. (2025) — "Serious Game Usability and Validation Study":
+    This study evaluated a nursing serious game using an expert panel of 12 educators and 40 students. The game achieved a Content Validity Index (CVI) of 0.92, showing high usability and marked knowledge improvements. The limitation is that the study did not track long-term learning retention. NurseQuest incorporates this structured validation methodology for curriculum modules while adding streaks and progression to encourage repeated study.
+
+15. D. Jones & R. Smith (2022) — "React-Based SPAs for Medical Training":
+    This usability assessment of a custom React single-page application for clinical training reported a high System Usability Scale (SUS) score of 82.5. The study proved that responsive SPAs are essential to mimic clinical equipment interfaces. The limitation is that the application lacked real-time websocket components or progression mechanics. NurseQuest combines a responsive React SPA with Socket.IO synchronization and a gamified leveling engine.
+
+2.2 Review of Existing System (S/W/H/W Products, Tools)
+
+To evaluate the unique contribution of NurseQuest, a detailed review of nine existing educational, assessment, and e-learning platforms was conducted. The systems are analyzed below:
+
+(Refer to Table 2.2 in the Landscape section for the comparative gap analysis matrix.)
+
+Detailed Analysis of Individual Systems:
+
+1. Moodle (by Moodle Pty Ltd) — 2002:
+   Moodle is an open-source Learning Management System (LMS) built on PHP. It delivers curriculum content, quizzes, forums, and grading through a structured course-module architecture. It is deployed globally across universities and hospitals. The key advantages are its extensibility, support for SCORM standards, and detailed instructor reports. The primary disadvantages are its heavy server administration requirements, outdated UI/UX, and complete lack of built-in gamification or real-time classroom competition. NurseQuest bridges these gaps by providing a lightweight, zero-setup platform with built-in WebSockets and a gamification engine.
+
+2. Quizlet (by Quizlet Inc.) — 2005:
+   Quizlet is a self-paced study tool utilizing spaced repetition and active recall via digital flashcards. It supports image-based cards and multiple self-study modes. The primary advantages are its simplicity and collaborative study sets, which make it popular for memorizing medical terminology. The disadvantages are its lack of real-time multiplayer lobbies, absence of progression mechanics (XP, streaks, ranks), and lack of support for clinical scenarios or procedurial checklists. NurseQuest integrates flashcard-style terminology review (via Jumbled Letters) with real-time lobbies and persistent accounts.
+
+3. ProProfs (by Snow Technologies) — 2006:
+   ProProfs is an online quiz maker that supports branching logic, timed tests, certificates, and instructor analytics dashboards. It is used in corporate training and professional certification. The advantages are its rich quiz creation options and automatic certificate generation. The disadvantages are its lack of clinical question types, absence of multiplayer modes, and expensive licensing. NurseQuest is open-source, tailored to the nursing curriculum, and includes live classroom synchronization.
+
+4. Socrative (by Showbie Inc.) — 2011:
+   Socrative is a classroom response system that allows teachers to create quizzes, exit tickets, and team "space races" in real-time. The advantages are its simple interface and instant class performance reports. The primary disadvantages are its limited question types (text-only MCQ, True/False, and short answer) and the lack of a persistent student progression system. NurseQuest extends this classroom response concept by supporting 9 specialized clinical formats and tracking student XP across sessions.
+
+5. Nearpod (by Nearpod Inc.) — 2012:
+   Nearpod is an interactive slide-based lesson delivery platform that integrates polls, videos, VR experiences, and collaborative boards. The advantages are its rich interactive media options and integration with major LMS systems. The disadvantages are that it is designed as a lesson delivery tool rather than a competitive quiz game, lacking student ranks, streaks, or nursing-specific content. NurseQuest focuses specifically on assessment and gamified competition.
+
+6. Google Forms (by Google LLC) — 2012:
+   Google Forms is a web-based survey and quiz tool that integrates with Google Classroom. The advantages are its zero cost, simple interface, and automated grading. The disadvantages are the complete absence of WebSockets, lack of gamification, and inability to handle complex clinical question formats. NurseQuest provides a stateful server architecture and specialized UI components that Forms cannot support.
+
+7. Kahoot! (by Kahoot! AS) — 2013:
+   Kahoot! is a game-based learning platform that uses a host-controller model, allowing teachers to project quizzes while students respond on personal devices. The advantages are its intuitive UI, real-time leaderboard, and high engagement. The disadvantages are its lack of nursing-specific clinical content, absence of persistent student rank tracking across different classes, and expensive subscription barriers. NurseQuest is designed specifically for nursing education, offering persistent student accounts and support for medical media.
+
+8. Mentimeter (by Mentimeter AB) — 2014:
+   Mentimeter is an interactive slide presentation tool that embeds live polls, Q&A widgets, and word clouds. The advantages are its visually appealing design and ease of use in presentations. The disadvantages are that it is not a dedicated quiz platform, lacking a grading database, scoring engine, or student accounts. NurseQuest is built around a structured grading database that tracks student quiz history and attempts.
+
+9. Wayground (by Wayground EdTech) — 2019:
+   Wayground is an online assessment and analytics platform that supports custom test forms, auto-grading, and dashboard reporting. The advantages are its customizability and robust analytics for professional certification. The disadvantages are its lack of gamification, absence of real-time multiplayer, and generic trivia content. NurseQuest bridges these gaps by incorporating WebSockets and a unified gamification engine.

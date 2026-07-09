@@ -1,0 +1,58 @@
+3.1 Problem Statement
+
+In the contemporary healthcare landscape, nursing professionals are required to possess not only a deep reservoir of theoretical knowledge but also advanced clinical reasoning skills, immediate situational awareness, and the ability to execute complex procedures under extreme time constraints. However, the current educational paradigms used in undergraduate nursing curricula are fundamentally unequipped to cultivate these critical competencies. The primary problems addressing nursing education and the technical limitations of existing software platforms are detailed below:
+
+1. Limitations of Traditional Pedagogical Methods: Nursing education has historically relied on passive learning modalities, such as classroom lectures, static textbook reading assignments, and paper-based worksheets. These methods encourage rote memorization of factual data (e.g., drug names, anatomical labels) rather than the active recall and critical synthesis required in clinical settings. When faced with a real-world patient crisis, students trained under passive systems often struggle to apply their knowledge, leading to a "theory-practice gap" that compromises patient safety and increases clinical errors.
+
+2. Inadequacy of General-Purpose E-Learning Platforms: Existing classroom response tools (e.g., Kahoot!, Mentimeter) and learning management systems (e.g., Moodle) are widely used in higher education but suffer from a complete lack of clinical domain specificity. These systems are designed for generic text-based trivia and do not support the multi-format, media-rich assessments crucial to medical training. For example, a nursing student must be evaluated on their ability to identify cardiac arrhythmias from live ECG grids, interpret auscultation sounds (e.g., wheezing, crepitations, murmurs) using high-fidelity audio, and order the step-by-step sequence of aseptic wound dressings or catheterizations. General-purpose platforms lack the UI layouts and rendering components needed to display these complex clinical scenarios.
+
+3. Absence of Long-Term Engagement and Progression Mechanics: Formative assessment tools used in classrooms are typically transient; they are executed during a single lecture, and student scores are discarded once the session ends. While these tools create short-term engagement, they fail to foster sustained, long-term learning habits. Without a persistent student profile that tracks continuous progress, levels, daily streaks, and unlocked achievements, students view test-taking as a chore rather than a continuous journey of professional growth. The lack of structured learning paths aligned with university curricula prevents students from bridging self-study with classroom competition.
+
+4. High Technical and Administrative Barriers to Entry: Enterprise learning management systems (LMS) like Moodle or Blackboard are heavy, expensive, and require significant administrative overhead to deploy, manage, and customize. For individual nursing departments or educators, creating and hosting custom interactive quizzes or tracking student section progress requires navigating complex corporate portals. There is a critical need for a lightweight, zero-setup platform that can be deployed instantly, allowing teachers to create quizzes via natural text document uploads and host real-time games with simple join codes.
+
+5. Real-Time Synchronization and Network Latency Issues: In multiplayer gamified learning settings, fair competition is essential to maintain student motivation. However, standard web architectures relying on HTTP polling fallbacks introduce significant latency (often exceeding 1,000ms), leading to out-of-sync question displays, mismatched timers, and unfair scoring. A platform targeting classroom environments must handle concurrent websocket connections and synchronize game state changes with sub-200ms round-trip latency to ensure all participants receive question broadcasts and timer ticks simultaneously.
+
+
+3.2 Objectives
+
+To address the pedagogical and technical challenges identified in the problem statement, the primary objective of this project is to design, implement, and evaluate NurseQuest—a specialized, gamified web-based education and assessment platform. The specific operational objectives of the system are defined as follows:
+
+Objective 1: Design and Implement a Unified Gamification Engine
+The platform must establish a persistent progression framework that rewards both academic accuracy and continuous study habits. This engine will feature:
+- An Experience Points (XP) accumulation model that maps quiz performance to levels.
+- A 7-tier nursing rank hierarchy ranging from "Nurse Intern" (Level 1) to "Chief Nurse" (Level 7) to provide a clear sense of professional growth.
+- Active daily streak counters with mathematical rewards to promote daily study consistency.
+- A global leaderboard rendering real-time rankings and level progress, driving peer-to-peer motivation.
+- A dynamic badge system that automatically unlocks achievements (e.g., "Speed Demon", "Perfect Care") based on specific performance milestones.
+
+Objective 2: Develop a Stateful Real-Time Multiplayer Quiz Engine
+The system must support synchronous classroom games where an instructor acts as the host and students join as active players. This requires:
+- Implementing bidirectional WebSockets via Socket.IO to manage stateful game lobbies.
+- Enforcing sub-200ms latency for question broadcasts, timer countdowns, and response collections.
+- Developing a Kahoot-style scoring algorithm that factors in correctness, response times, and streaks to reward both accuracy and speed.
+- Designing a "Round Leaderboard" screen that updates rankings after every question and a final "Podium Showcase" using confetti and three-dimensional visual effects.
+
+Objective 3: Build a Multi-Format Assessment and Rendering Interface
+To support complex clinical scenarios, the platform must render nine unique question types:
+- Multiple Choice Questions (MCQ) for general clinical knowledge.
+- Image-based questions to identify anatomical structures or medical equipment.
+- Video-based questions to evaluate patient-care scenarios and communication skills.
+- Audio-based questions to test stethoscope auscultation sounds.
+- Jumbled Letters to reinforce spelling and recall of complex medical terminology.
+- Sequence Ordering to evaluate procedure checklists (e.g., sterile glove donning).
+- Sliders to estimate numeric vital signs and pharmaceutical dosages.
+- Matching Pairs to connect diseases with their symptoms or drugs with classes.
+- Click-on-Image CAPTCHAs to pinpoint clinical coordinates (e.g., injection sites).
+
+Objective 4: Implement Role-Based Access Control and Secure Session Management
+The platform must protect administrative, educator, and student spaces through:
+- JSON Web Token (JWT) stateless authentication to securely persist sessions.
+- Secure HTTP-Only cookies to store credentials, mitigating Cross-Site Scripting (XSS) risks.
+- Enforcing strict role-based routing (Student, Teacher, Admin) on both frontend page displays and backend API routes.
+- An Administrative Control Panel for user role management, system audits, and module publishing.
+
+Objective 5: Design a Dynamic Document Importer and Quiz Parser
+To minimize the administrative burden on educators, the platform must automate content creation by:
+- Developing an intelligent, regular-expression-based text parser that extracts questions, options, correct answers, and explanations from text blocks.
+- Supporting document ingestion from standard university file formats including Microsoft Word (DOCX), Adobe PDF, and plain text (TXT).
+- Integrating ZIP archive parsing to upload structured quiz documents bundled with media folders containing clinical images, audio recordings, and video clips, automatically resolving local file references in the database.

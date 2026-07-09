@@ -39,7 +39,7 @@ async function seedComprehensiveQuiz() {
     'A challenging assessment containing all 9 interactive question types to test your knowledge and skills.',
     'General Nursing',
     'medium',
-    1,
+    null,
     'Module 1',
     45, // 45 seconds per question
     teacherId,

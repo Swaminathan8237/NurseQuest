@@ -119,6 +119,11 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
+  const allowedRoles = ['student', 'teacher'];
+  if (!allowedRoles.includes(role)) {
+    return res.status(400).json({ error: 'Invalid registration role. Admin registration is prohibited.' });
+  }
+
   try {
     let sessionData = null;
     const sql = getDB();

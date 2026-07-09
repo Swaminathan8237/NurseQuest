@@ -1,0 +1,103 @@
+4.1 Workflow Diagram
+
+The system architecture of NurseQuest is based on a modern, decoupled client-server web architecture designed to support high-performance rendering and stateful, real-time data synchronization. The platform comprises three primary logical layers: the Client Presentation Layer (React 19 Single Page Application), the Application Services Layer (Node.js Express API & stateful Socket.IO server), and the Persistent Data Storage Layer (PostgreSQL database hosted on Supabase). The system workflow and data routing pathways are structured as follows:
+
+1. Client Presentation Layer (React 19 Frontend):
+   The frontend is compiled using Vite version 8.0.10 for fast hot-module replacement and optimized asset building. The user interface follows the custom "Clinical Luminary" design language, featuring clean, high-contrast light-themed layouts. The client application utilizes React Router DOM for client-side routing, restricting access to teacher dashboards or quiz builder sections based on user roles. The global client state is managed by two primary React Context Providers:
+   - `AuthContext`: Manages the current user authentication state, stores user profiles, and persists the JSON Web Token (JWT) in local storage for session recovery.
+   - `ThemeContext`: Toggles the interface theme class on `document.body` between light and dark settings, persisting the choice across active sessions.
+   - API Client: Built using Axios to make asynchronous, promise-based HTTP REST requests to the backend server.
+   - Socket.IO Client: Establishes a stateful, full-duplex TCP socket connection to the server during live classroom games.
+
+2. Application Services Layer (Node.js Express Server):
+   The backend is a Node.js runtime executing Express version 5.1.0. It acts as both a RESTful API server and a stateful WebSocket hub:
+   - REST API Endpoints: Handle traditional CRUD operations. These include `/api/auth` (registration, login, verification), `/api/quizzes` (quiz management, media uploads, document imports), `/api/scores` (individual quiz history, leaderboards), `/api/users` (profile and avatar configurations), and `/api/modules` (learning module controls).
+   - Socket.IO Server: Initialized using the Node.js `http` module. It maintains stateful memory maps of active game rooms, handles player join/leave states, validates response correct answers, and runs server-side timers (5s ready count, 30s question countdown) to synchronize multiplayer screens in real-time.
+   - Media upload service: Integrates Multer middleware to process file uploads, validating file sizes (up to 50MB) and mimetypes before writing them to partitioned media directories (`uploads/images/`, `uploads/audio/`, `uploads/videos/`).
+
+3. Data Storage Layer (PostgreSQL / Supabase):
+   The persistent storage is a relational PostgreSQL database hosted on Supabase. The Node.js server maintains connection pooling (maximum 10 connections) using the `postgres` driver. The database stores user progression data, curriculum structures, quiz databases, attempt histories, and achievements.
+
+The operational data flow of the system consists of three main pathways:
+- **Authentication Flow**: The client submits email and password → The server validates the inputs → Generates a stateless JWT signed with a server secret → Pushes it to the client via secure cookies/headers → The client caches the token and attaches it to subsequent requests.
+- **RESTful Content Flow**: The educator uploads a lecture document via Quiz Builder → The server extracts text using Mammoth or pdf-parse → Runs the parser → populates quizzes and questions tables → The student retrieves quizzes via `/api/quizzes` and submits answers via `/api/scores/submit`.
+- **WebSocket Event Loop**: The host triggers a multiplayer lobby → Server generates a code and opens a socket room → Students join the room → Host starts the countdown → Server broadcasts question structures → Students submit answers → Server aggregates distributions, calculates scores, and broadcasts round rankings → Ends game and showcases the podium.
+
+4.2 Modules
+
+The system is partitioned into five main functional modules, each corresponding to a primary project objective. These modules are detailed below:
+
+4.2.1 Unified Gamification Engine (Objective 1)
+The gamification engine governs the player progression, rank hierarchy, and motivational mechanics:
+- **XP Mapping and Levels**: Experience Points (XP) are accumulated by taking quizzes. The level is calculated dynamically using a step-progression model:
+  $$	ext{Level} = 	ext{Floor}\left(rac{	ext{XP}}{1000}ight) + 1$$
+  The platform defines seven distinct nursing ranks:
+  1. *Nurse Intern* (0 - 999 XP, Level 1)
+  2. *Junior Nurse* (1,000 - 2,999 XP, Level 2)
+  3. *Nurse* (3,000 - 5,999 XP, Level 3)
+  4. *Senior Nurse* (6,000 - 9,999 XP, Level 4)
+  5. *Head Nurse* (10,000 - 14,999 XP, Level 5)
+  6. *Nurse Specialist* (15,000 - 24,999 XP, Level 6)
+  7. *Chief Nurse* (25,000+ XP, Level 7)
+- **Active Streaks**: To encourage daily study, the system tracks consecutive-day activity. When a user submits a quiz, the backend compares the current timestamp with their `last_active` timestamp. If it is within 24 to 48 hours, the streak is incremented. If it exceeds 48 hours, the streak resets to zero. Active streaks grant score multipliers:
+  $$	ext{Multiplier} = 1 + \left(	ext{Min}(	ext{Streak}, 5) 	imes 0.1ight)$$
+- **Achievements Badges**: The `achievements` table defines milestones (e.g., "Speed Demon" for answering in under 2 seconds, "Perfect Care" for 100% accuracy). When a quiz attempt is submitted, a database trigger or middleware evaluates the metrics and inserts a record into `user_achievements` if the criteria are met, displaying a level-up animation on the student dashboard.
+
+4.2.2 Real-Time Multiplayer Quiz Engine (Objective 2)
+The live game module manages the WebSocket state machine and synchronized classroom lobbies:
+- **Stateful Socket Rooms**: The server uses a stateful `Map` called `liveSessions`. When a teacher triggers `create-session`, a room object is created containing the quiz details, questions, host socket ID, and an empty participant map. The server generates a unique 6-digit join code and inserts a record into `live_sessions`.
+- **Lobby Joining**: Students call `join-session` with their credentials. The server verifies the join code, inserts the student into the session's participant list, and broadcasts `participant-joined` to update the teacher's lobby screen.
+- **Synchronized Game Loop**:
+  - The host sends `start-game` → Server triggers a 3-second countdown broadcast.
+  - For each question: Server emits `get-ready` (5-second warning showing question text) → Server starts question timer and emits `new-question` with the question structure and media URL → Students submit answers via `submit-answer` → Server registers response time, validates correctness, calculates scores, and triggers `answer-count` to update the host's answer tally.
+  - Round end: If the timer expires or all students submit, the server calls `emitQuestionResults`, calculating the answer distribution and broadcasting `question-results` with interim rankings.
+  - Final: Once all questions are completed, the server broadcasts `game-over`, writing the session results to the database and displaying the animated 3D podium.
+
+4.2.3 Multi-Format Assessment Engine (Objective 3)
+To assess clinical competency, the platform implements 9 specialized question formats:
+1. *Multiple Choice Questions (MCQ)*: Standard 4-option questions.
+2. *Image-based*: Displays high-resolution clinical images (anatomical diagrams, medical tools) via dynamic React components.
+3. *Video-based*: Embeds video files of nurse-patient scenarios.
+4. *Audio-based*: Stethoscopic auscultation audio clips (e.g., lungs, heart valve sounds) played using Howler.js.
+5. *Jumbled Letters*: Text field where letters of a medical term (e.g., "HYPOXIA") are randomized, requiring the student to unscramble the spelling.
+6. *Sequence Ordering*: Drag-and-drop lists (using HTML5 drag events) where students must order procedure checklists (e.g., sterile gloves donning steps: 1. Hand hygiene, 2. Open outer package, 3. Grasp inner cuff, etc.).
+7. *Slider-based*: Numeric estimation inputs with a minimum, maximum, step, and unit (e.g., inputting vital signs like "estimate blood pressure in mmHg" or "infusion rate in mL/h").
+8. *Matching Pairs*: UI where students match left items (diseases/symptoms) with right items (treatments/symptom matches).
+9. *Click CAPTCHAs*: Bounding coordinate challenges. The student clicks on the correct site of an image (e.g., deltoid injection site). The backend calculates the Intersection over Union (IoU) of the clicked coordinates against correct bounding boxes.
+
+4.2.4 Role-Based Access Control and Session Security (Objective 4)
+Security and authorization are integrated across both frontend routes and backend APIs:
+- **Stateless Authentication**: Uses JWT. Upon login, the server generates a token containing the user's ID, email, role, and expiration timestamp, signed with the server's cryptographic secret.
+- **Route Authorization**: Middleware in `backend/middleware/auth.js` intercepts all requests to `/api/admin` or `/api/modules` (POST/PUT/DELETE) and validates the JWT payload. The helper `requireRole('teacher')` restricts access to educator endpoints, and `requireRole('admin')` restricts user role modification or module publishing. On the frontend, React Router guards redirect unauthorized roles back to the login screen.
+
+4.2.5 Document Importer and Quiz Parser (Objective 5)
+The bulk importer automates quiz creation from university worksheets:
+- **Parser Regular Expressions**: The parser reads text files and splits them into question blocks based on boundary regex. It matches:
+  - Type tags: `^\[(MCQ|TrueFalse|Matching|Sequence|Jumble|Slider|Image|Video|Audio|Captcha)\]`
+  - Question numbers: `^(\d+)\.\s+(.+)`
+  - Options: `^([A-H])\)\s+(.+)`
+  - Answers: `^Answer:\s*(.+)`
+  - Slider config: `Min:\s*([\d.]+)\s+Max:\s*([\d.]+)...`
+  - Bounding boxes: `Box:\s*([\d.]+),([\d.]+),([\d.]+),([\d.]+)`
+- **ZIP Archive Processing**: Educators can upload a ZIP archive containing a quiz document (PDF/DOCX) alongside a `media/` folder. The importer uses `adm-zip` to extract the document and Mammoth to parse Word files. It automatically maps files referenced in the text (e.g., `Media: heart.svg`) to media folder buffers, writes the files securely using UUIDs to `/uploads`, and saves the URLs in the database.
+
+4.3 Proof of Concept, Formulation of Methods, and Prototype Design
+
+The NurseQuest prototype was constructed as a functional demonstration of a gamified nursing platform. The following structural elements validate the platform's proof of concept:
+
+1. Interface Layouts (Light Mode):
+   - **Login/Register View (`auth_page_light.png`)**: A clean, centered authentication screen featuring input validation, role selection tabs (Student/Teacher), and demo credentials buttons (Student, Teacher, Admin) to enable rapid evaluations.
+   - **Student Dashboard (`student_dashboard_light.png`)**: The student home screen. It displays current XP points, level, active streak counters, recent quiz attempts, and a list of study modules. It features the progress bar that fills dynamically as XP increases.
+   - **Leaderboard View (`leaderboard_light.png`)**: Displays global rankings. The top three players are displayed on a podium with their customizable avatars. The lower list displays student ranks, names, levels, and XP.
+   - **Teacher Dashboard (`teacher_dashboard_light.png`)**: Displays aggregated class analytics (total students, total quizzes, average score, cohort progress charts) and invites.
+   - **Quiz Builder (`quiz_builder_light.png`)**: An interactive editor allowing teachers to create quizzes manually, add questions, select types, configure sliders, and write explanations.
+   - **Module Manager (`module_manager_light.png`)**: An administrative interface where teachers and administrators can create curriculum units, link quizzes, and toggle publishing states.
+
+2. Code Mapping and Structural Files:
+   - `backend/server.js`: Sets up Express middleware, static directories, Multer disk storage, REST API routes, and launches the Socket.IO listener.
+   - `backend/socket.js`: Stateful live session engine containing the client socket handlers (`create-session`, `join-session`, `submit-answer`, `next-question`).
+   - `backend/db/schema.sql`: 10 relational tables including index optimization keys.
+   - `backend/utils/quizParser.js`: Quiz regular expressions and block parsing logic.
+   - `backend/utils/scoring.js`: XP formulas and leveling configurations.
+   - `frontend/src/App.jsx`: React Router DOM routing configuration.
+   - `frontend/src/contexts/ThemeContext.jsx`: Client-side light/dark theme class injection.

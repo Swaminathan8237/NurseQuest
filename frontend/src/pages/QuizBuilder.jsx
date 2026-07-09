@@ -240,7 +240,7 @@ export default function QuizBuilder() {
   const navigate = useNavigate();
   const location = useLocation();
   const [saving, setSaving] = useState(false);
-  const [quiz, setQuiz] = useState({ title: '', description: '', category: 'Patient Care', difficulty: 'medium', unit: 1, timePerQuestion: 30 });
+  const [quiz, setQuiz] = useState({ title: '', description: '', category: 'Patient Care', difficulty: 'medium', unit: null, timePerQuestion: 30 });
   const [questions, setQuestions] = useState([createEmptyQuestion()]);
   const [activeQ, setActiveQ] = useState(0);
   const [uploading, setUploading] = useState(false);

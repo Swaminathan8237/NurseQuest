@@ -52,11 +52,11 @@ async function initializeDB() {
     // Check if the users table has the default admin/teacher, or quizzes count
     const quizCountResult = await sql`SELECT COUNT(*) as count FROM quizzes`;
     const quizCount = parseInt(quizCountResult[0].count, 10);
-    if (quizCount !== 11) {
-      console.log(`🔄 DB check: Quiz count is ${quizCount}. Expected exactly 11 (Unit 1-11). Triggering reset...`);
+    if (quizCount === 0) {
+      console.log(`🔄 DB check: Quiz count is ${quizCount}. Triggering initial seed...`);
       const { cleanAndImport } = require('./clean_and_import');
       await cleanAndImport();
-      console.log('  ✅ DB clean and re-import complete.');
+      console.log('  ✅ DB clean and import complete.');
     }
   } catch (e) {
     console.warn('DB Seeding check warning:', e.message);

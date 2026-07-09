@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ══════════════════════════════════════════════════════
    NurseQuest Design System
    Premium dark-mode design with glassmorphism

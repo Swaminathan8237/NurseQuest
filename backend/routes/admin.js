@@ -256,7 +256,7 @@ router.get('/requests', authenticateToken, requireAdmin, async (req, res) => {
 router.post('/requests/:id/action', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { action, adminNotes } = req.body;
+    const { action, adminNotes, unit } = req.body;
 
     if (!['approve', 'reject'].includes(action)) {
       return res.status(400).json({ error: "Invalid action. Use 'approve' or 'reject'." });
@@ -286,10 +286,11 @@ router.post('/requests/:id/action', authenticateToken, requireAdmin, async (req,
       `;
 
       if (action === 'approve') {
-        // Associate quiz with module
+        const targetUnit = unit !== undefined && unit !== null && unit !== 'none' && unit !== '' ? parseInt(unit, 10) : null;
+        // Associate quiz with module and unit
         await sql`
           UPDATE quizzes 
-          SET module_id = ${request.module_id}, is_published = 1 
+          SET module_id = ${request.module_id}, unit = ${targetUnit}, is_published = 1 
           WHERE id = ${request.quiz_id}
         `;
       }

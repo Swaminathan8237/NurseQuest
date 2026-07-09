@@ -18,7 +18,7 @@ router.get('/', authenticateToken, async (req, res) => {
           (SELECT COUNT(*) FROM quizzes WHERE module_id = m.id) as quiz_count,
           (SELECT COUNT(*) FROM quizzes WHERE module_id = m.id AND is_published = 1) as published_quiz_count,
           (SELECT COALESCE(SUM(qa.cnt), 0) FROM (SELECT COUNT(*) as cnt FROM quiz_attempts WHERE quiz_id IN (SELECT id FROM quizzes WHERE module_id = m.id)) qa) as total_attempts
-        FROM modules m WHERE m.created_by = ${req.user.id}
+        FROM modules m
         ORDER BY m.order_index ASC, m.created_at DESC
       `;
       const modules = modulesResult.map(m => ({
@@ -124,8 +124,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Create module (teacher only)
-router.post('/', authenticateToken, requireRole('teacher'), async (req, res) => {
+// Create module (admin only)
+router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
   try {
     const { title, description, icon, color, isPublished } = req.body;
     if (!title || title.trim() === '') {
@@ -137,7 +137,7 @@ router.post('/', authenticateToken, requireRole('teacher'), async (req, res) => 
     // Get the next order_index
     const maxOrderResult = await sql`
       SELECT COALESCE(MAX(order_index), -1) as max_order 
-      FROM modules WHERE created_by = ${req.user.id}
+      FROM modules
     `;
     const maxOrder = parseInt(maxOrderResult[0].max_order, 10);
 
@@ -155,11 +155,11 @@ router.post('/', authenticateToken, requireRole('teacher'), async (req, res) => 
   }
 });
 
-// Update module (teacher only)
-router.put('/:id', authenticateToken, requireRole('teacher'), async (req, res) => {
+// Update module (admin only)
+router.put('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
   try {
     const sql = getDB();
-    const modules = await sql`SELECT * FROM modules WHERE id = ${req.params.id} AND created_by = ${req.user.id}`;
+    const modules = await sql`SELECT * FROM modules WHERE id = ${req.params.id}`;
     const module = modules[0];
     if (!module) return res.status(404).json({ error: 'Module not found' });
 
@@ -184,11 +184,11 @@ router.put('/:id', authenticateToken, requireRole('teacher'), async (req, res) =
   }
 });
 
-// Delete module (teacher only)
-router.delete('/:id', authenticateToken, requireRole('teacher'), async (req, res) => {
+// Delete module (admin only)
+router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
   try {
     const sql = getDB();
-    const modules = await sql`SELECT * FROM modules WHERE id = ${req.params.id} AND created_by = ${req.user.id}`;
+    const modules = await sql`SELECT * FROM modules WHERE id = ${req.params.id}`;
     const module = modules[0];
     if (!module) return res.status(404).json({ error: 'Module not found' });
 
@@ -203,14 +203,14 @@ router.delete('/:id', authenticateToken, requireRole('teacher'), async (req, res
   }
 });
 
-// Reorder quizzes within a module (teacher only)
-router.put('/:id/reorder', authenticateToken, requireRole('teacher'), async (req, res) => {
+// Reorder quizzes within a module (admin only)
+router.put('/:id/reorder', authenticateToken, requireRole('admin'), async (req, res) => {
   try {
     const { quizIds } = req.body;
     if (!Array.isArray(quizIds)) return res.status(400).json({ error: 'quizIds must be an array' });
 
     const sql = getDB();
-    const modules = await sql`SELECT * FROM modules WHERE id = ${req.params.id} AND created_by = ${req.user.id}`;
+    const modules = await sql`SELECT * FROM modules WHERE id = ${req.params.id}`;
     const module = modules[0];
     if (!module) return res.status(404).json({ error: 'Module not found' });
 

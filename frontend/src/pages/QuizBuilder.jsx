@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { quizAPI } from '../api';
 import Navbar from '../components/Navbar';
+import { useAuth } from '../contexts/AuthContext';
 
 /* ─── Captcha Bounding-Box Editor (Teacher draws the correct region) ─── */
 function CaptchaBoundingBoxEditor({ imageUrl, value, onChange }) {
@@ -236,6 +237,7 @@ const Q_TYPES = [
 ];
 
 export default function QuizBuilder() {
+  const { user } = useAuth();
   const { id: editId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -429,23 +431,25 @@ export default function QuizBuilder() {
                 </div>
 
                 {/* Unit Selector */}
-                <div>
-                  <label className="block text-sm font-label font-semibold text-slate-400 mb-1 uppercase tracking-wider">Unit</label>
-                  <select 
-                    className="input cursor-pointer"
-                    value={quiz.unit === null ? 'standalone' : quiz.unit} 
-                    onChange={e => setQuiz({...quiz, unit: e.target.value === 'standalone' ? null : (parseInt(e.target.value) || 1)})}
-                  >
-                    <option value="standalone">None (Standalone / Practice Quiz)</option>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(u => (
-                      <option key={u} value={u}>Unit {u}</option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-primary/70 mt-1 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">info</span>
-                    Select which unit this quiz belongs to, or None for a standalone/practice quiz.
-                  </p>
-                </div>
+                {user?.role === 'admin' && (
+                  <div>
+                    <label className="block text-sm font-label font-semibold text-slate-400 mb-1 uppercase tracking-wider">Unit</label>
+                    <select 
+                      className="input cursor-pointer"
+                      value={quiz.unit === null ? 'standalone' : quiz.unit} 
+                      onChange={e => setQuiz({...quiz, unit: e.target.value === 'standalone' ? null : (parseInt(e.target.value) || 1)})}
+                    >
+                      <option value="standalone">None (Standalone / Practice Quiz)</option>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(u => (
+                        <option key={u} value={u}>Unit {u}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-primary/70 mt-1 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">info</span>
+                      Select which unit this quiz belongs to, or None for a standalone/practice quiz.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
             {/* Question Editor */}

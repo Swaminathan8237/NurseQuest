@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { quizAPI, moduleAPI } from '../api';
+import { useAuth } from '../contexts/AuthContext';
 
 /* ─── Captcha Bounding-Box Editor ─── */
 function CaptchaBoundingBoxEditor({ imageUrl, value, onChange }) {
@@ -209,6 +210,7 @@ const Q_TYPES = [
 ];
 
 export default function ImportQuizModal({ onClose, onImportSuccess }) {
+  const { user } = useAuth();
   const [stage, setStage] = useState('upload'); // 'upload' | 'preview' | 'saving'
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
@@ -603,19 +605,21 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
                         placeholder="Enter quiz title"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Unit</label>
-                      <select
-                        className="w-full bg-surface-container-high border border-outline-variant/30 rounded px-3 py-2 text-sm text-on-surface outline-none"
-                        value={quizMeta.unit === null ? 'standalone' : quizMeta.unit}
-                        onChange={e => setQuizMeta({ ...quizMeta, unit: e.target.value === 'standalone' ? null : (parseInt(e.target.value) || 1) })}
-                      >
-                        <option value="standalone">None (Standalone / Practice)</option>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(u => (
-                          <option key={u} value={u}>Unit {u}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {user?.role === 'admin' && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Unit</label>
+                        <select
+                          className="w-full bg-surface-container-high border border-outline-variant/30 rounded px-3 py-2 text-sm text-on-surface outline-none"
+                          value={quizMeta.unit === null ? 'standalone' : quizMeta.unit}
+                          onChange={e => setQuizMeta({ ...quizMeta, unit: e.target.value === 'standalone' ? null : (parseInt(e.target.value) || 1) })}
+                        >
+                          <option value="standalone">None (Standalone / Practice)</option>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(u => (
+                            <option key={u} value={u}>Unit {u}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Category</label>

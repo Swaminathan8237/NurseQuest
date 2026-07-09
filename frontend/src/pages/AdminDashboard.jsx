@@ -23,6 +23,7 @@ export default function AdminDashboard() {
   // Modal states
   const [requestActionModal, setRequestActionModal] = useState(null); // { request, action: 'approve'|'reject' }
   const [adminNotes, setAdminNotes] = useState('');
+  const [selectedUnit, setSelectedUnit] = useState('none');
   const [moduleModal, setModuleModal] = useState(null); // { mode: 'create'|'edit', module?: m }
 
   // Module Form state
@@ -134,9 +135,10 @@ export default function AdminDashboard() {
     if (!requestActionModal) return;
     const { request, action } = requestActionModal;
     try {
-      await adminAPI.processQuizRequest(request.id, action, adminNotes);
+      await adminAPI.processQuizRequest(request.id, action, adminNotes, selectedUnit === 'none' ? null : selectedUnit);
       setRequestActionModal(null);
       setAdminNotes('');
+      setSelectedUnit('none');
       // Refresh requests and stats
       const r = await adminAPI.getAllQuizRequests();
       setRequests(r);
@@ -601,13 +603,19 @@ export default function AdminDashboard() {
                               <div className="flex gap-1.5 justify-end">
                                 <button
                                   className="px-3 py-1.5 bg-success-light hover:bg-success/20 border border-success/30 text-success text-xs font-bold rounded-lg transition-all"
-                                  onClick={() => setRequestActionModal({ request: req, action: 'approve' })}
+                                  onClick={() => {
+                                    setSelectedUnit('none');
+                                    setRequestActionModal({ request: req, action: 'approve' });
+                                  }}
                                 >
                                   Approve
                                 </button>
                                 <button
                                   className="px-3 py-1.5 bg-danger-light hover:bg-danger/20 border border-danger/30 text-danger text-xs font-bold rounded-lg transition-all"
-                                  onClick={() => setRequestActionModal({ request: req, action: 'reject' })}
+                                  onClick={() => {
+                                    setSelectedUnit('none');
+                                    setRequestActionModal({ request: req, action: 'reject' });
+                                  }}
                                 >
                                   Reject
                                 </button>
@@ -716,6 +724,27 @@ export default function AdminDashboard() {
               <p>Target Unit: <strong>{requestActionModal.request.module_title}</strong></p>
               <p>Teacher: <strong>{requestActionModal.request.teacher_name}</strong></p>
             </div>
+
+            {requestActionModal.action === 'approve' && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                  Assign to Student Learning Path Unit (Optional)
+                </label>
+                <select
+                  value={selectedUnit}
+                  onChange={(e) => setSelectedUnit(e.target.value)}
+                  className="w-full p-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-secondary focus:outline-none cursor-pointer text-slate-300"
+                >
+                  <option value="none">None (Standalone / Practice Only)</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(u => (
+                    <option key={u} value={u}>Unit {u}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-text-muted mt-1">
+                  Assigning a unit (1-15) places the quiz sequentially on the Student Unit dashboard.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-text-muted uppercase tracking-wider">

@@ -153,7 +153,7 @@ export const adminAPI = {
   submitQuizRequest: (quizId, moduleId) => request('/admin/requests', { method: 'POST', body: JSON.stringify({ quizId, moduleId }) }),
   getMyQuizRequests: () => request('/admin/my-requests'),
   getAllQuizRequests: () => request('/admin/requests'),
-  processQuizRequest: (id, action, adminNotes) => request(`/admin/requests/${id}/action`, { method: 'POST', body: JSON.stringify({ action, adminNotes }) }),
+  processQuizRequest: (id, action, adminNotes, unit) => request(`/admin/requests/${id}/action`, { method: 'POST', body: JSON.stringify({ action, adminNotes, unit }) }),
   getStats: () => request('/admin/stats'),
   resetStatistics: () => request('/admin/reset-statistics', { method: 'POST' }),
 };

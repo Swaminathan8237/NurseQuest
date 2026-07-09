@@ -9,6 +9,13 @@ const { getDB } = require('../db/init');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { parseQuizText, quizToText, FORMAT, normalize } = require('../utils/quizParser');
 
+const requireTeacherOrAdmin = (req, res, next) => {
+  if (!req.user || (req.user.role !== 'teacher' && req.user.role !== 'admin')) {
+    return res.status(403).json({ error: 'Access denied. Teacher or Admin role required.' });
+  }
+  next();
+};
+
 const router = express.Router();
 
 // ─── Safe Media Writer ──────────────────────────────────────────────
@@ -112,7 +119,7 @@ function detectFileType(buffer) {
 // Returns parsed preview (no DB write). Teacher-only.
 // Must be registered BEFORE /:id routes.
 
-router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => {
+router.post('/import', authenticateToken, requireTeacherOrAdmin, (req, res) => {
   importUpload.single('file')(req, res, async function (uploadErr) {
     if (uploadErr) {
       console.error('Import upload error:', uploadErr.message);
@@ -252,7 +259,7 @@ router.post('/import', authenticateToken, requireRole('teacher'), (req, res) => 
 // ─── POST /import/confirm — Save previewed import ───────────────────
 // Accepts edited preview, validates, and persists using insertQuizWithQuestions.
 
-router.post('/import/confirm', authenticateToken, requireRole('teacher'), async (req, res) => {
+router.post('/import/confirm', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
   try {
     const { title, description, category, difficulty, unit, timePerQuestion, questions, moduleId } = req.body;
 
@@ -372,7 +379,7 @@ router.post('/import/confirm', authenticateToken, requireRole('teacher'), async 
 
 // ─── GET /my-quizzes — Teacher's own quizzes ────────────────────────
 
-router.get('/my-quizzes', authenticateToken, requireRole('teacher'), async (req, res) => {
+router.get('/my-quizzes', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
   try {
     const sql = getDB();
     const quizzesResult = await sql`
@@ -381,7 +388,9 @@ router.get('/my-quizzes', authenticateToken, requireRole('teacher'), async (req,
         (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = q.id) as attempt_count,
         (SELECT COALESCE(AVG(score * 100.0 / NULLIF(total_points, 0)), 0) FROM quiz_attempts WHERE quiz_id = q.id) as avg_score
       FROM quizzes q LEFT JOIN modules m ON q.module_id = m.id
-      WHERE q.created_by = ${req.user.id} ORDER BY q.created_at DESC
+      WHERE q.created_by = ${req.user.id}
+        ${req.user.role === 'teacher' ? sql`AND q.unit IS NULL AND q.module_id IS NULL` : sql``}
+      ORDER BY q.created_at DESC
     `;
 
     const quizzes = quizzesResult.map(q => ({
@@ -466,6 +475,13 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
 
+    // Draft standalone quiz protection:
+    if (quiz.is_published === 0 && quiz.unit === null && quiz.module_id === null) {
+      if (req.user.role === 'teacher' && quiz.created_by !== req.user.id) {
+        return res.status(403).json({ error: 'Access denied to this draft quiz.' });
+      }
+    }
+
     // Enforce lock validation for students on Unit-Based learning path
     if (req.user.role === 'student' && quiz.unit && quiz.unit > 1 && quiz.unit <= 11) {
       const prevQuizzes = await sql`
@@ -501,12 +517,16 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
 // ─── GET /:id/export — Download quiz as DOCX, JSON, or ZIP ─────────
 
-router.get('/:id/export', authenticateToken, requireRole('teacher'), async (req, res) => {
+router.get('/:id/export', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
   try {
     const sql = getDB();
-    const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id} AND created_by = ${req.user.id}`;
+    const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id}`;
     const quiz = quizzes[0];
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+
+    if (req.user.role === 'teacher' && quiz.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied. You do not own this quiz.' });
+    }
 
     const questions = await sql`SELECT * FROM questions WHERE quiz_id = ${req.params.id} ORDER BY order_index`;
     questions.forEach(q => {
@@ -615,7 +635,7 @@ async function generateDocxBuffer(title, textContent) {
 
 // ─── POST / — Create quiz (teacher only) ────────────────────────────
 
-router.post('/', authenticateToken, requireRole('teacher'), async (req, res) => {
+router.post('/', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
   try {
     const { title, description, category, difficulty, unit, module, timePerQuestion, questions, moduleId } = req.body;
     const sql = getDB();
@@ -637,14 +657,28 @@ router.post('/', authenticateToken, requireRole('teacher'), async (req, res) => 
 
 // ─── PUT /:id — Update quiz ─────────────────────────────────────────
 
-router.put('/:id', authenticateToken, requireRole('teacher'), async (req, res) => {
+router.put('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
   try {
     const { title, description, category, difficulty, unit, module, timePerQuestion, isPublished, questions, moduleId } = req.body;
     const sql = getDB();
 
-    const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id} AND created_by = ${req.user.id}`;
+    const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id}`;
     const quiz = quizzes[0];
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+
+    if (req.user.role === 'teacher') {
+      if (quiz.created_by !== req.user.id) {
+        return res.status(403).json({ error: 'Access denied. You do not own this quiz.' });
+      }
+      if (quiz.unit !== null || quiz.module_id !== null) {
+        return res.status(403).json({ error: 'Access denied. Teachers cannot modify unit-based quizzes.' });
+      }
+      // Check if locked due to pending request
+      const pendingRequests = await sql`SELECT id FROM quiz_requests WHERE quiz_id = ${req.params.id} AND status = 'pending'`;
+      if (pendingRequests.length > 0) {
+        return res.status(403).json({ error: 'Access denied. This quiz is locked pending admin review.' });
+      }
+    }
 
     const finalModuleId = req.user.role === 'admin' ? (moduleId !== undefined ? (moduleId || null) : quiz.module_id) : quiz.module_id;
     const finalUnit = req.user.role === 'admin' ? (unit === null ? null : (unit || quiz.unit)) : quiz.unit;
@@ -688,12 +722,26 @@ router.put('/:id', authenticateToken, requireRole('teacher'), async (req, res) =
 
 // ─── DELETE /:id — Delete quiz ──────────────────────────────────────
 
-router.delete('/:id', authenticateToken, requireRole('teacher'), async (req, res) => {
+router.delete('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
   try {
     const sql = getDB();
-    const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id} AND created_by = ${req.user.id}`;
+    const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id}`;
     const quiz = quizzes[0];
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+
+    if (req.user.role === 'teacher') {
+      if (quiz.created_by !== req.user.id) {
+        return res.status(403).json({ error: 'Access denied. You do not own this quiz.' });
+      }
+      if (quiz.unit !== null || quiz.module_id !== null) {
+        return res.status(403).json({ error: 'Access denied. Teachers cannot delete unit-based quizzes.' });
+      }
+      // Check if locked due to pending request
+      const pendingRequests = await sql`SELECT id FROM quiz_requests WHERE quiz_id = ${req.params.id} AND status = 'pending'`;
+      if (pendingRequests.length > 0) {
+        return res.status(403).json({ error: 'Access denied. This quiz is locked pending admin review.' });
+      }
+    }
 
     await sql`DELETE FROM questions WHERE quiz_id = ${req.params.id}`;
     await sql`DELETE FROM quiz_attempts WHERE quiz_id = ${req.params.id}`;

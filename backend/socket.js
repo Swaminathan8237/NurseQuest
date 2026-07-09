@@ -186,6 +186,22 @@ function initializeSocket(io) {
         const quiz = quizzes[0];
         if (!quiz) return socket.emit('error', { message: 'Quiz not found' });
 
+        // Retrieve user role to enforce hosting permissions
+        const users = await sql`SELECT role FROM users WHERE id = ${data.userId}`;
+        const user = users[0];
+        if (!user) return socket.emit('error', { message: 'User not found.' });
+
+        if (user.role === 'teacher') {
+          if (quiz.created_by !== data.userId) {
+            return socket.emit('error', { message: 'Access denied. You do not own this quiz.' });
+          }
+          if (quiz.unit !== null || quiz.module_id !== null) {
+            return socket.emit('error', { message: 'Access denied. Teachers can only host standalone quizzes.' });
+          }
+        } else if (user.role !== 'admin') {
+          return socket.emit('error', { message: 'Access denied. Only teachers and administrators can host sessions.' });
+        }
+
         const questions = await sql`SELECT * FROM questions WHERE quiz_id = ${data.quizId} ORDER BY order_index`;
         questions.forEach(q => {
           q.options = JSON.parse(q.options || '[]');

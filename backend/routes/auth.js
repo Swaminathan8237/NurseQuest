@@ -92,9 +92,11 @@ router.post('/login', async (req, res) => {
     let users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
     
     if (users.length === 0) {
-      const name = email.split('@')[0];
-      const role = email === 'admin@nursequest.com' ? 'admin' : (email === 'teacher@nursequest.com' ? 'teacher' : 'student');
-      await sql`INSERT INTO users (id, email, name, role) VALUES (${userId}, ${email}, ${name}, ${role})`;
+      const metadata = sessionData.user.user_metadata || {};
+      const name = metadata.name || email.split('@')[0];
+      const role = metadata.role || (email === 'admin@nursequest.com' ? 'admin' : (email === 'teacher@nursequest.com' ? 'teacher' : 'student'));
+      const avatarConfig = metadata.avatar_config || {};
+      await sql`INSERT INTO users (id, email, name, role, avatar_config) VALUES (${userId}, ${email}, ${name}, ${role}, ${JSON.stringify(avatarConfig)})`;
       users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
     }
 
@@ -139,13 +141,39 @@ router.post('/register', async (req, res) => {
         'apikey': SUPABASE_KEY,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ 
+        email, 
+        password,
+        options: {
+          data: {
+            name,
+            role,
+            avatar_config: avatarConfig
+          }
+        }
+      })
     });
 
     const signUpData = await signUpResponse.json();
     if (!signUpResponse.ok) {
       return res.status(signUpResponse.status).json({ error: signUpData.message || 'Registration failed' });
     }
+
+    const userId = signUpData.user ? signUpData.user.id : (signUpData.id || null);
+    if (!userId) {
+      return res.status(500).json({ error: 'Supabase signup did not return a user ID.' });
+    }
+
+    // Insert user into local DB immediately to preserve profile details
+    await sql`
+      INSERT INTO users (id, email, name, role, avatar_config)
+      VALUES (${userId}, ${email}, ${name}, ${role}, ${JSON.stringify(avatarConfig || {})})
+      ON CONFLICT (id) DO UPDATE SET
+        email = EXCLUDED.email,
+        name = EXCLUDED.name,
+        role = EXCLUDED.role,
+        avatar_config = EXCLUDED.avatar_config
+    `;
 
     if (!signUpData.session) {
       return res.status(201).json({
@@ -163,17 +191,6 @@ router.post('/register', async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     };
     res.cookie('nursequest_token', sessionData.access_token, cookieOptions);
-
-    const userId = sessionData.user.id;
-    await sql`
-      INSERT INTO users (id, email, name, role, avatar_config)
-      VALUES (${userId}, ${email}, ${name}, ${role}, ${JSON.stringify(avatarConfig || {})})
-      ON CONFLICT (id) DO UPDATE SET
-        email = EXCLUDED.email,
-        name = EXCLUDED.name,
-        role = EXCLUDED.role,
-        avatar_config = EXCLUDED.avatar_config
-    `;
 
     const users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
     const user = users[0];
@@ -397,6 +414,21 @@ router.get('/me', authenticateToken, async (req, res) => {
             return res.status(500).json({ error: 'Failed to migrate user profile' });
           }
         }
+      } else {
+        // Create user from Supabase user_metadata
+        const metadata = (req.user.tokenData && req.user.tokenData.user_metadata) || {};
+        const name = metadata.name || req.user.email.split('@')[0];
+        const role = metadata.role || (req.user.email === 'admin@nursequest.com' ? 'admin' : (req.user.email === 'teacher@nursequest.com' ? 'teacher' : 'student'));
+        const avatarConfig = metadata.avatar_config || {};
+
+        console.log(`🔑 Auth: Auto-creating user profile for ${req.user.email} in GET /me using token metadata`);
+        await sql`
+          INSERT INTO users (id, email, name, role, avatar_config)
+          VALUES (${req.user.id}, ${req.user.email}, ${name}, ${role}, ${JSON.stringify(avatarConfig)})
+        `;
+
+        users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak, created_at FROM users WHERE id = ${req.user.id}`;
+        user = users[0];
       }
     }
 

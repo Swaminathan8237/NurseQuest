@@ -48,7 +48,8 @@ async function authenticateToken(req, res, next) {
       id: userId,
       email: email,
       role: user ? user.role : null,
-      name: user ? user.name : null
+      name: user ? user.name : null,
+      tokenData: decoded
     };
 
     next();

@@ -31,19 +31,30 @@ router.post('/login', async (req, res) => {
       'admin@nursequest.com': { role: 'admin', pw: 'admin123' }
     };
 
-    const demo = demoAccounts[lowerEmail];
-    if (demo && password === demo.pw) {
-      console.log(`🔑 Auth: Logging in ${lowerEmail} using local fallback...`);
-      
-      // Look up user ID from database
-      let users = await sql`SELECT id FROM users WHERE email = ${lowerEmail}`;
+    const isLocalBypass = lowerEmail.endsWith('@test.com') || lowerEmail.endsWith('@nursequest.com');
+    if (isLocalBypass) {
+      console.log(`🔑 Auth: Logging in ${lowerEmail} locally via bypass...`);
+      let users = await sql`SELECT id, password, role FROM users WHERE email = ${lowerEmail}`;
       let userId;
+      let userRole;
+      
+      const demo = demoAccounts[lowerEmail];
       if (users.length > 0) {
-        userId = users[0].id;
+        const userRecord = users[0];
+        if (password !== userRecord.password && (!demo || password !== demo.pw)) {
+          return res.status(400).json({ error: 'Invalid email or password' });
+        }
+        userId = userRecord.id;
+        userRole = userRecord.role;
       } else {
-        userId = uuidv4();
-        const name = lowerEmail.split('@')[0];
-        await sql`INSERT INTO users (id, email, name, role) VALUES (${userId}, ${lowerEmail}, ${name}, ${demo.role})`;
+        if (demo && password === demo.pw) {
+          userId = uuidv4();
+          userRole = demo.role;
+          const name = lowerEmail.split('@')[0];
+          await sql`INSERT INTO users (id, email, password, name, role) VALUES (${userId}, ${lowerEmail}, ${password}, ${name}, ${userRole})`;
+        } else {
+          return res.status(400).json({ error: 'Invalid email or password' });
+        }
       }
 
       const payload = {
@@ -130,6 +141,49 @@ router.post('/register', async (req, res) => {
   try {
     let sessionData = null;
     const sql = getDB();
+    const lowerEmail = email.toLowerCase();
+
+    const isLocalBypass = lowerEmail.endsWith('@test.com') || lowerEmail.endsWith('@nursequest.com');
+    if (isLocalBypass) {
+      console.log(`🔑 Auth: Registering ${lowerEmail} locally via bypass...`);
+      const existing = await sql`SELECT id FROM users WHERE email = ${lowerEmail}`;
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'User already exists' });
+      }
+
+      const userId = uuidv4();
+      await sql`
+        INSERT INTO users (id, email, password, name, role, avatar_config)
+        VALUES (${userId}, ${lowerEmail}, ${password}, ${name}, ${role}, ${JSON.stringify(avatarConfig || {})})
+      `;
+
+      const payload = {
+        sub: userId,
+        email: lowerEmail,
+        role: 'authenticated',
+        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 hours
+      };
+      const secret = process.env.SUPABASE_JWT_SECRET || 'fallback-secret-for-demo';
+      const token = jwt.sign(payload, secret);
+
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      };
+      res.cookie('nursequest_token', token, cookieOptions);
+
+      const users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
+      const user = users[0];
+
+      return res.status(201).json({
+        user: {
+          ...user,
+          avatar_config: JSON.parse(user.avatar_config || '{}')
+        }
+      });
+    }
 
     console.log(`🔑 Auth: Registering ${email} in Supabase Auth...`);
     if (!SUPABASE_URL || !SUPABASE_KEY) {

@@ -73,7 +73,8 @@ router.post('/login', async (req, res) => {
 
       const data = await response.json();
       if (!response.ok) {
-        return res.status(response.status).json({ error: data.error_description || data.error || 'Authentication failed' });
+        const errMsg = data.msg || data.message || data.error_description || data.error || 'Authentication failed';
+        return res.status(response.status).json({ error: errMsg });
       }
 
       sessionData = { access_token: data.access_token, user: data.user };
@@ -156,7 +157,8 @@ router.post('/register', async (req, res) => {
 
     const signUpData = await signUpResponse.json();
     if (!signUpResponse.ok) {
-      return res.status(signUpResponse.status).json({ error: signUpData.message || 'Registration failed' });
+      const errMsg = signUpData.msg || signUpData.message || signUpData.error_description || signUpData.error || 'Registration failed';
+      return res.status(signUpResponse.status).json({ error: errMsg });
     }
 
     const userId = signUpData.user ? signUpData.user.id : (signUpData.id || null);

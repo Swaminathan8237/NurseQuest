@@ -1,3 +1,4 @@
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const { getDB } = require('./init');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
@@ -280,30 +281,91 @@ async function cleanAndImport() {
     await sql`DELETE FROM users`;
   }
 
-  console.log('👤 Seeding users...');
-  
-  // Seed demo teacher
-  const teacherId = uuidv4();
-  const teacherPassword = null;
-  await sql`INSERT INTO users (id, email, password, name, role) VALUES (${teacherId}, 'teacher@nursequest.com', ${teacherPassword}, 'Dr. Sarah Johnson', 'teacher')`;
-
-  // Seed demo students
-  const studentIds = [];
-  const studentNames = ['Alex Rivera', 'Priya Sharma', 'Jordan Kim', 'Maya Chen', 'Liam O\'Brien'];
-  const avatarConfigs = [
-    '{"face":0,"skin":2,"hair":3,"hairColor":"#8B4513","eyes":1,"mouth":2,"accessory":"cap","scrubsColor":"#6C5CE7"}',
-    '{"face":1,"skin":4,"hair":5,"hairColor":"#1a1a2e","eyes":3,"mouth":1,"accessory":"stethoscope","scrubsColor":"#00CEC9"}',
-    '{"face":2,"skin":1,"hair":1,"hairColor":"#D4A574","eyes":2,"mouth":3,"accessory":"badge","scrubsColor":"#00B894"}',
-    '{"face":3,"skin":3,"hair":7,"hairColor":"#2d2d2d","eyes":4,"mouth":0,"accessory":"cap","scrubsColor":"#FF6B6B"}',
-    '{"face":0,"skin":0,"hair":2,"hairColor":"#C68642","eyes":0,"mouth":4,"accessory":"stethoscope","scrubsColor":"#FDCB6E"}'
+  const demoEmails = [
+    'teacher@nursequest.com',
+    'student1@nursequest.com',
+    'student2@nursequest.com',
+    'student3@nursequest.com',
+    'student4@nursequest.com',
+    'student5@nursequest.com',
+    'admin@nursequest.com'
   ];
-  const xps = [4800, 3200, 5900, 2100, 6400];
 
-  for (let i = 0; i < studentNames.length; i++) {
-    const id = uuidv4();
-    studentIds.push(id);
-    const password = null;
-    await sql`INSERT INTO users (id, email, password, name, role, avatar_config, xp, level, streak) VALUES (${id}, ${`student${i + 1}@nursequest.com`}, ${password}, ${studentNames[i]}, 'student', ${avatarConfigs[i]}, ${xps[i]}, ${Math.floor(xps[i] / 1000) + 1}, ${Math.floor(Math.random() * 10) + 1})`;
+  console.log('🧹 Deleting demo accounts from auth.users...');
+  for (const email of demoEmails) {
+    try {
+      await sql`DELETE FROM auth.users WHERE email = ${email}`;
+    } catch (e) {
+      console.warn(`Could not delete ${email} from auth.users:`, e.message);
+    }
+  }
+
+  console.log('👤 Seeding users into auth.users and public.users...');
+  
+  const targetUsers = [
+    { email: 'teacher@nursequest.com', password: 'teacher123', name: 'Dr. Sarah Johnson', role: 'teacher', avatarConfig: '{}', xp: 0, level: 1, streak: 0 },
+    { email: 'student1@nursequest.com', password: 'student123', name: 'Alex Rivera', role: 'student', avatarConfig: '{"face":0,"skin":2,"hair":3,"hairColor":"#8B4513","eyes":1,"mouth":2,"accessory":"cap","scrubsColor":"#6C5CE7"}', xp: 4800, level: 5, streak: 3 },
+    { email: 'student2@nursequest.com', password: 'student123', name: 'Priya Sharma', role: 'student', avatarConfig: '{"face":1,"skin":4,"hair":5,"hairColor":"#1a1a2e","eyes":3,"mouth":1,"accessory":"stethoscope","scrubsColor":"#00CEC9"}', xp: 3200, level: 4, streak: 2 },
+    { email: 'student3@nursequest.com', password: 'student123', name: 'Jordan Kim', role: 'student', avatarConfig: '{"face":2,"skin":1,"hair":1,"hairColor":"#D4A574","eyes":2,"mouth":3,"accessory":"badge","scrubsColor":"#00B894"}', xp: 5900, level: 6, streak: 5 },
+    { email: 'student4@nursequest.com', password: 'student123', name: 'Maya Chen', role: 'student', avatarConfig: '{"face":3,"skin":3,"hair":7,"hairColor":"#2d2d2d","eyes":4,"mouth":0,"accessory":"cap","scrubsColor":"#FF6B6B"}', xp: 2100, level: 3, streak: 1 },
+    { email: 'student5@nursequest.com', password: 'student123', name: 'Liam O\'Brien', role: 'student', avatarConfig: '{"face":0,"skin":0,"hair":2,"hairColor":"#C68642","eyes":0,"mouth":4,"accessory":"stethoscope","scrubsColor":"#FDCB6E"}', xp: 6400, level: 7, streak: 4 },
+    { email: 'admin@nursequest.com', password: 'admin123', name: 'Admin User', role: 'admin', avatarConfig: '{}', xp: 0, level: 1, streak: 0 }
+  ];
+
+  let teacherId = null;
+  const studentIds = [];
+
+  for (const u of targetUsers) {
+    const userId = uuidv4();
+    const identityId = uuidv4();
+    
+    if (u.role === 'teacher') {
+      teacherId = userId;
+    } else if (u.role === 'student') {
+      studentIds.push(userId);
+    }
+
+    try {
+      await sql.begin(async (sql) => {
+        await sql`
+          INSERT INTO auth.users (
+            id, aud, role, email, encrypted_password, email_confirmed_at, 
+            raw_app_meta_data, raw_user_meta_data, is_super_admin, 
+            created_at, updated_at, is_anonymous, is_sso_user
+          ) VALUES (
+            ${userId}, 'authenticated', 'authenticated', ${u.email}, 
+            crypt(${u.password}, gen_salt('bf')), NOW(), 
+            '{"provider": "email", "providers": ["email"]}'::jsonb, 
+            ${sql.json({ name: u.name, role: u.role })}, 
+            false, NOW(), NOW(), false, false
+          )
+        `;
+
+        const identityData = { sub: userId, email: u.email, email_verified: true, phone_verified: false };
+        await sql`
+          INSERT INTO auth.identities (
+            id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at, provider_id
+          ) VALUES (
+            ${identityId}, ${userId}, ${sql.json(identityData)}, 'email', NOW(), NOW(), NOW(), ${userId}
+          )
+        `;
+      });
+      console.log(`✅ Seeded to auth.users: ${u.email}`);
+    } catch (e) {
+      console.error(`❌ Failed to seed ${u.email} in auth.users:`, e.message);
+    }
+
+    try {
+      await sql`
+        INSERT INTO public.users (id, email, password, name, role, avatar_config, xp, level, streak)
+        VALUES (${userId}, ${u.email}, null, ${u.name}, ${u.role}, ${u.avatarConfig}, ${u.xp}, ${u.level}, ${u.streak})
+        ON CONFLICT (email) DO UPDATE
+        SET id = ${userId}, name = ${u.name}, role = ${u.role}, avatar_config = ${u.avatarConfig}, xp = ${u.xp}, level = ${u.level}, streak = ${u.streak}
+      `;
+      console.log(`✅ Upserted in public.users: ${u.email}`);
+    } catch (e) {
+      console.error(`❌ Failed to upsert ${u.email} in public.users:`, e.message);
+    }
   }
 
   let importedQuizzes = [];
@@ -420,3 +482,15 @@ async function cleanAndImport() {
 }
 
 module.exports = { cleanAndImport };
+
+if (require.main === module) {
+  cleanAndImport()
+    .then(() => {
+      console.log('SUCCESS');
+      process.exit(0);
+    })
+    .catch(err => {
+      console.error('FAILURE', err);
+      process.exit(1);
+    });
+}

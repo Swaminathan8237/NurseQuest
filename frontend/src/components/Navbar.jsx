@@ -42,7 +42,7 @@ export default function Navbar() {
               NurseQuest
             </span>
           </NavLink>
-          <div className="hidden md:flex gap-1 font-['Manrope'] tracking-tight font-semibold text-sm">
+          <div className="hidden lg:flex gap-1 font-['Manrope'] tracking-tight font-semibold text-sm">
             <NavLink to={dashPath} className={navLinkClass}>
               Dashboard
             </NavLink>
@@ -71,7 +71,7 @@ export default function Navbar() {
         </div>
         <div className="flex items-center gap-2 md:gap-3">
           {isStudent && (
-            <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm bg-brand-elevated text-brand-textPrimary shadow-[inset_-2px_-2px_4px_rgba(70,75,120,0.15),_inset_2px_2px_4px_rgba(10,10,25,0.3)]">
+            <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm bg-brand-elevated text-brand-textPrimary shadow-[inset_-2px_-2px_4px_rgba(70,75,120,0.15),_inset_2px_2px_4px_rgba(10,10,25,0.3)]">
               <span className="material-symbols-outlined text-sm animate-pulse" style={{fontVariationSettings: "'FILL' 1"}}>bolt</span>
               <span>{user?.xp || 0} XP</span>
             </div>
@@ -88,7 +88,7 @@ export default function Navbar() {
             </button>
 
             <button 
-              className="hidden md:inline-flex p-2.5 rounded-full hover:bg-error/10 transition-all duration-200 text-on-surface-variant hover:text-error"
+              className="hidden lg:inline-flex p-2.5 rounded-full hover:bg-error/10 transition-all duration-200 text-on-surface-variant hover:text-error"
               onClick={handleLogout} 
               title="Logout"
             >
@@ -112,7 +112,7 @@ export default function Navbar() {
             </div>
 
             <button
-              className="md:hidden p-2.5 rounded-full hover:bg-surface-container transition-all duration-200 text-on-surface-variant hover:text-primary"
+              className="lg:hidden p-2.5 rounded-full hover:bg-surface-container transition-all duration-200 text-on-surface-variant hover:text-primary"
               onClick={() => setMobileMenuOpen(true)}
               title="Open Menu"
             >
@@ -123,7 +123,7 @@ export default function Navbar() {
       </nav>
 
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-[60] md:hidden">
+        <div className="fixed inset-0 z-[60] lg:hidden">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileMenuOpen(false)}

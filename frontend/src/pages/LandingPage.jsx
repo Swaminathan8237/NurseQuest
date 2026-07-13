@@ -459,15 +459,15 @@ export default function LandingPage() {
           </button>
 
           {/* Desktop links */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-8">
             <a href="#recommends" className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors">Recommendations</a>
             <a href="#quiz-details" className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors">Quiz Formats</a>
             <a href="#contact" className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors">Contact Us</a>
           </div>
 
           {/* Right actions */}
-          <div className="flex items-center gap-3 md:gap-6">
-            <div className="hidden md:flex items-center gap-6">
+          <div className="flex items-center gap-3 lg:gap-6">
+            <div className="hidden lg:flex items-center gap-6">
               <button
                 onClick={() => setShowJoinModal(true)}
                 className="text-sm font-bold text-on-surface hover:text-primary transition-colors cursor-pointer"
@@ -499,7 +499,7 @@ export default function LandingPage() {
             </button>
             {/* Mobile menu toggle */}
             <button
-              className="md:hidden p-2 rounded-lg text-on-surface-variant hover:text-primary transition-colors"
+              className="lg:hidden p-2 rounded-lg text-on-surface-variant hover:text-primary transition-colors"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               <span className="material-symbols-outlined">{mobileMenuOpen ? 'close' : 'menu'}</span>
@@ -509,7 +509,7 @@ export default function LandingPage() {
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-surface-container/95 backdrop-blur-2xl border-t border-outline-variant/20 px-6 py-6 flex flex-col gap-4 animate-fadeIn">
+          <div className="lg:hidden bg-surface-container/95 backdrop-blur-2xl border-t border-outline-variant/20 px-6 py-6 flex flex-col gap-4 animate-fadeIn">
             <a href="#recommends" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors py-2">Recommendations</a>
             <a href="#quiz-details" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors py-2">Quiz Formats</a>
             <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors py-2">Contact Us</a>

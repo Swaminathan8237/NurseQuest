@@ -4,13 +4,13 @@ const ThemeContext = createContext(null);
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem('nursequest_theme');
+    const savedTheme = localStorage.getItem('skillquest_theme');
     if (savedTheme) return savedTheme;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
   useEffect(() => {
-    localStorage.setItem('nursequest_theme', theme);
+    localStorage.setItem('skillquest_theme', theme);
     if (theme === 'light') {
       document.body.classList.add('light-theme');
       document.documentElement.classList.remove('dark');

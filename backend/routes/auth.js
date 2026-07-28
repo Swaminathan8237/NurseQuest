@@ -3,6 +3,9 @@ const { getDB } = require('../db/init');
 const { authenticateToken } = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 const router = express.Router();
 
@@ -17,60 +20,17 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    let sessionData = null;
     const sql = getDB();
     const lowerEmail = email.toLowerCase();
+
+    // Check if user exists in the local database
+    const users = await sql`SELECT id, password, role, is_verified FROM users WHERE email = ${lowerEmail}`;
     
-    const demoAccounts = {
-      'teacher@nursequest.com': { role: 'teacher', pw: 'teacher123' },
-      'student1@nursequest.com': { role: 'student', pw: 'student123' },
-      'student2@nursequest.com': { role: 'student', pw: 'student123' },
-      'student3@nursequest.com': { role: 'student', pw: 'student123' },
-      'student4@nursequest.com': { role: 'student', pw: 'student123' },
-      'student5@nursequest.com': { role: 'student', pw: 'student123' },
-      'admin@nursequest.com': { role: 'admin', pw: 'admin123' }
-    };
-
-    const isLocalBypass = lowerEmail.endsWith('@test.com') || lowerEmail.endsWith('@nursequest.com');
-    if (isLocalBypass) {
-      console.log(`🔑 Auth: Logging in ${lowerEmail} locally via bypass...`);
-      let users = await sql`SELECT id, password, role FROM users WHERE email = ${lowerEmail}`;
-      let userId;
-      let userRole;
-      
-      const demo = demoAccounts[lowerEmail];
-      if (users.length > 0) {
-        const userRecord = users[0];
-        if (password !== userRecord.password && (!demo || password !== demo.pw)) {
-          return res.status(400).json({ error: 'Invalid email or password' });
-        }
-        userId = userRecord.id;
-        userRole = userRecord.role;
-      } else {
-        if (demo && password === demo.pw) {
-          userId = uuidv4();
-          userRole = demo.role;
-          const name = lowerEmail.split('@')[0];
-          await sql`INSERT INTO users (id, email, password, name, role) VALUES (${userId}, ${lowerEmail}, ${password}, ${name}, ${userRole})`;
-        } else {
-          return res.status(400).json({ error: 'Invalid email or password' });
-        }
-      }
-
-      const payload = {
-        sub: userId,
-        email: lowerEmail,
-        role: 'authenticated',
-        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 hours
-      };
-      const secret = process.env.SUPABASE_JWT_SECRET || 'fallback-secret-for-demo';
-      const token = jwt.sign(payload, secret);
-
-      sessionData = { access_token: token, user: { id: userId, email: lowerEmail } };
-    } else {
-      console.log(`🔑 Auth: Connecting to Supabase Auth for ${email}...`);
+    if (users.length === 0) {
+      // If they don't exist locally, check if they exist in Supabase Auth (fallback)
+      console.log(`🔑 Auth: User not found in local DB, checking Supabase Auth for ${email}...`);
       if (!SUPABASE_URL || !SUPABASE_KEY) {
-        return res.status(500).json({ error: 'Supabase credentials are not configured on the server' });
+        return res.status(400).json({ error: 'Invalid email or password' });
       }
       
       const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -84,12 +44,97 @@ router.post('/login', async (req, res) => {
 
       const data = await response.json();
       if (!response.ok) {
-        const errMsg = data.msg || data.message || data.error_description || data.error || 'Authentication failed';
-        return res.status(response.status).json({ error: errMsg });
+        return res.status(400).json({ error: 'Invalid email or password' });
       }
 
-      sessionData = { access_token: data.access_token, user: data.user };
+      // If successful, synchronization will happen or we insert them
+      const userId = data.user.id;
+      const metadata = data.user.user_metadata || {};
+      const name = metadata.name || email.split('@')[0];
+      const role = metadata.role || 'student';
+      
+      await sql`
+        INSERT INTO users (id, email, name, role, avatar_config, is_verified) 
+        VALUES (${userId}, ${email}, ${name}, ${role}, '{}', true)
+        ON CONFLICT (email) DO UPDATE SET is_verified = true
+      `;
+      
+      // Re-query user
+      const usersReload = await sql`SELECT id, password, role, is_verified FROM users WHERE email = ${lowerEmail}`;
+      const userRecord = usersReload[0];
+      
+      const payload = {
+        sub: userId,
+        email: lowerEmail,
+        role: 'authenticated',
+        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24)
+      };
+      const secret = process.env.SUPABASE_JWT_SECRET || 'fallback-secret-for-demo';
+      const token = jwt.sign(payload, secret);
+      
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000
+      };
+      res.cookie('skillquest_token', token, cookieOptions);
+      
+      const fullUsers = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
+      const user = fullUsers[0];
+      return res.json({
+        user: {
+          ...user,
+          avatar_config: JSON.parse(user.avatar_config || '{}')
+        }
+      });
     }
+
+    const userRecord = users[0];
+
+    // Check email verification status
+    if (userRecord.is_verified === false) {
+      return res.status(400).json({ error: 'Please verify your email address before logging in.' });
+    }
+
+    // Verify password
+    let passwordMatches = false;
+    const isBcrypt = userRecord.password && (userRecord.password.startsWith('$2a$') || userRecord.password.startsWith('$2b$') || userRecord.password.startsWith('$2y$'));
+    
+    if (isBcrypt) {
+      passwordMatches = await bcrypt.compare(password, userRecord.password);
+    } else {
+      passwordMatches = (password === userRecord.password);
+    }
+
+    const demoAccounts = {
+      'teacher@skillquest.io': 'teacher123',
+      'student1@skillquest.io': 'student123',
+      'student2@skillquest.io': 'student123',
+      'student3@skillquest.io': 'student123',
+      'student4@skillquest.io': 'student123',
+      'student5@skillquest.io': 'student123',
+      'admin@skillquest.io': 'admin123',
+      'admin@nursing.io': 'admin123'
+    };
+
+    if (!passwordMatches && demoAccounts[lowerEmail] && password === demoAccounts[lowerEmail]) {
+      passwordMatches = true;
+    }
+
+    if (!passwordMatches) {
+      return res.status(400).json({ error: 'Invalid email or password' });
+    }
+
+    // Generate local JWT token
+    const payload = {
+      sub: userRecord.id,
+      email: lowerEmail,
+      role: 'authenticated',
+      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 hours
+    };
+    const secret = process.env.SUPABASE_JWT_SECRET || 'fallback-secret-for-demo';
+    const token = jwt.sign(payload, secret);
 
     const cookieOptions = {
       httpOnly: true,
@@ -98,21 +143,11 @@ router.post('/login', async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     };
 
-    res.cookie('nursequest_token', sessionData.access_token, cookieOptions);
+    res.cookie('skillquest_token', token, cookieOptions);
 
-    const userId = sessionData.user.id;
-    let users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
-    
-    if (users.length === 0) {
-      const metadata = sessionData.user.user_metadata || {};
-      const name = metadata.name || email.split('@')[0];
-      const role = metadata.role || (email === 'admin@nursequest.com' ? 'admin' : (email === 'teacher@nursequest.com' ? 'teacher' : 'student'));
-      const avatarConfig = metadata.avatar_config || {};
-      await sql`INSERT INTO users (id, email, name, role, avatar_config) VALUES (${userId}, ${email}, ${name}, ${role}, ${JSON.stringify(avatarConfig)})`;
-      users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
-    }
+    const fullUsers = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userRecord.id}`;
+    const user = fullUsers[0];
 
-    const user = users[0];
     res.json({
       user: {
         ...user,
@@ -139,124 +174,109 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    let sessionData = null;
     const sql = getDB();
     const lowerEmail = email.toLowerCase();
 
-    const isLocalBypass = lowerEmail.endsWith('@test.com') || lowerEmail.endsWith('@nursequest.com');
-    if (isLocalBypass) {
-      console.log(`🔑 Auth: Registering ${lowerEmail} locally via bypass...`);
-      const existing = await sql`SELECT id FROM users WHERE email = ${lowerEmail}`;
-      if (existing.length > 0) {
-        return res.status(400).json({ error: 'User already exists' });
-      }
-
-      const userId = uuidv4();
-      await sql`
-        INSERT INTO users (id, email, password, name, role, avatar_config)
-        VALUES (${userId}, ${lowerEmail}, ${password}, ${name}, ${role}, ${JSON.stringify(avatarConfig || {})})
-      `;
-
-      const payload = {
-        sub: userId,
-        email: lowerEmail,
-        role: 'authenticated',
-        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 hours
-      };
-      const secret = process.env.SUPABASE_JWT_SECRET || 'fallback-secret-for-demo';
-      const token = jwt.sign(payload, secret);
-
-      const cookieOptions = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
-      };
-      res.cookie('nursequest_token', token, cookieOptions);
-
-      const users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
-      const user = users[0];
-
-      return res.status(201).json({
-        user: {
-          ...user,
-          avatar_config: JSON.parse(user.avatar_config || '{}')
-        }
-      });
+    // Check if user already exists
+    const existing = await sql`SELECT id FROM users WHERE email = ${lowerEmail}`;
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'An account with this email already exists' });
     }
 
-    console.log(`🔑 Auth: Registering ${email} in Supabase Auth...`);
-    if (!SUPABASE_URL || !SUPABASE_KEY) {
-      return res.status(500).json({ error: 'Supabase credentials are not configured on the server' });
-    }
+    // 1. Hash the user's password using bcrypt
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const signUpResponse = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ 
-        email, 
-        password,
-        options: {
-          data: {
-            name,
-            role,
-            avatar_config: avatarConfig
-          }
-        }
-      })
-    });
+    // 2. Generate a secure random token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
 
-    const signUpData = await signUpResponse.json();
-    if (!signUpResponse.ok) {
-      const errMsg = signUpData.msg || signUpData.message || signUpData.error_description || signUpData.error || 'Registration failed';
-      return res.status(signUpResponse.status).json({ error: errMsg });
-    }
+    // 3. Save the new User in the database with isVerified: false, the token, and expiration timestamp set to 24 hours from now
+    const tokenExpiresAt = new Date();
+    tokenExpiresAt.setHours(tokenExpiresAt.getHours() + 24);
 
-    const userId = signUpData.user ? signUpData.user.id : (signUpData.id || null);
-    if (!userId) {
-      return res.status(500).json({ error: 'Supabase signup did not return a user ID.' });
-    }
-
-    // Insert user into local DB immediately to preserve profile details
+    const userId = uuidv4();
     await sql`
-      INSERT INTO users (id, email, name, role, avatar_config)
-      VALUES (${userId}, ${email}, ${name}, ${role}, ${JSON.stringify(avatarConfig || {})})
-      ON CONFLICT (id) DO UPDATE SET
-        email = EXCLUDED.email,
-        name = EXCLUDED.name,
-        role = EXCLUDED.role,
-        avatar_config = EXCLUDED.avatar_config
+      INSERT INTO users (id, email, password, name, role, avatar_config, is_verified, verification_token, token_expires_at)
+      VALUES (
+        ${userId}, 
+        ${lowerEmail}, 
+        ${hashedPassword}, 
+        ${name}, 
+        ${role}, 
+        ${JSON.stringify(avatarConfig || {})}, 
+        false, 
+        ${verificationToken}, 
+        ${tokenExpiresAt}
+      )
     `;
 
-    if (!signUpData.session) {
-      return res.status(201).json({
-        message: 'Registration successful! Please check your email for confirmation.',
-        emailVerificationPending: true
+    // 4. Construct a verification URL pointing to: http://localhost:3001/api/auth/verify-email?token={TOKEN}&email={EMAIL}
+    const verifyUrl = `http://localhost:3001/api/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(lowerEmail)}`;
+    
+    // Log the verification URL in the console for easy developer testing/bypass
+    console.log(`\n✉️  [SKILLQUEST VERIFICATION] Email verification URL generated for ${lowerEmail}:`);
+    console.log(`👉 ${verifyUrl}\n`);
+
+    // 5. Use the Nodemailer transporter to send a styled HTML email to the student containing a clear, puffy action button to "Verify My Account" using the verification URL
+    const smtpHost = process.env.SMTP_HOST || 'smtp.ethereal.email';
+    const smtpPort = parseInt(process.env.SMTP_PORT || '587');
+    const smtpUser = process.env.SMTP_USER || '';
+    const smtpPass = process.env.SMTP_PASS || '';
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass
+      }
+    });
+
+    const mailOptions = {
+      from: process.env.SMTP_FROM || `"SkillQuest Support" <no-reply@skillquest.io>`,
+      to: lowerEmail,
+      subject: 'Verify Your SkillQuest Account',
+      html: `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #0F0E1A; border-radius: 16px; color: #E8E4F5;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #7C3AED; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; font-family: 'Manrope', sans-serif;">SkillQuest</h1>
+            <p style="color: #A8A3C0; margin: 5px 0 0 0; font-size: 14px;">Learn · Practice · Excel</p>
+          </div>
+          <div style="background-color: #1A1830; padding: 40px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1);">
+            <h2 style="color: #E8E4F5; margin-top: 0; font-size: 20px; font-weight: 700;">Welcome to SkillQuest, ${name}!</h2>
+            <p style="color: #4E4E5A; line-height: 1.6; font-size: 15px;">
+              Thank you for registering. To verify your email and activate your account, please click the puffy verification button below:
+            </p>
+            <div style="text-align: center; margin: 35px 0;">
+              <a href="${verifyUrl}" style="background-color: #ff3b93; color: #ffffff; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 15px rgba(255, 59, 147, 0.4); text-transform: uppercase; letter-spacing: 0.5px;">
+                Verify My Account
+              </a>
+            </div>
+            <p style="color: #8E8EA0; font-size: 12px; line-height: 1.5; margin-bottom: 0;">
+              If the button above does not work, copy and paste this URL into your browser: <br/>
+              <a href="${verifyUrl}" style="color: #b76dff; text-decoration: none; word-break: break-all;">${verifyUrl}</a>
+            </p>
+          </div>
+          <div style="text-align: center; margin-top: 25px; color: #B2B2C2; font-size: 12px;">
+            <p style="margin: 0;">This verification link is valid for 24 hours.</p>
+          </div>
+        </div>
+      `
+    };
+
+    if (!smtpUser || !smtpPass) {
+      console.log(`⚠️ SMTP credentials not configured. Skipping email transmission. (URL logged above)`);
+    } else {
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          console.error('❌ Failed to transmit verification email:', error.message);
+        } else {
+          console.log('✉️ Verification email transmitted successfully:', info.messageId);
+        }
       });
     }
 
-    sessionData = { access_token: signUpData.session.access_token, user: signUpData.user };
-
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    };
-    res.cookie('nursequest_token', sessionData.access_token, cookieOptions);
-
-    const users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
-    const user = users[0];
-
-    res.status(201).json({
-      user: {
-        ...user,
-        avatar_config: JSON.parse(user.avatar_config || '{}')
-      }
-    });
+    return res.status(201).json({ message: "Registration successful. Verification email transmitted.", emailVerificationPending: true });
 
   } catch (err) {
     console.error('Registration error:', err);
@@ -264,10 +284,62 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// GET /api/auth/verify-email
+router.get('/verify-email', async (req, res) => {
+  const { token, email } = req.query;
+  if (!token || !email) {
+    return res.status(400).json({ error: 'Token and email query parameters are required.' });
+  }
+
+  try {
+    const sql = getDB();
+    const lowerEmail = email.toLowerCase();
+
+    // 1. Fetch user by email
+    const users = await sql`SELECT id, verification_token, token_expires_at FROM users WHERE email = ${lowerEmail}`;
+    
+    if (users.length === 0) {
+      return res.status(400).json({ error: 'Verification failed: User account not found.' });
+    }
+
+    const user = users[0];
+
+    // 2. Check if token matches and token_expires_at is in the future
+    if (user.verification_token !== token) {
+      return res.status(400).json({ error: 'Verification failed: Invalid verification token.' });
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(user.token_expires_at);
+    if (expiresAt < now) {
+      return res.status(400).json({ error: 'Verification failed: Verification token has expired.' });
+    }
+
+    // 3. If valid, update user: set is_verified = true, and nullify verification_token and token_expires_at
+    await sql`
+      UPDATE users 
+      SET is_verified = true, 
+          verification_token = null, 
+          token_expires_at = null 
+      WHERE id = ${user.id}
+    `;
+
+    console.log(`✅ Email verified successfully for: ${lowerEmail}`);
+
+    // 4. Redirect to FRONTEND_URL/login?verified=true (will trigger the AppRoutes redirect to /auth?verified=true)
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    return res.redirect(`${frontendUrl}/login?verified=true`);
+  } catch (err) {
+    console.error('Email verification error:', err);
+    return res.status(500).json({ error: 'Server error during email verification: ' + err.message });
+  }
+});
+
+
 // POST /api/auth/logout
 router.post('/logout', async (req, res) => {
   try {
-    res.clearCookie('nursequest_token', {
+    res.clearCookie('skillquest_token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict'
@@ -294,7 +366,7 @@ router.post('/set-cookie', async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     };
 
-    res.cookie('nursequest_token', token, cookieOptions);
+    res.cookie('skillquest_token', token, cookieOptions);
     res.json({ success: true });
   } catch (err) {
     console.error('Set cookie error:', err);
@@ -317,7 +389,7 @@ router.post('/sync-profile', authenticateToken, async (req, res) => {
     }
 
     let finalRole = role;
-    if (req.user.email === 'admin@nursequest.com') {
+    if (req.user.email === 'admin@skillquest.io') {
       finalRole = 'admin';
     }
 
@@ -422,7 +494,7 @@ router.get('/me', authenticateToken, async (req, res) => {
             await sql.begin(async (tx) => {
               // Ensure admin role for admin email
               let migratedRole = oldUser.role;
-              if (req.user.email === 'admin@nursequest.com') {
+              if (req.user.email === 'admin@skillquest.io') {
                 migratedRole = 'admin';
               }
 
@@ -474,7 +546,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         // Create user from Supabase user_metadata
         const metadata = (req.user.tokenData && req.user.tokenData.user_metadata) || {};
         const name = metadata.name || req.user.email.split('@')[0];
-        const role = metadata.role || (req.user.email === 'admin@nursequest.com' ? 'admin' : (req.user.email === 'teacher@nursequest.com' ? 'teacher' : 'student'));
+        const role = metadata.role || (req.user.email === 'admin@skillquest.io' ? 'admin' : (req.user.email === 'teacher@skillquest.io' ? 'teacher' : 'student'));
         const avatarConfig = metadata.avatar_config || {};
 
         console.log(`🔑 Auth: Auto-creating user profile for ${req.user.email} in GET /me using token metadata`);

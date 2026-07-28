@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ══════════════════════════════════════════════════════
-   NurseQuest Design System
+   SkillQuest Design System
    Premium dark-mode design with glassmorphism
    ══════════════════════════════════════════════════════ */
 
@@ -18,58 +18,59 @@
 
 /* ─── Design Tokens ─── */
 :root {
-  /* Primary palette (Stitch Cyan Accents) */
-  --primary: #00E5FF;
-  --primary-light: #c3f5ff;
-  --primary-dark: #00626e;
-  --primary-glow: rgba(0, 229, 255, 0.35);
+  /* Primary palette (SkillQuest Purple) */
+  --primary: #7C3AED;
+  --primary-light: #A78BFA;
+  --primary-dark: #4A1D96;
+  --primary-glow: rgba(124, 58, 237, 0.35);
 
-  /* Secondary palette (Stitch Purple Accents) */
-  --secondary: #b76dff;
-  --secondary-light: #ddb7ff;
-  --secondary-dark: #670dae;
+  /* Secondary palette (SkillQuest Gold/Amber Accent) */
+  --secondary: #F59E0B;
+  --secondary-light: #FDE68A;
+  --secondary-dark: #B45309;
 
   /* Accent colors */
-  --accent-pink: #FD79A8;
-  --accent-orange: #F39C12;
-  --accent-yellow: #FDCB6E;
+  --accent-indigo: #6366F1;
+  --accent-emerald: #10B981;
+  --accent-rose: #F43F5E;
+  --accent-yellow: #F59E0B;
 
-  /* Semantic colors (Stitch Telemetry Accents) */
-  --success: #39FF14;
-  --success-light: rgba(57, 255, 20, 0.15);
-  --danger: #FF3131;
-  --danger-light: rgba(255, 49, 49, 0.15);
-  --warning: #fabc4e;
-  --warning-light: rgba(250, 188, 78, 0.15);
-  --info: #00E5FF;
-  --info-light: rgba(0, 229, 255, 0.15);
+  /* Semantic colors */
+  --success: #10B981;
+  --success-light: rgba(16, 185, 129, 0.15);
+  --danger: #EF4444;
+  --danger-light: rgba(239, 68, 68, 0.15);
+  --warning: #F59E0B;
+  --warning-light: rgba(245, 158, 11, 0.15);
+  --info: #6366F1;
+  --info-light: rgba(99, 102, 241, 0.15);
 
-  /* Background system (Stitch Clinical Pulse Night Base) */
-  --bg-base: #0a0e14;
-  --bg-surface: #181c22;
-  --bg-card: #1c2026;
-  --bg-elevated: #262a31;
-  --bg-hover: #31353c;
-  --bg-input: #181c22;
+  /* Background system (SkillQuest Deep Navy/Indigo Base) */
+  --bg-base: #0F0E1A;
+  --bg-surface: #1A1830;
+  --bg-card: #1E1B3A;
+  --bg-elevated: #2A2650;
+  --bg-hover: #342F60;
+  --bg-input: #1A1830;
 
-  /* Text system (Stitch High Contrast) */
-  --text-primary: #dfe2eb;
-  --text-secondary: #bac9cc;
-  --text-muted: #849396;
-  --text-inverse: #0a0e14;
+  /* Text system */
+  --text-primary: #E8E4F5;
+  --text-secondary: #A8A3C0;
+  --text-muted: #6E6A8A;
+  --text-inverse: #0F0E1A;
 
   /* Border system */
-  --border: rgba(255, 255, 255, 0.05);
-  --border-light: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.06);
+  --border-light: rgba(255, 255, 255, 0.12);
   --border-focus: var(--primary);
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #00E5FF 0%, #b76dff 100%);
-  --gradient-hero: linear-gradient(135deg, #00E5FF 0%, #c3f5ff 50%, #b76dff 100%);
-  --gradient-warm: linear-gradient(135deg, #FD79A8 0%, #b76dff 100%);
-  --gradient-success: linear-gradient(135deg, #39FF14 0%, #baffa2 100%);
-  --gradient-danger: linear-gradient(135deg, #FF3131 0%, #ffc2bb 100%);
-  --gradient-card: linear-gradient(145deg, rgba(28, 32, 38, 0.8) 0%, rgba(38, 42, 49, 0.4) 100%);
+  --gradient-primary: linear-gradient(135deg, #7C3AED 0%, #4A1D96 100%);
+  --gradient-hero: linear-gradient(135deg, #7C3AED 0%, #A78BFA 50%, #F59E0B 100%);
+  --gradient-warm: linear-gradient(135deg, #F59E0B 0%, #F43F5E 100%);
+  --gradient-success: linear-gradient(135deg, #10B981 0%, #6EE7B7 100%);
+  --gradient-danger: linear-gradient(135deg, #EF4444 0%, #FCA5A5 100%);
+  --gradient-card: linear-gradient(145deg, rgba(30, 27, 58, 0.85) 0%, rgba(42, 38, 80, 0.5) 100%);
 
   /* Shadows */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
@@ -78,10 +79,12 @@
   --shadow-glow: 0 0 30px var(--primary-glow);
   --shadow-glow-sm: 0 0 15px var(--primary-glow);
 
-  /* Typography */
-  --font-heading: 'Outfit', sans-serif;
-  --font-body: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* Typography (Fredoka & Nunito - Curvy Gamified Look) */
+  --font-heading: 'Fredoka', 'Nunito', sans-serif;
+  --font-headline: 'Fredoka', 'Nunito', sans-serif;
+  --font-display: 'Fredoka', 'Nunito', sans-serif;
+  --font-body: 'Fredoka', 'Nunito', sans-serif;
+  --font-mono: 'Fredoka', monospace;
 
   /* Spacing */
   --space-xs: 4px;
@@ -92,7 +95,7 @@
   --space-2xl: 48px;
   --space-3xl: 64px;
 
-  /* Border radius (Stitch roundedness DEFAULT to lg) */
+  /* Border radius */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -104,39 +107,50 @@
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Spring Easing Curves (Physics-modeled) */
+  --ease-spring-soft: cubic-bezier(0.34, 1.56, 0.64, 1);    /* Gentle overshoot — cards, reveals */
+  --ease-spring-bouncy: cubic-bezier(0.68, -0.55, 0.27, 1.55); /* Duolingo bounce — buttons, badges */
+  --ease-spring-snappy: cubic-bezier(0.22, 1, 0.36, 1);     /* Framer snappy — page transitions */
+  --ease-decel: cubic-bezier(0, 0, 0.2, 1);                 /* Natural deceleration — entrances */
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);          /* Exponential ease-out — dramatic reveals */
 }
 
 /* ─── Light Theme Tokens ─── */
 body.light-theme {
-  --bg-base: #F8FAFC;
+  --bg-base: #FAF8FF;
   --bg-surface: #FFFFFF;
   --bg-card: #FFFFFF;
-  --bg-elevated: #F1F5F9;
-  --bg-hover: #E2E8F0;
+  --bg-elevated: #F3F0FF;
+  --bg-hover: #EDE9FE;
   --bg-input: #FFFFFF;
 
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-muted: #64748B;
-  --text-inverse: #F8FAFC;
+  --text-primary: #1E1B4B;
+  --text-secondary: #4C4883;
+  --text-muted: #7C78A8;
+  --text-inverse: #FAF8FF;
 
-  --border: rgba(0, 0, 0, 0.06);
-  --border-light: rgba(0, 0, 0, 0.1);
+  --border: rgba(30, 27, 75, 0.08);
+  --border-light: rgba(30, 27, 75, 0.14);
 
-  --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(241, 245, 249, 0.8) 100%);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.12);
+  --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(243, 240, 255, 0.8) 100%);
+  --shadow-sm: 0 2px 8px rgba(30, 27, 75, 0.05);
+  --shadow-md: 0 4px 20px rgba(30, 27, 75, 0.08);
+  --shadow-lg: 0 8px 40px rgba(30, 27, 75, 0.12);
 }
 
-/* ─── Base Styles ─── */
+/* ─── Base Styles (Curvy Gamified Fredoka Font System) ─── */
 html {
   font-size: 16px;
   scroll-behavior: smooth;
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+}
+
+body, h1, h2, h3, h4, h5, h6, button, input, select, textarea {
+  font-family: 'Fredoka', 'Nunito', sans-serif !important;
 }
 
 body {
-  font-family: var(--font-body);
   background: var(--bg-base);
   color: var(--text-primary);
   line-height: 1.6;
@@ -1557,4 +1571,421 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 229, 255, 0.45);
+}
+
+/* ══════════════════════════════════════════════════════
+   Phase 1: Animation Foundation — Spring Curves & Reveals
+   ══════════════════════════════════════════════════════ */
+
+/* ─── Accessibility: Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Scroll Reveal System ─── */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s var(--ease-spring-snappy),
+              transform 0.7s var(--ease-spring-snappy);
+  will-change: opacity, transform;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.92) translateY(20px);
+  transition: opacity 0.6s var(--ease-spring-soft),
+              transform 0.6s var(--ease-spring-soft);
+  will-change: opacity, transform;
+}
+
+.reveal-scale.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.reveal-left {
+  opacity: 0;
+  transform: translateX(-40px);
+  transition: opacity 0.7s var(--ease-spring-snappy),
+              transform 0.7s var(--ease-spring-snappy);
+}
+
+.reveal-left.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.reveal-right {
+  opacity: 0;
+  transform: translateX(40px);
+  transition: opacity 0.7s var(--ease-spring-snappy),
+              transform 0.7s var(--ease-spring-snappy);
+}
+
+.reveal-right.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Stagger delays — apply to children of a reveal container */
+.reveal-stagger-1 { transition-delay: 80ms; }
+.reveal-stagger-2 { transition-delay: 160ms; }
+.reveal-stagger-3 { transition-delay: 240ms; }
+.reveal-stagger-4 { transition-delay: 320ms; }
+.reveal-stagger-5 { transition-delay: 400ms; }
+.reveal-stagger-6 { transition-delay: 480ms; }
+.reveal-stagger-7 { transition-delay: 560ms; }
+.reveal-stagger-8 { transition-delay: 640ms; }
+
+/* ─── New Keyframe Animations ─── */
+@keyframes elasticPop {
+  0% { transform: scale(0); opacity: 0; }
+  40% { transform: scale(1.15); opacity: 1; }
+  65% { transform: scale(0.95); }
+  80% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(124, 58, 237, 0.3),
+                0 0 20px rgba(124, 58, 237, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(124, 58, 237, 0.5),
+                0 0 40px rgba(124, 58, 237, 0.25);
+  }
+}
+
+@keyframes glowPulseAmber {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.3),
+                0 0 16px rgba(245, 158, 11, 0.1);
+    text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.5),
+                0 0 40px rgba(245, 158, 11, 0.2);
+    text-shadow: 0 0 16px rgba(245, 158, 11, 0.6);
+  }
+}
+
+@keyframes xpFloat {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-60px) scale(0.9);
+  }
+}
+
+@keyframes levelUpBurst {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+  60% {
+    transform: scale(0.9);
+  }
+  80% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes confettiPiece {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(300px) rotate(720deg) scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes typewriterCursor {
+  0%, 100% { border-right-color: transparent; }
+  50% { border-right-color: var(--primary); }
+}
+
+@keyframes subtleDrift {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes borderGlow {
+  0%, 100% {
+    border-color: rgba(124, 58, 237, 0.2);
+  }
+  50% {
+    border-color: rgba(124, 58, 237, 0.5);
+  }
+}
+
+@keyframes successFlash {
+  0% { background-color: transparent; }
+  20% { background-color: rgba(16, 185, 129, 0.15); }
+  100% { background-color: transparent; }
+}
+
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  10%, 50%, 90% { transform: translateX(-4px); }
+  30%, 70% { transform: translateX(4px); }
+}
+
+/* ─── Phase 1 Utility Classes ─── */
+.animate-elasticPop {
+  animation: elasticPop 0.6s var(--ease-spring-bouncy) both;
+}
+
+.animate-glowPulse {
+  animation: glowPulse 2.5s ease-in-out infinite;
+}
+
+.animate-glowPulseAmber {
+  animation: glowPulseAmber 2s ease-in-out infinite;
+}
+
+.animate-xpFloat {
+  animation: xpFloat 1.4s var(--ease-out-expo) forwards;
+}
+
+.animate-levelUpBurst {
+  animation: levelUpBurst 0.8s var(--ease-spring-bouncy) both;
+}
+
+.animate-subtleDrift {
+  animation: subtleDrift 3s ease-in-out infinite;
+}
+
+.animate-successFlash {
+  animation: successFlash 0.6s ease-out;
+}
+
+.animate-errorShake {
+  animation: errorShake 0.4s ease-out;
+}
+
+.animate-borderGlow {
+  animation: borderGlow 2s ease-in-out infinite;
+}
+
+/* ─── Enhanced Interactive States ─── */
+.interactive-lift {
+  transition: transform 0.3s var(--ease-spring-soft),
+              box-shadow 0.3s var(--ease-spring-soft);
+}
+
+.interactive-lift:hover {
+  transform: translateY(-4px) rotate(0.5deg);
+  box-shadow: var(--shadow-lg), 0 0 30px rgba(124, 58, 237, 0.1);
+}
+
+.interactive-lift:active {
+  transform: translateY(-1px) scale(0.98);
+  transition-duration: 100ms;
+}
+
+/* Button spring press */
+.btn-spring {
+  transition: transform 0.25s var(--ease-spring-soft),
+              box-shadow 0.25s ease;
+}
+
+.btn-spring:hover {
+  transform: translateY(-2px);
+}
+
+.btn-spring:active {
+  transform: scale(0.94) translateY(1px);
+  transition-duration: 80ms;
+}
+
+/* Input focus glow ring */
+.input-glow-focus {
+  transition: border-color 0.3s ease,
+              box-shadow 0.4s var(--ease-spring-soft);
+}
+
+.input-glow-focus:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15),
+              0 0 20px rgba(124, 58, 237, 0.08) !important;
+}
+
+/* ─── Orchestrated Entrance Helpers ─── */
+.entrance-hero {
+  opacity: 0;
+  transform: translateY(40px);
+  animation: fadeInUp 0.7s var(--ease-spring-snappy) forwards;
+}
+
+.entrance-hero-d1 { animation-delay: 0.1s; }
+.entrance-hero-d2 { animation-delay: 0.2s; }
+.entrance-hero-d3 { animation-delay: 0.35s; }
+.entrance-hero-d4 { animation-delay: 0.5s; }
+.entrance-hero-d5 { animation-delay: 0.65s; }
+.entrance-hero-d6 { animation-delay: 0.8s; }
+.entrance-hero-d7 { animation-delay: 0.95s; }
+
+/* Cascade entrance for stat cards */
+.cascade-entrance {
+  opacity: 0;
+  transform: translateX(-30px) scale(0.95);
+  animation: slideInFromLeft 0.6s var(--ease-spring-soft) forwards;
+}
+
+.cascade-d1 { animation-delay: 0.1s; }
+.cascade-d2 { animation-delay: 0.2s; }
+.cascade-d3 { animation-delay: 0.3s; }
+.cascade-d4 { animation-delay: 0.4s; }
+
+/* Tab crossfade */
+.tab-content-enter {
+  animation: fadeInScale 0.35s var(--ease-spring-snappy) both;
+}
+
+/* Confetti particle base */
+.confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confettiPiece 1.5s var(--ease-decel) forwards;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════
+   Google Flow & Google Whisk AI Motion Keyframes
+   ══════════════════════════════════════════════════════ */
+
+@keyframes whiskFloat {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+    filter: drop-shadow(0 15px 25px rgba(124, 58, 237, 0.25));
+  }
+  50% {
+    transform: translateY(-12px) rotate(2deg);
+    filter: drop-shadow(0 25px 35px rgba(124, 58, 237, 0.4));
+  }
+}
+
+@keyframes flowOrbit {
+  0% {
+    transform: perspective(1000px) rotateY(0deg) rotateX(0deg);
+  }
+  50% {
+    transform: perspective(1000px) rotateY(6deg) rotateX(-4deg);
+  }
+  100% {
+    transform: perspective(1000px) rotateY(0deg) rotateX(0deg);
+  }
+}
+
+@keyframes pulseGlowCyan {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.25), 0 0 30px rgba(6, 182, 212, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.5), 0 0 60px rgba(6, 182, 212, 0.25);
+  }
+}
+
+.animate-whiskFloat {
+  animation: whiskFloat 4s ease-in-out infinite;
+}
+
+.animate-flowOrbit {
+  animation: flowOrbit 8s ease-in-out infinite;
+}
+
+.animate-pulseGlowCyan {
+  animation: pulseGlowCyan 3s ease-in-out infinite;
+}
+
+/* ══════════════════════════════════════════════════════
+   3D Conquer Levels Button (From Uiverse.io by kosedagyazilim)
+   ══════════════════════════════════════════════════════ */
+.btn-conquer {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 14px 32px;
+  font-family: var(--font-headline, 'Outfit', sans-serif);
+  font-size: 1.125rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background-image: linear-gradient(to bottom right, #00c6ff, #0072ff);
+  border: none;
+  border-radius: 40px;
+  box-shadow: 0px 5px 0px #0056c6, 0px 10px 20px rgba(0, 114, 255, 0.4);
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  user-select: none;
+}
+
+.btn-conquer:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0px 7px 0px #0056c6, 0px 15px 30px rgba(0, 198, 255, 0.5);
+  background-image: linear-gradient(to bottom right, #1ad1ff, #0072ff);
+}
+
+.btn-conquer:active {
+  transform: translateY(2px);
+  box-shadow: 0px 2px 0px #0056c6;
+  background-image: linear-gradient(to bottom right, #0072ff, #00c6ff);
+}
+
+.btn-conquer::before,
+.btn-conquer::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  pointer-events: none;
+  border-radius: 44px;
+}
+
+.btn-conquer::before {
+  border-top: 3px solid #ffffff;
+  border-left: 3px solid #ffffff;
+}
+
+.btn-conquer::after {
+  border-bottom: 3px solid #ffffff;
+  border-right: 3px solid #ffffff;
 }

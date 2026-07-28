@@ -5,7 +5,7 @@ const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 
 async function authenticateToken(req, res, next) {
   // Read token from HttpOnly cookie first, fall back to Authorization header
-  let token = req.cookies ? req.cookies.nursequest_token : null;
+  let token = req.cookies ? req.cookies.skillquest_token : null;
   if (!token) {
     const authHeader = req.headers['authorization'];
     token = authHeader && authHeader.split(' ')[1];

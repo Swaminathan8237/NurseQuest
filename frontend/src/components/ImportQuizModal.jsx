@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { quizAPI, moduleAPI } from '../api';
+import { quizAPI } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
 /* ─── Captcha Bounding-Box Editor ─── */
@@ -230,12 +230,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
 
   const [questions, setQuestions] = useState([]);
   const [activeQ, setActiveQ] = useState(0);
-  const [modules, setModules] = useState([]);
   const [uploadingMedia, setUploadingMedia] = useState(false);
-
-  useEffect(() => {
-    moduleAPI.getAll().then(data => setModules(data)).catch(console.error);
-  }, []);
 
   const handleDragOver = (e) => {
     e.preventDefault();

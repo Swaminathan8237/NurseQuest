@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { userAPI, quizAPI, adminAPI, moduleAPI } from '../api';
+import { userAPI, quizAPI, adminAPI } from '../api';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import ImportQuizModal from '../components/ImportQuizModal';
@@ -18,9 +18,8 @@ export default function TeacherDashboard() {
 
   const [activeTab, setActiveTab] = useState('quizzes'); // 'quizzes' | 'requests'
   const [quizRequests, setQuizRequests] = useState([]);
-  const [modules, setModules] = useState([]);
   const [showRequestModal, setShowRequestModal] = useState(null); // quiz object if open
-  const [selectedModuleId, setSelectedModuleId] = useState('');
+  const [selectedUnit, setSelectedUnit] = useState(1);
   const [submittingRequest, setSubmittingRequest] = useState(false);
 
   useEffect(() => {
@@ -46,15 +45,13 @@ export default function TeacherDashboard() {
       userAPI.getDashboardStats(), 
       quizAPI.getMyQuizzes(), 
       userAPI.getStudents(),
-      adminAPI.getMyQuizRequests(),
-      moduleAPI.getAll()
+      adminAPI.getMyQuizRequests()
     ])
-      .then(([s, q, st, reqs, mods]) => { 
+      .then(([s, q, st, reqs]) => { 
         setStats(s); 
         setQuizzes(q || []); 
         setStudents(st || []); 
         setQuizRequests(reqs || []);
-        setModules(mods || []);
       })
       .catch(console.error).finally(() => setLoading(false));
   }, []);
@@ -340,7 +337,7 @@ export default function TeacherDashboard() {
                               </span>
                             </div>
                             <p className="text-xs text-slate-400">
-                              Requested for module: <span className="text-slate-300 font-semibold">{req.module_title || 'General'}</span>
+                              Requested for unit: <span className="text-slate-300 font-semibold">{req.module_title || 'General'}</span>
                             </p>
                             {req.admin_notes && (
                               <div className="text-xs p-2.5 rounded bg-brand-surface shadow-clay-sunken text-slate-300 border border-brand-elevated/40 mt-2">
@@ -462,15 +459,14 @@ export default function TeacherDashboard() {
             </p>
             
             <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Select Learning Module</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Select Learning Unit</label>
               <select
                 className="w-full bg-brand-surface border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface outline-none cursor-pointer"
-                value={selectedModuleId}
-                onChange={e => setSelectedModuleId(e.target.value)}
+                value={selectedUnit}
+                onChange={e => setSelectedUnit(parseInt(e.target.value))}
               >
-                <option value="">Select Module...</option>
-                {modules.map(m => (
-                  <option key={m.id} value={m.id}>{m.title}</option>
+                {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(u => (
+                  <option key={u} value={u}>Unit {u}</option>
                 ))}
               </select>
             </div>
@@ -483,12 +479,13 @@ export default function TeacherDashboard() {
                 Cancel
               </button>
               <button 
-                className="btn btn-primary rounded-xl px-5 py-2 text-xs font-bold"
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-primary text-on-primary hover:brightness-110 transition-all flex items-center gap-2 shadow-md"
+                disabled={submittingRequest}
                 onClick={async () => {
-                  if (!selectedModuleId) return alert('Please select a module');
                   setSubmittingRequest(true);
                   try {
-                    await adminAPI.submitQuizRequest(showRequestModal.id, selectedModuleId);
+                    await adminAPI.submitQuizRequest(showRequestModal.id, selectedUnit);
+                    alert('Publish request submitted to administrators!');
                     setShowRequestModal(null);
                     await refreshRequests();
                   } catch (err) {
@@ -498,7 +495,6 @@ export default function TeacherDashboard() {
                     setSubmittingRequest(false);
                   }
                 }}
-                disabled={submittingRequest || !selectedModuleId}
               >
                 {submittingRequest ? 'Submitting...' : 'Submit Request'}
               </button>

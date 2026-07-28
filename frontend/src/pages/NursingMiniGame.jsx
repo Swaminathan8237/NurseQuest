@@ -363,7 +363,6 @@ export default function NursingMiniGame() {
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none"></div>
 
           <div className="flex-1 z-10">
-            <p className="text-sm font-label font-bold text-tertiary uppercase tracking-widest mb-2">Nursing Mini-Game System</p>
             <h1 className="text-3xl md:text-5xl font-headline font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-primary mb-4">
               IV Stabilization Sprint
             </h1>

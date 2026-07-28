@@ -61,9 +61,10 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      const profile = await authAPI.login(email, password);
-      setUser(profile);
-      return profile;
+      const response = await authAPI.login(email, password);
+      const userObj = response.user || response;
+      setUser(userObj);
+      return userObj;
     } catch (err) {
       console.error('Login failed:', err);
       throw err;

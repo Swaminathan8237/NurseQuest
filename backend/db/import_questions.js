@@ -2,7 +2,7 @@
  * import_questions.js
  * 
  * Parses 11 Word documents containing 165 nursing questions and imports
- * them into the NurseQuest SQLite database.
+ * them into the SkillQuest database.
  * 
  * Usage:  node backend/db/import_questions.js
  * 

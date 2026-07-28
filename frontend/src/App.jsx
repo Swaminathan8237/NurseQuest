@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import AuthPage from './pages/AuthPage';
@@ -10,14 +10,14 @@ import QuizPlayer from './pages/QuizPlayer';
 import QuizBuilder from './pages/QuizBuilder';
 import Leaderboard from './pages/Leaderboard';
 import LiveGame from './pages/LiveGame';
-import NursingMiniGame from './pages/NursingMiniGame';
 import Units from './pages/Units';
 import AdminDashboard from './pages/AdminDashboard';
+import logo from './assets/skillquest-logo.png';
 import './App.css';
 
 function ProtectedRoute({ children, allowedRoles, role }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="loading-screen"><div className="spinner" /><p>Loading NurseQuest...</p></div>;
+  if (loading) return <div className="loading-screen"><div className="spinner" /><p>Loading SkillQuest...</p></div>;
   if (!user) return <Navigate to="/auth" />;
   if (user.needProfileSetup) return <Navigate to="/auth" />;
 
@@ -31,13 +31,14 @@ function ProtectedRoute({ children, allowedRoles, role }) {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
       <div className="loading-screen">
-        <div className="nq-logo animate-pulse">🏥</div>
+        <img src={logo} alt="SkillQuest Logo" className="w-16 h-16 animate-pulse mb-2 object-contain" />
         <div className="spinner" />
-        <p style={{ color: 'var(--text-secondary)' }}>Loading NurseQuest...</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading SkillQuest...</p>
       </div>
     );
   }
@@ -45,6 +46,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<Navigate to={`/auth${location.search}`} replace />} />
       <Route path="/auth" element={user && !user.needProfileSetup ? <Navigate to={user.role === 'admin' ? '/admin' : (user.role === 'teacher' ? '/teacher' : '/student')} /> : <AuthPage />} />
       <Route path="/avatar-setup" element={<ProtectedRoute role="student"><AvatarSetup /></ProtectedRoute>} />
       <Route path="/student" element={<ProtectedRoute role="student"><StudentDashboard /></ProtectedRoute>} />
@@ -54,10 +56,9 @@ function AppRoutes() {
       <Route path="/quiz-builder" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><QuizBuilder /></ProtectedRoute>} />
       <Route path="/quiz-builder/:id" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><QuizBuilder /></ProtectedRoute>} />
       <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
-      <Route path="/live/:code" element={<LiveGame />} />
-      <Route path="/live" element={<LiveGame />} />
+      <Route path="/live" element={<ProtectedRoute><LiveGame /></ProtectedRoute>} />
+      <Route path="/live/:code" element={<ProtectedRoute><LiveGame /></ProtectedRoute>} />
       <Route path="/units" element={<ProtectedRoute><Units /></ProtectedRoute>} />
-      <Route path="/mini-game" element={<ProtectedRoute role="student"><NursingMiniGame /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

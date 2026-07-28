@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../contexts/ThemeContext';
+import useScrollReveal from '../hooks/useScrollReveal';
+import logo from '../assets/skillquest-logo.png';
+import mascotImg from '../assets/skillquest-mascot.png';
+import trophyImg from '../assets/skillquest-trophy.png';
+import arenaImg from '../assets/skillquest-arena.png';
 
 // ── Fun nickname generator ──
 const ADJECTIVES = [
@@ -9,8 +13,8 @@ const ADJECTIVES = [
   'Keen', 'Wise', 'Pure', 'True', 'Star',
 ];
 const NOUNS = [
-  'Nurse', 'Healer', 'Medic', 'Pulse', 'Heart', 'Shield', 'Vitals',
-  'Beacon', 'Spark', 'Echo', 'Sage', 'Crest', 'Wave', 'Glow', 'Flame',
+  'Scholar', 'Explorer', 'Thinker', 'Maven', 'Spark', 'Sage', 'Phoenix',
+  'Beacon', 'Ace', 'Echo', 'Flash', 'Crest', 'Wave', 'Glow', 'Flame',
   'Wing', 'Storm', 'Frost', 'Dawn', 'Tide',
 ];
 
@@ -212,46 +216,46 @@ function RoomCodeDemo() {
   );
 }
 
-const DOCTORS = [
+const EDUCATORS = [
   {
-    name: 'Dr. Sarah Jenkins, MD, FACP',
-    role: 'Chief of Medical Residency, Metro Health',
-    specialty: 'Internal Medicine & Medical Education',
-    quote: "NurseQuest bridges the gap between textbook clinical theory and high-stakes split-second decision making. It's a game-changer for nursing residency programs.",
+    name: 'Prof. Sarah Jenkins, PhD',
+    role: 'Head of Digital Assessment, Metro University',
+    specialty: 'Educational Technology & Assessment',
+    quote: "SkillQuest bridges the gap between passive studying and active, high-retention learning. It's a game-changer for modern interactive classrooms.",
     avatarColor: 'from-blue-500 to-indigo-600',
-    avatarIcon: 'medical_services',
-  },
-  {
-    name: 'Dr. Marcus Vance, DNP, APRN',
-    role: 'Director of Clinical Simulation, St. Jude University',
-    specialty: 'Emergency Nursing & Simulation',
-    quote: "Gamified active learning is the future. My students show 40% higher retention in ACLS protocols since we introduced NurseQuest's real-time quizzes.",
-    avatarColor: 'from-emerald-500 to-teal-600',
-    avatarIcon: 'emergency',
-  },
-  {
-    name: 'Dr. Elena Rostova, PhD, RN',
-    role: 'Professor of Nursing Education, Eastern State College',
-    specialty: 'Curriculum Design & NCLEX Prep',
-    quote: "The variety of question formats—especially the sequencing and matching pairs—perfectly mimics the cognitive challenges of the NCLEX exam.",
-    avatarColor: 'from-purple-500 to-pink-600',
     avatarIcon: 'school',
   },
   {
-    name: 'Dr. Arthur Pendelton, MD, FCCP',
-    role: 'Chief of Pulmonary Medicine, City General Hospital',
-    specialty: 'Critical Care & Pulmonology',
-    quote: "NurseQuest is exceptional. By turning complex diagnostic criteria into rapid-fire interactive challenges, it engages learners like nothing else.",
-    avatarColor: 'from-rose-500 to-orange-600',
-    avatarIcon: 'clinical_notes',
+    name: 'Dr. Marcus Vance, EdD',
+    role: 'Director of Interactive Learning, St. Jude Academy',
+    specialty: 'Gamified Education & Physics',
+    quote: "Gamified active learning is the future. My students show 40% higher retention in complex concepts since we introduced SkillQuest's real-time quizzes.",
+    avatarColor: 'from-emerald-500 to-teal-600',
+    avatarIcon: 'science',
   },
   {
-    name: 'Dr. Priya Nair, DNP, CPNP-PC',
-    role: 'Assistant Professor, Pediatric Nursing Academy',
-    specialty: 'Pediatrics & Clinical Instruction',
-    quote: "My students love the interactive team game mode. The friendly competition drives them to master critical pediatric drug dosages without stress.",
+    name: 'Elena Rostova, MEd',
+    role: 'Senior Curriculum Specialist, Global Ed Institute',
+    specialty: 'Curriculum Design & Test Prep',
+    quote: "The variety of question formats—especially the sequence and matching challenges—engages learners and reinforces deep subject mastery.",
+    avatarColor: 'from-purple-500 to-pink-600',
+    avatarIcon: 'psychology',
+  },
+  {
+    name: 'Arthur Pendelton, MSc',
+    role: 'Lead STEM Educator, City Tech High',
+    specialty: 'Computer Science & Mathematics',
+    quote: "SkillQuest is exceptional. By turning complex problem solving into rapid-fire interactive challenges, it engages learners like nothing else.",
+    avatarColor: 'from-rose-500 to-orange-600',
+    avatarIcon: 'calculate',
+  },
+  {
+    name: 'Priya Nair, MA',
+    role: 'Assistant Professor of Languages, Horizon Academy',
+    specialty: 'Linguistics & Interactive Prep',
+    quote: "My students love the live team game mode. The friendly competition drives them to master vocabulary and concepts without stress.",
     avatarColor: 'from-amber-500 to-red-600',
-    avatarIcon: 'child_care',
+    avatarIcon: 'translate',
   },
 ];
 
@@ -273,8 +277,8 @@ const matchPairsData = {
 // ═══════════════════════════════════════════════
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const scrollRevealRef = useScrollReveal();
 
   // Guest join modal states
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -300,7 +304,7 @@ export default function LandingPage() {
       return;
     }
 
-    localStorage.setItem('nursequest_guest_name', modalNickname.trim());
+    localStorage.setItem('skillquest_guest_name', modalNickname.trim());
     setShowJoinModal(false);
     navigate(`/live/${modalCode.toUpperCase().trim()}`);
   };
@@ -326,6 +330,109 @@ export default function LandingPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // ═══════════════════════════════════════════════
+  // Ultra-Fast Canvas Frame Sequence Engine (240 WebP Frames)
+  // ═══════════════════════════════════════════════
+  const canvasRef = useRef(null);
+  const imagesRef = useRef([]);
+  const currentFrameRef = useRef(0);
+  const totalFrames = 240;
+
+  // Draw frame with object-fit "cover" algorithm
+  const drawCanvasFrame = (frameIndex) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const img = imagesRef.current[frameIndex];
+
+    if (!img || !img.complete || !img.naturalWidth) return;
+
+    const imgW = img.naturalWidth;
+    const imgH = img.naturalHeight;
+    const canvasW = canvas.width;
+    const canvasH = canvas.height;
+    const imgRatio = imgW / imgH;
+    const canvasRatio = canvasW / canvasH;
+
+    let renderW, renderH, offsetX, offsetY;
+    if (canvasRatio > imgRatio) {
+      renderW = canvasW;
+      renderH = canvasW / imgRatio;
+      offsetX = 0;
+      offsetY = (canvasH - renderH) / 2;
+    } else {
+      renderW = canvasH * imgRatio;
+      renderH = canvasH;
+      offsetX = (canvasW - renderW) / 2;
+      offsetY = 0;
+    }
+
+    ctx.clearRect(0, 0, canvasW, canvasH);
+    ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
+  };
+
+  // Preload all 240 frames into memory
+  useEffect(() => {
+    const images = new Array(totalFrames);
+    for (let i = 0; i < totalFrames; i++) {
+      const img = new Image();
+      const frameNum = String(i + 1).padStart(4, '0');
+      img.src = `/frames/frame_${frameNum}.webp`;
+      img.onload = () => {
+        if (i === currentFrameRef.current) {
+          drawCanvasFrame(i);
+        }
+      };
+      images[i] = img;
+    }
+    imagesRef.current = images;
+  }, []);
+
+  // Resize listener for canvas dimensions
+  useEffect(() => {
+    const handleResize = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      drawCanvasFrame(currentFrameRef.current);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // High-Frequency Scroll Listener (Zero-Rerender 60fps)
+  useEffect(() => {
+    let animId;
+
+    const handleScroll = () => {
+      if (animId) cancelAnimationFrame(animId);
+
+      animId = requestAnimationFrame(() => {
+        const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+        if (totalHeight <= 0) return;
+
+        const scrollRatio = Math.min(Math.max(window.scrollY / totalHeight, 0), 1);
+        const targetFrame = Math.min(Math.floor(scrollRatio * (totalFrames - 1)), totalFrames - 1);
+
+        if (targetFrame !== currentFrameRef.current) {
+          currentFrameRef.current = targetFrame;
+          drawCanvasFrame(targetFrame);
+        }
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (animId) cancelAnimationFrame(animId);
+    };
+  }, []);
+
   // Doctors circle states
   const [activeDocIndex, setActiveDocIndex] = useState(0);
   const [autoplay, setAutoplay] = useState(true);
@@ -333,7 +440,7 @@ export default function LandingPage() {
   useEffect(() => {
     if (!autoplay) return;
     const timer = setInterval(() => {
-      setActiveDocIndex((prev) => (prev + 1) % DOCTORS.length);
+      setActiveDocIndex((prev) => (prev + 1) % EDUCATORS.length);
     }, 5000);
     return () => clearInterval(timer);
   }, [autoplay]);
@@ -443,26 +550,34 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-on-background font-body overflow-x-hidden transition-colors duration-500">
+    <div ref={scrollRevealRef} className="min-h-screen bg-[#0B0F19] text-white font-body overflow-x-hidden relative">
+
+      {/* ═══════════ SCROLL-DRIVEN BACKGROUND CANVAS ═══════════ */}
+      <div className="fixed inset-0 w-full h-full pointer-events-none z-0 overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          className="w-full h-full object-cover opacity-90 filter brightness-105 saturate-110 transition-opacity duration-700"
+        />
+        {/* Soft legibility overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0B0F19]/50 via-[#0B0F19]/30 to-[#0B0F19]/70 pointer-events-none" />
+      </div>
 
       {/* ═══════════ NAVBAR ═══════════ */}
-      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-surface-container-lowest/70 border-b border-outline-variant/20">
+      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-[#0F0E1A]/80 border-b border-white/10 text-white">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           {/* Logo */}
           <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 bg-surface-container-highest rounded-xl flex items-center justify-center ring-1 ring-primary/40 shadow-[0_0_12px_rgba(108,92,231,0.25)] group-hover:shadow-[0_0_20px_rgba(108,92,231,0.4)] transition-all">
-              <span className="material-symbols-outlined text-xl text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>medical_services</span>
-            </div>
+            <img src={logo} alt="SkillQuest Logo" className="w-9 h-9 object-contain rounded-xl shadow-[0_0_12px_rgba(124,58,237,0.3)] group-hover:scale-105 transition-all" />
             <span className="font-headline font-extrabold text-lg tracking-tight">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-tertiary">NurseQuest</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] to-[#F59E0B]">SkillQuest</span>
             </span>
           </button>
 
           {/* Desktop links */}
           <div className="hidden lg:flex items-center gap-8">
-            <a href="#recommends" className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors">Recommendations</a>
-            <a href="#quiz-details" className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors">Quiz Formats</a>
-            <a href="#contact" className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors">Contact Us</a>
+            <a href="#recommends" className="text-sm font-medium text-slate-300 hover:text-primary transition-colors">Recommendations</a>
+            <a href="#quiz-details" className="text-sm font-medium text-slate-300 hover:text-primary transition-colors">Quiz Formats</a>
+            <a href="#contact" className="text-sm font-medium text-slate-300 hover:text-primary transition-colors">Contact Us</a>
           </div>
 
           {/* Right actions */}
@@ -470,13 +585,13 @@ export default function LandingPage() {
             <div className="hidden lg:flex items-center gap-6">
               <button
                 onClick={() => setShowJoinModal(true)}
-                className="text-sm font-bold text-on-surface hover:text-primary transition-colors cursor-pointer"
+                className="text-sm font-bold text-white hover:text-primary transition-colors cursor-pointer"
               >
                 Enter code
               </button>
               <button
                 onClick={() => navigate('/auth', { state: { tab: 'signin' } })}
-                className="text-sm font-bold text-on-surface hover:text-primary transition-colors cursor-pointer"
+                className="text-sm font-bold text-white hover:text-primary transition-colors cursor-pointer"
               >
                 Log in
               </button>
@@ -488,18 +603,9 @@ export default function LandingPage() {
                 Sign up
               </button>
             </div>
-            <button
-              onClick={toggleTheme}
-              className="p-2.5 rounded-xl border border-outline-variant/20 text-on-surface-variant hover:text-primary hover:border-primary/30 transition-all cursor-pointer"
-              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            >
-              <span className="material-symbols-outlined text-lg leading-none">
-                {theme === 'dark' ? 'light_mode' : 'dark_mode'}
-              </span>
-            </button>
             {/* Mobile menu toggle */}
             <button
-              className="lg:hidden p-2 rounded-lg text-on-surface-variant hover:text-primary transition-colors"
+              className="lg:hidden p-2 rounded-lg text-slate-300 hover:text-primary transition-colors"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               <span className="material-symbols-outlined">{mobileMenuOpen ? 'close' : 'menu'}</span>
@@ -509,19 +615,19 @@ export default function LandingPage() {
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="lg:hidden bg-surface-container/95 backdrop-blur-2xl border-t border-outline-variant/20 px-6 py-6 flex flex-col gap-4 animate-fadeIn">
-            <a href="#recommends" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors py-2">Recommendations</a>
-            <a href="#quiz-details" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors py-2">Quiz Formats</a>
-            <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors py-2">Contact Us</a>
+          <div className="lg:hidden bg-[#0F0E1A]/95 backdrop-blur-2xl border-t border-white/10 px-6 py-6 flex flex-col gap-4 animate-fadeIn">
+            <a href="#recommends" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-slate-300 hover:text-primary transition-colors py-2">Recommendations</a>
+            <a href="#quiz-details" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-slate-300 hover:text-primary transition-colors py-2">Quiz Formats</a>
+            <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-slate-300 hover:text-primary transition-colors py-2">Contact Us</a>
             <button
               onClick={() => { setShowJoinModal(true); setMobileMenuOpen(false); }}
-              className="w-full py-2.5 text-center text-sm font-bold text-on-surface hover:text-primary transition-colors"
+              className="w-full py-2.5 text-center text-sm font-bold text-white hover:text-primary transition-colors"
             >
               Enter code
             </button>
             <button
               onClick={() => { navigate('/auth', { state: { tab: 'signin' } }); setMobileMenuOpen(false); }}
-              className="w-full py-2.5 text-center text-sm font-bold text-on-surface hover:text-primary transition-colors"
+              className="w-full py-2.5 text-center text-sm font-bold text-white hover:text-primary transition-colors"
             >
               Log in
             </button>
@@ -554,49 +660,49 @@ export default function LandingPage() {
 
         <div className="max-w-7xl mx-auto text-center relative z-10">
 
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-headline font-black tracking-tighter leading-[0.95] mb-6 animate-fadeInUp">
-            Learn Nursing.
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-headline font-black tracking-tight leading-[1.0] mb-6 entrance-hero entrance-hero-d1 text-white">
+            Learn Anything.
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-container via-primary to-tertiary">Play to Master.</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E5FF] via-[#A78BFA] to-[#FFB800] drop-shadow-[0_0_25px_rgba(0,229,255,0.3)]">Play to Master.</span>
           </h1>
 
-          <p className="text-lg md:text-xl text-on-surface-variant max-w-2xl mx-auto mb-10 leading-relaxed animate-fadeInUp" style={{ animationDelay: '0.15s' }}>
-            Transform clinical education into thrilling, real-time quiz battles.
+          <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed font-body font-medium entrance-hero entrance-hero-d2">
+            Transform education into thrilling, real-time quiz battles.
             Host games, join with a PIN code — no sign-up needed for players.
           </p>
 
           {/* CTA buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fadeInUp" style={{ animationDelay: '0.3s' }}>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 entrance-hero entrance-hero-d3">
             <button
               onClick={() => navigate('/auth')}
-              className="px-8 py-4 bg-gradient-to-r from-primary-container to-primary text-on-primary-container rounded-2xl font-headline font-bold text-lg tracking-wider shadow-[0_6px_30px_rgba(183,109,255,0.4)] hover:shadow-[0_6px_40px_rgba(183,109,255,0.6)] hover:scale-[1.03] transition-all active:scale-95 flex items-center gap-2"
+              className="px-9 py-4 bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#00E5FF] text-white rounded-2xl font-headline font-black text-lg tracking-wide shadow-[0_6px_30px_rgba(124,58,237,0.5)] hover:shadow-[0_8px_40px_rgba(0,229,255,0.6)] hover:scale-[1.04] transition-all active:scale-95 flex items-center gap-2.5 btn-spring border border-white/20"
             >
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>rocket_launch</span>
-              Start Teaching
+              <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>rocket_launch</span>
+              <span>Start Creating</span>
             </button>
             <a
               href="#quiz-details"
-              className="px-8 py-4 bg-surface-container-high/60 backdrop-blur-md border border-outline-variant/30 text-on-surface rounded-2xl font-headline font-bold text-lg tracking-wider hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center gap-2"
+              className="px-9 py-4 bg-surface-container-high/80 backdrop-blur-md border border-white/20 text-white rounded-2xl font-headline font-bold text-lg tracking-wide hover:border-[#00E5FF]/60 hover:bg-[#00E5FF]/10 transition-all flex items-center gap-2.5 shadow-lg"
             >
-              <span className="material-symbols-outlined">sports_esports</span>
-              Try a Demo
+              <span className="material-symbols-outlined text-2xl text-[#00E5FF]">sports_esports</span>
+              <span>Try a Demo</span>
             </a>
           </div>
 
-          {/* Stats bar */}
-          <div className="mt-16 md:mt-20 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto animate-fadeInUp" style={{ animationDelay: '0.45s' }}>
+          {/* Stats bar with ultra-clear high-contrast colors */}
+          <div className="mt-16 md:mt-20 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto entrance-hero entrance-hero-d5">
             {[
-              { value: 10, suffix: '+', label: 'Question Types' },
-              { value: 6, suffix: '-Digit', label: 'PIN Join' },
-              { value: 50, suffix: '+', label: 'Players / Room' },
-              { value: 0, suffix: '', label: 'Sign-ups Needed', special: true },
+              { value: 10, suffix: '+', label: 'Question Types', color: 'text-[#00E5FF]' },
+              { value: 6, suffix: '-Digit', label: 'PIN Join', color: 'text-[#A78BFA]' },
+              { value: 50, suffix: '+', label: 'Players / Room', color: 'text-[#58CC02]' },
+              { value: 0, suffix: '', label: 'Sign-ups Needed', special: true, color: 'text-[#FFB800]' },
             ].map((s, i) => (
-              <div key={i} className="text-center">
-                <div className={`text-3xl md:text-4xl font-headline font-black ${s.special ? 'text-tertiary' : 'text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-primary'}`}>
+              <div key={i} className="text-center bg-surface-container-low/40 border border-white/10 rounded-2xl p-4 backdrop-blur-md">
+                <div className={`text-3xl md:text-4xl font-headline font-black ${s.color} drop-shadow-sm`}>
                   {s.special ? '0' : <AnimatedCount target={s.value} />}
                   {s.special ? '' : s.suffix}
                 </div>
-                <p className="text-xs font-mono text-on-surface-variant tracking-wider uppercase mt-1">{s.label}</p>
+                <p className="text-xs font-headline font-bold text-slate-300 tracking-wider uppercase mt-1">{s.label}</p>
               </div>
             ))}
           </div>
@@ -609,18 +715,17 @@ export default function LandingPage() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[130px] pointer-events-none" />
 
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <span className="text-xs font-mono font-bold text-primary tracking-[0.2em] uppercase">Clinical advisory board</span>
-            <h2 className="text-4xl md:text-5xl font-headline font-black tracking-tight mt-3">
+          <div className="text-center mb-16 reveal">
+            <h2 className="text-4xl md:text-5xl font-headline font-black tracking-tight">
               Endorsed by
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-tertiary"> Medical Experts</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-tertiary"> Top Educators</span>
             </h2>
             <p className="text-on-surface-variant text-lg mt-4 max-w-xl mx-auto">
-              Top doctors, clinical directors, and educators who advocate for NurseQuest's gamified active-learning approach.
+              Top professors, curriculum directors, and learning specialists who advocate for SkillQuest's gamified active-learning approach.
             </p>
           </div>
 
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-16 lg:gap-24">
+          <div className="flex flex-col lg:flex-row items-center justify-center gap-16 lg:gap-24 reveal reveal-stagger-2">
 
             {/* Circular Orbit Console */}
             <div
@@ -633,12 +738,12 @@ export default function LandingPage() {
               <div className="orbit-ring-glow" />
 
               {/* Central testimonial display card */}
-              <div className="absolute w-[240px] h-[240px] md:w-[280px] md:h-[280px] rounded-full bg-surface-container/65 backdrop-blur-2xl border border-outline-variant/30 flex flex-col items-center justify-center p-6 text-center z-20 shadow-2xl transition-all duration-500 hover:border-primary/45">
+              <div className="absolute w-[240px] h-[240px] md:w-[280px] md:h-[280px] rounded-full bg-surface-container-high border border-outline-variant/40 flex flex-col items-center justify-center p-6 text-center z-20 shadow-2xl transition-all duration-500 hover:border-primary/45">
                 <span className="material-symbols-outlined text-primary text-3xl mb-2 opacity-85" style={{ fontVariationSettings: "'FILL' 1" }}>
                   format_quote
                 </span>
                 <p className="text-xs md:text-sm text-on-surface italic line-clamp-6 leading-relaxed px-2">
-                  "{DOCTORS[activeDocIndex].quote}"
+                  "{EDUCATORS[activeDocIndex].quote}"
                 </p>
                 <div className="flex gap-0.5 mt-3 text-amber-400">
                   {[...Array(5)].map((_, i) => (
@@ -647,18 +752,29 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {/* Neon Connector Line */}
+              {/* Neon Connector Line (starts from edge of central card to active node) */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
-                <line
-                  x1="50%"
-                  y1="50%"
-                  x2={`calc(50% + ${Math.cos((activeDocIndex * 2 * Math.PI) / DOCTORS.length - Math.PI / 2) * (isMobile ? 125 : 190)}px)`}
-                  y2={`calc(50% + ${Math.sin((activeDocIndex * 2 * Math.PI) / DOCTORS.length - Math.PI / 2) * (isMobile ? 125 : 190)}px)`}
-                  stroke="url(#neonGradient)"
-                  strokeWidth="2.5"
-                  strokeDasharray="6,4"
-                  className="animate-pulse"
-                />
+                {(() => {
+                  const angle = (activeDocIndex * 2 * Math.PI) / EDUCATORS.length - Math.PI / 2;
+                  const innerRadius = isMobile ? 120 : 140;
+                  const outerRadius = isMobile ? 125 : 190;
+                  const x1 = Math.cos(angle) * innerRadius;
+                  const y1 = Math.sin(angle) * innerRadius;
+                  const x2 = Math.cos(angle) * outerRadius;
+                  const y2 = Math.sin(angle) * outerRadius;
+                  return (
+                    <line
+                      x1={`calc(50% + ${x1}px)`}
+                      y1={`calc(50% + ${y1}px)`}
+                      x2={`calc(50% + ${x2}px)`}
+                      y2={`calc(50% + ${y2}px)`}
+                      stroke="url(#neonGradient)"
+                      strokeWidth="3"
+                      strokeDasharray="6,4"
+                      className="animate-pulse"
+                    />
+                  );
+                })()}
                 <defs>
                   <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="var(--primary)" stopOpacity="1" />
@@ -667,9 +783,9 @@ export default function LandingPage() {
                 </defs>
               </svg>
 
-              {/* Orbiting Doctor Nodes */}
-              {DOCTORS.map((doc, idx) => {
-                const angle = (idx * 2 * Math.PI) / DOCTORS.length - Math.PI / 2;
+              {/* Orbiting Educator Nodes */}
+              {EDUCATORS.map((doc, idx) => {
+                const angle = (idx * 2 * Math.PI) / EDUCATORS.length - Math.PI / 2;
                 const radiusVal = isMobile ? 125 : 190;
                 const x = Math.cos(angle) * radiusVal;
                 const y = Math.sin(angle) * radiusVal;
@@ -704,27 +820,27 @@ export default function LandingPage() {
               })}
             </div>
 
-            {/* Doctor Info Card */}
+            {/* Educator Info Card */}
             <div className="w-full max-w-md bg-surface-container-low/55 backdrop-blur-xl border border-outline-variant/20 rounded-3xl p-8 shadow-xl animate-fadeIn">
-              <span className="badge badge-primary mb-3">Verified Recommender</span>
+              <span className="badge badge-primary mb-3">Verified Educator</span>
               <h3 className="text-2xl font-headline font-black text-transparent bg-clip-text bg-gradient-to-r from-primary-light via-primary to-secondary mb-1">
-                {DOCTORS[activeDocIndex].name}
+                {EDUCATORS[activeDocIndex].name}
               </h3>
-              <p className="text-sm font-semibold text-on-surface mb-0.5">{DOCTORS[activeDocIndex].role}</p>
-              <p className="text-xs font-mono text-on-surface-variant uppercase tracking-wider mb-5">{DOCTORS[activeDocIndex].specialty}</p>
+              <p className="text-sm font-semibold text-on-surface mb-0.5">{EDUCATORS[activeDocIndex].role}</p>
+              <p className="text-xs font-mono text-on-surface-variant uppercase tracking-wider mb-5">{EDUCATORS[activeDocIndex].specialty}</p>
 
               <div className="border-t border-outline-variant/20 pt-4 flex gap-4 items-center">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                   <span className="material-symbols-outlined">verified_user</span>
                 </div>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  Endorsed based on curriculum accuracy, engagement telemetry, and NCLEX diagnostic mapping protocols.
+                  Endorsed based on curriculum accuracy, engagement telemetry, and diagnostic learning protocols.
                 </p>
               </div>
 
               {/* Navigation dots */}
               <div className="flex gap-2.5 mt-8 justify-center lg:justify-start">
-                {DOCTORS.map((_, idx) => (
+                {EDUCATORS.map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActiveDocIndex(idx)}
@@ -745,18 +861,17 @@ export default function LandingPage() {
         <div className="absolute top-1/4 right-0 w-[400px] h-[400px] bg-tertiary/8 rounded-full blur-[120px] pointer-events-none" />
 
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-16">
-            <span className="text-xs font-mono font-bold text-tertiary tracking-[0.2em] uppercase">Two Experiences</span>
-            <h2 className="text-4xl md:text-5xl font-headline font-black tracking-tight mt-3">
+          <div className="text-center mb-16 reveal">
+            <h2 className="text-4xl md:text-5xl font-headline font-black tracking-tight">
               Host
               <span className="text-on-surface-variant mx-3 font-normal text-3xl">vs.</span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-tertiary to-tertiary-fixed">Player</span>
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto reveal reveal-stagger-2">
             {/* Host Card */}
-            <div className="bg-surface-container-low/60 backdrop-blur-xl border border-primary/20 rounded-3xl p-8 relative overflow-hidden group hover:border-primary/40 hover:shadow-[0_12px_50px_rgba(108,92,231,0.15)] transition-all duration-300">
+            <div className="bg-surface-container-low/60 backdrop-blur-xl border border-primary/20 rounded-3xl p-8 relative overflow-hidden group hover:border-primary/40 hover:shadow-[0_12px_50px_rgba(108,92,231,0.15)] transition-all duration-300 interactive-lift">
               <div className="absolute top-0 right-0 w-40 h-40 bg-primary/5 rounded-full blur-[60px] pointer-events-none" />
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-14 h-14 rounded-2xl bg-primary/15 border border-primary/25 flex items-center justify-center shadow-[0_0_15px_rgba(108,92,231,0.2)]">
@@ -835,9 +950,8 @@ export default function LandingPage() {
         <div className="absolute bottom-0 left-0 w-[450px] h-[450px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
 
         <div className="max-w-6xl mx-auto relative z-10">
-          <div className="text-center mb-16">
-            <span className="text-xs font-mono font-bold text-tertiary tracking-[0.2em] uppercase">Interactive Sandbox</span>
-            <h2 className="text-4xl md:text-5xl font-headline font-black tracking-tight mt-3">
+          <div className="text-center mb-16 reveal">
+            <h2 className="text-4xl md:text-5xl font-headline font-black tracking-tight">
               Explore Our
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-tertiary to-tertiary-fixed"> Quiz Arena</span>
             </h2>
@@ -939,16 +1053,16 @@ export default function LandingPage() {
                     <div className="mb-4">
                       <span className="text-[10px] font-mono text-on-surface-variant uppercase tracking-wider">Question 04/10</span>
                       <h3 className="text-base font-headline font-bold text-on-surface mt-1 leading-relaxed">
-                        A patient with suspected sepsis has a blood pressure of 85/45 mmHg. Which fluid resuscitation order should the nurse anticipate first?
+                        Which planet in our solar system has the highest number of confirmed moons?
                       </h3>
                     </div>
 
                     <div className="flex flex-col gap-3 mt-4">
                       {[
-                        { label: 'A. 5% Dextrose in Water (D5W) infusion', id: 0, explanation: 'Incorrect. D5W is not used for intravascular volume expansion in sepsis resuscitation.' },
-                        { label: 'B. 0.9% Normal Saline bolus (30 mL/kg)', id: 1, isCorrect: true, explanation: 'Correct! Crystalloid bolus (30 mL/kg) is the first-line treatment for sepsis-induced hypotension.' },
-                        { label: 'C. Hetastarch colloid solution', id: 2, explanation: 'Incorrect. Synthetic colloids are associated with increased risk of kidney injury in sepsis patients.' },
-                        { label: 'D. Packed red blood cells (PRBCs)', id: 3, explanation: 'Incorrect. Blood products are only administered if hemoglobin drops below 7.0 g/dL, not as initial fluid resuscitation.' }
+                        { label: 'A. Jupiter (95 moons)', id: 0, explanation: 'Incorrect. Jupiter has 95 confirmed moons, making it second place!' },
+                        { label: 'B. Saturn (146 moons)', id: 1, isCorrect: true, explanation: 'Correct! Saturn officially leads with 146 confirmed moons as of 2023.' },
+                        { label: 'C. Uranus (28 moons)', id: 2, explanation: 'Incorrect. Uranus has 28 confirmed moons.' },
+                        { label: 'D. Neptune (16 moons)', id: 3, explanation: 'Incorrect. Neptune has 16 confirmed moons.' }
                       ].map((opt) => {
                         const isSelected = selectedMcqOption === opt.id;
                         let stateClass = '';
@@ -1233,8 +1347,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center">
             {/* Left - Text */}
             <div>
-              <span className="text-xs font-mono font-bold text-tertiary tracking-[0.2em] uppercase">Interactive Demo</span>
-              <h2 className="text-4xl md:text-5xl font-headline font-black tracking-tight mt-3 mb-6">
+              <h2 className="text-4xl md:text-5xl font-headline font-black tracking-tight mb-6">
                 Frictionless
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-tertiary to-tertiary-fixed"> Joining</span>
               </h2>
@@ -1292,13 +1405,12 @@ export default function LandingPage() {
 
             {/* Left - Contact Details */}
             <div className="lg:col-span-5">
-              <span className="text-xs font-mono font-bold text-primary tracking-[0.2em] uppercase">Get In Touch</span>
-              <h2 className="text-4xl md:text-5xl font-headline font-black tracking-tight mt-3 mb-6">
+              <h2 className="text-4xl md:text-5xl font-headline font-black tracking-tight mb-6">
                 Connect With Our
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-tertiary"> Academic Team</span>
               </h2>
               <p className="text-on-surface-variant text-base leading-relaxed mb-8">
-                Interested in implementing NurseQuest within your hospital, nursing school, or residency program?
+                Interested in implementing SkillQuest within your school, university, or organization?
                 Reach out to schedule a private walkthrough or custom integration assessment.
               </p>
 
@@ -1306,21 +1418,21 @@ export default function LandingPage() {
                 {[
                   {
                     icon: 'mail',
-                    title: 'Academic Support',
-                    detail: 'support@nursequest.edu',
-                    action: 'mailto:support@nursequest.edu'
+                    title: 'Support & Inquiries',
+                    detail: 'support@skillquest.io',
+                    action: 'mailto:support@skillquest.io'
                   },
                   {
                     icon: 'call',
-                    title: 'Call Academic Relations',
-                    detail: '+1 (800) 555-NURSE',
-                    action: 'tel:+18005556877'
+                    title: 'Call Educational Relations',
+                    detail: '+1 (800) 555-QUIZ',
+                    action: 'tel:+18005557849'
                   },
                   {
                     icon: 'distance',
-                    title: 'Clinical Education Center',
-                    detail: '75 Francis St, Boston, MA 02115',
-                    action: 'https://maps.google.com/?q=75+Francis+St,+Boston,+MA+02115'
+                    title: 'Global Learning Hub',
+                    detail: '100 Innovation Way, Boston, MA 02115',
+                    action: 'https://maps.google.com/?q=100+Innovation+Way,+Boston,+MA+02115'
                   }
                 ].map((item, idx) => (
                   <a
@@ -1371,7 +1483,7 @@ export default function LandingPage() {
                         onChange={(e) => setContactEmail(e.target.value)}
                         className="contact-input"
                       />
-                      <label className="contact-label">Institutional Email</label>
+                      <label className="contact-label">Email Address</label>
                     </div>
                   </div>
 
@@ -1381,12 +1493,12 @@ export default function LandingPage() {
                       onChange={(e) => setContactRole(e.target.value)}
                       className="contact-input appearance-none animate-none"
                     >
-                      <option value="educator">Clinical Educator / Professor</option>
-                      <option value="student">Nursing Student</option>
-                      <option value="admin">Institutional Administrator</option>
-                      <option value="other">Other Healthcare Professional</option>
+                      <option value="educator">Teacher / Educator / Professor</option>
+                      <option value="student">Student</option>
+                      <option value="admin">Administrator / Organization Leader</option>
+                      <option value="other">Learner / Quiz Enthusiast</option>
                     </select>
-                    <label className="contact-label">Your Clinical Role</label>
+                    <label className="contact-label">Your Role</label>
                   </div>
 
                   <div className="contact-input-wrapper">
@@ -1398,7 +1510,7 @@ export default function LandingPage() {
                       onChange={(e) => setContactMessage(e.target.value)}
                       className="contact-input resize-none animate-none"
                     />
-                    <label className="contact-label">Message details (e.g. classes size, institution...)</label>
+                    <label className="contact-label">Message details...</label>
                   </div>
 
                   <button
@@ -1406,7 +1518,7 @@ export default function LandingPage() {
                     className="w-full py-4 bg-gradient-to-r from-primary-container to-primary text-on-primary-container font-headline font-bold text-sm tracking-widest uppercase rounded-xl hover:shadow-[0_4px_25px_rgba(183,109,255,0.4)] transition-all flex items-center justify-center gap-2 mt-2"
                   >
                     <span className="material-symbols-outlined">send</span>
-                    Send Academic Inquiry
+                    Send Inquiry
                   </button>
 
                 </form>
@@ -1421,16 +1533,16 @@ export default function LandingPage() {
       <section className="py-20 md:py-28 px-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent pointer-events-none" />
         <div className="max-w-3xl mx-auto text-center relative z-10">
-          <div className="w-20 h-20 mx-auto rounded-3xl bg-surface-container-highest/80 border border-primary/20 flex items-center justify-center shadow-[0_0_40px_rgba(108,92,231,0.2)] mb-8 animate-float">
-            <span className="material-symbols-outlined text-primary text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>medical_services</span>
+          <div className="w-20 h-20 mx-auto rounded-3xl bg-surface-container-highest/80 border border-primary/20 flex items-center justify-center shadow-[0_0_40px_rgba(124,58,237,0.25)] mb-8 animate-float">
+            <img src={logo} alt="SkillQuest" className="w-12 h-12 object-contain" />
           </div>
           <h2 className="text-4xl md:text-6xl font-headline font-black tracking-tight mb-6">
             Ready to Level Up
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-container via-primary to-tertiary">Your Classroom?</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-container via-primary to-tertiary">Your Knowledge?</span>
           </h2>
           <p className="text-on-surface-variant text-lg mb-10 max-w-xl mx-auto">
-            Join educators transforming nursing education with real-time, gamified quizzes. Set up in minutes.
+            Join learners and educators transforming learning with real-time, gamified quizzes. Set up in minutes.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
@@ -1455,15 +1567,13 @@ export default function LandingPage() {
       <footer className="border-t border-outline-variant/20 bg-surface-container-lowest/80 backdrop-blur-xl py-10 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-surface-container-highest rounded-lg flex items-center justify-center ring-1 ring-primary/30">
-              <span className="material-symbols-outlined text-lg text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>medical_services</span>
-            </div>
-            <span className="font-headline font-extrabold text-sm tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-tertiary">
-              NurseQuest
+            <img src={logo} alt="SkillQuest" className="w-8 h-8 object-contain rounded-lg" />
+            <span className="font-headline font-extrabold text-sm tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] to-[#F59E0B]">
+              SkillQuest
             </span>
           </div>
           <p className="text-xs text-on-surface-variant font-mono">
-            © {new Date().getFullYear()} NurseQuest · Gamified Interactive Learning for Nursing Education
+            © {new Date().getFullYear()} SkillQuest · Learn · Practice · Excel
           </p>
           <div className="flex items-center gap-4">
             <a href="#recommends" className="text-xs text-on-surface-variant hover:text-primary transition-colors">Recommendations</a>

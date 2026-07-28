@@ -54,7 +54,48 @@ const ACCESSORIES = {
   badge: `<rect x="125" y="145" width="30" height="38" rx="4" fill="white" stroke="#ddd"/><rect x="125" y="145" width="30" height="12" rx="4" fill="#6C5CE7"/><text x="140" y="154" text-anchor="middle" font-size="7" fill="white" font-weight="bold">NQ</text><circle cx="140" cy="170" r="5" fill="#00CEC9"/>`,
 };
 
+export const DICEBEAR_STYLES = [
+  { id: 'adventurer', name: 'Adventurer', icon: 'shield', desc: 'RPG Fantasy Characters' },
+  { id: 'bottts', name: 'Robots', icon: 'smart_toy', desc: 'Cute Sci-Fi Bots' },
+  { id: 'avataaars', name: 'Avataaars', icon: 'face', desc: 'Modern Vector People' },
+  { id: 'pixel-art', name: 'Pixel Art', icon: 'sports_esports', desc: '8-Bit Retro Gaming' },
+  { id: 'fun-emoji', name: 'Fun Emoji', icon: 'mood', desc: 'Playful Expressive Emojis' },
+  { id: 'lorelei', name: 'Lorelei', icon: 'auto_awesome', desc: 'Chibi Anime Style' },
+  { id: 'micah', name: 'Micah', icon: 'palette', desc: 'Minimalist Modern Art' },
+  { id: 'thumbs', name: 'Thumbs', icon: 'thumb_up', desc: 'Friendly Thumbs' },
+  { id: 'notionists', name: 'Notionists', icon: 'draw', desc: 'Hand-drawn Illustrations' },
+  { id: 'big-smile', name: 'Big Smile', icon: 'sentiment_very_satisfied', desc: 'Cheerful Characters' },
+];
+
 export default function Avatar({ config = {}, size = 200, className = '', onClick, showBg = true }) {
+  // ── DiceBear API Mode Support ──
+  const isDicebear = config?.mode === 'dicebear' || config?.useDicebear || !!config?.dicebearStyle;
+
+  if (isDicebear) {
+    const style = config?.dicebearStyle || 'adventurer';
+    const seed = config?.seed || 'SkillQuest';
+    const bg = config?.bgColor ? `&backgroundColor=${config.bgColor.replace('#', '')}` : '';
+    const dicebearUrl = `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}${bg}`;
+
+    return (
+      <div
+        className={`relative inline-flex items-center justify-center rounded-full overflow-hidden ${showBg ? 'bg-surface-container-high ring-2 ring-primary/30 p-1' : ''} ${className}`}
+        style={{ width: size, height: size, cursor: onClick ? 'pointer' : 'default' }}
+        onClick={onClick}
+      >
+        <img
+          src={dicebearUrl}
+          alt={`Dicebear ${style} Avatar`}
+          className="w-full h-full object-contain transition-transform duration-300 hover:scale-105"
+          onError={(e) => {
+            e.target.style.opacity = '0.5';
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ── Custom SVG Builder Mode ──
   const {
     face = 0,
     skin = 0,

@@ -26,7 +26,7 @@ async function seed() {
     // Create demo teacher
     const teacherId = uuidv4();
     const teacherPassword = null;
-    await sql`INSERT INTO users (id, email, password, name, role) VALUES (${teacherId}, 'teacher@nursequest.com', ${teacherPassword}, 'Dr. Sarah Johnson', 'teacher')`;
+    await sql`INSERT INTO users (id, email, password, name, role) VALUES (${teacherId}, 'teacher@skillquest.io', ${teacherPassword}, 'Dr. Sarah Johnson', 'teacher')`;
 
     // Create demo students
     const studentIds = [];
@@ -45,7 +45,7 @@ async function seed() {
       const id = uuidv4();
       studentIds.push(id);
       const password = null;
-      await sql`INSERT INTO users (id, email, password, name, role, avatar_config, xp, level, streak) VALUES (${id}, ${`student${i + 1}@nursequest.com`}, ${password}, ${name}, 'student', ${avatarConfigs[i]}, ${xps[i]}, ${Math.floor(xps[i] / 1000) + 1}, ${Math.floor(Math.random() * 10)})`;
+      await sql`INSERT INTO users (id, email, password, name, role, avatar_config, xp, level, streak) VALUES (${id}, ${`student${i + 1}@skillquest.io`}, ${password}, ${name}, 'student', ${avatarConfigs[i]}, ${xps[i]}, ${Math.floor(xps[i] / 1000) + 1}, ${Math.floor(Math.random() * 10)})`;
     }
 
     // Create demo modules
@@ -217,8 +217,8 @@ async function seed() {
     }
 
     console.log('✅ Database seeded successfully!');
-    console.log('📧 Teacher login: teacher@nursequest.com / teacher123');
-    console.log('📧 Student login: student1@nursequest.com / student123');
+    console.log('📧 Teacher login: teacher@skillquest.io / teacher123');
+    console.log('📧 Student login: student1@skillquest.io / student123');
   } catch (err) {
     console.error('❌ Seeding failed:', err);
     throw err;

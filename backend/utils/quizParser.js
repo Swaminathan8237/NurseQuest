@@ -1,5 +1,5 @@
 /**
- * NurseQuest Quiz Parser — Unified block-based parser for all 9 question types
+ * SkillQuest Quiz Parser — Unified block-based parser for all 9 question types
  * 
  * Converts raw text → quiz questions array.
  * Pure functions, no I/O dependencies.

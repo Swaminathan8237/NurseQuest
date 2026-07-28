@@ -401,10 +401,11 @@ export default function QuizBuilder() {
                       value={quiz.category} 
                       onChange={e => setQuiz({...quiz, category: e.target.value})}
                     >
-                      <option value="Patient Care">Patient Care</option>
-                      <option value="Pharmacology">Pharmacology</option>
-                      <option value="Anatomy">Anatomy</option>
-                      <option value="General Nursing">General Nursing</option>
+                      <option value="General Knowledge">General Knowledge</option>
+                      <option value="Science & STEM">Science & STEM</option>
+                      <option value="History & Arts">History & Arts</option>
+                      <option value="Languages & Literature">Languages & Literature</option>
+                      <option value="Tech & Coding">Tech & Coding</option>
                     </select>
                   </div>
                   <div>

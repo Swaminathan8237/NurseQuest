@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { quizAPI } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
+import SectionSideCanvas from '../components/SectionSideCanvas';
 
 const UNIT_ICONS = {
   1: 'health_and_safety',
@@ -19,31 +20,32 @@ const UNIT_ICONS = {
 };
 
 const UNIT_COLORS = {
-  1: '#00E5FF', // Cyan
-  2: '#b76dff', // Purple
-  3: '#71d7cd', // Teal
-  4: '#FF6B6B', // Red
-  5: '#f59e0b', // Amber
-  6: '#00B894', // Green
-  7: '#FD79A8', // Pink
-  8: '#38bdf8', // Light Blue
-  9: '#a855f7', // Indigo
-  10: '#4ade80', // Emerald
-  11: '#f43f5e', // Rose
+  1: '#7C3AED',
+  2: '#0284C7',
+  3: '#059669',
+  4: '#D97706',
+  5: '#DC2626',
+  6: '#4F46E5',
+  7: '#0D9488',
+  8: '#C026D3',
+  9: '#E11D48',
+  10: '#2563EB',
+  11: '#7C3AED',
 };
 
 export default function Units() {
-  const navigate = useNavigate();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const sectionRef = useRef(null);
 
   useEffect(() => {
     quizAPI.getAll()
-      .then(data => {
-        // Filter quizzes to only those with unit 1-11
+      .then((data) => {
+        // Filter unit-based quizzes (unit 1 to 15) and sort ascending
         const unitQuizzes = data
-          .filter(q => q.unit >= 1 && q.unit <= 11)
+          .filter(q => q.unit >= 1 && q.unit <= 15)
           .sort((a, b) => a.unit - b.unit);
         setQuizzes(unitQuizzes);
       })
@@ -53,283 +55,261 @@ export default function Units() {
 
   if (loading) {
     return (
-      <div className="loading-screen">
-        <div className="spinner" />
-        <p style={{ color: 'var(--text-secondary)' }}>Loading learning path...</p>
+      <div className="min-h-screen bg-[#f2f2f2] text-slate-900 font-body">
+        <Navbar />
+        <div className="flex flex-col items-center justify-center h-[70vh] gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-sm font-bold text-slate-600 font-headline">Loading Clinical Units...</p>
+        </div>
       </div>
     );
   }
 
-  // Calculate overall stats
   const totalUnits = quizzes.length;
   const completedUnits = quizzes.filter(q => q.bestScorePercent >= 75).length;
 
   const progressPercent = totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0;
 
   return (
-    <div className="min-h-screen pb-24 font-body">
+    <div className="min-h-screen pb-24 font-body relative overflow-x-hidden bg-[#f2f2f2] text-slate-900">
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-6 flex flex-col gap-8 pb-12 animate-slideUp" style={{ paddingTop: '100px' }}>
+      <main className="max-w-7xl mx-auto px-6 flex flex-col gap-8 pb-12 animate-slideUp relative z-10" style={{ paddingTop: '100px' }}>
         {/* Header and Progress Overview */}
-        <section className="w-full clay-card p-8 relative overflow-hidden flex flex-col md:flex-row items-center gap-8 justify-between">
-          <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary/20 rounded-full blur-[80px] pointer-events-none"></div>
+        <section className="w-full lg:max-w-[660px] xl:max-w-[760px] bg-white border border-slate-200/90 shadow-xl rounded-3xl p-8 relative overflow-hidden flex flex-col md:flex-row items-center gap-8 justify-between">
+          <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none"></div>
           
           <div className="flex-1 space-y-2">
-            <nav className="flex text-xs text-slate-400 font-label items-center gap-2">
+            <nav className="flex text-xs text-slate-500 font-label items-center gap-2 font-semibold">
               <span className="material-symbols-outlined text-[14px]">home</span>
               <span>/</span>
               <span onClick={() => navigate('/student')} className="cursor-pointer hover:text-primary transition-colors">Dashboard</span>
               <span>/</span>
-              <span className="text-primary">Learning Path</span>
+              <span className="text-primary font-bold">Learning Path</span>
             </nav>
-            <h1 className="font-headline text-4xl text-on-surface font-extrabold tracking-tight">
-              Unit-Based <span className="gradient-text">Learning Path</span>
+            <h1 className="font-headline text-4xl text-slate-900 font-extrabold tracking-tight">
+              Unit-Based <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-tertiary">Learning Path</span>
             </h1>
-            <p className="font-body text-on-surface-variant text-base">
-              Complete the assessment quizzes for all 11 foundational infection control and safety units.
+            <p className="font-body text-slate-600 text-base font-medium">
+              Master each unit step-by-step. Score 75%+ to unlock the next clinical challenge!
             </p>
           </div>
 
-          <div className="bg-brand-surface shadow-clay-inner p-6 rounded-2xl w-full md:w-auto min-w-0 md:min-w-[320px]">
-            <div className="flex justify-between items-center mb-3">
-              <span className="font-headline text-xs font-bold uppercase tracking-widest text-slate-400">Total Path Completion</span>
-              <span className="font-mono text-sm font-bold text-primary">{completedUnits} / {totalUnits} Units</span>
+          {/* Progress Ring / Bar */}
+          <div className="bg-slate-50 border border-slate-200 shadow-inner rounded-2xl p-6 min-w-[280px] w-full md:w-auto">
+            <div className="flex justify-between items-center mb-3 font-headline">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500">Overall Progress</span>
+              <span className="text-sm font-black text-slate-900">{completedUnits} / {totalUnits} Units</span>
             </div>
-            <div className="w-full h-4 bg-brand-elevated shadow-clay-sunken rounded-full overflow-hidden mb-2">
+            <div className="w-full h-4 bg-slate-200 rounded-full overflow-hidden mb-2">
               <div 
-                className="h-full bg-gradient-primary rounded-full transition-all duration-700" 
+                className="h-full bg-gradient-to-r from-primary via-indigo-500 to-emerald-400 rounded-full transition-all duration-700" 
                 style={{ width: `${progressPercent}%` }}
               ></div>
             </div>
-            <div className="flex justify-between font-mono text-[10px] text-on-surface-variant">
+            <div className="flex justify-between font-headline text-xs font-bold text-slate-500">
               <span>0%</span>
-              <span className="font-bold text-primary">{progressPercent}% Completed</span>
+              <span className="font-extrabold text-primary">{progressPercent}% Completed</span>
               <span>100%</span>
             </div>
           </div>
         </section>
 
         {/* Units Timeline / Grid */}
-        <section className="space-y-6">
-          <h2 className="text-2xl font-headline font-bold text-on-surface flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">view_timeline</span> Learning Units
+        <section ref={sectionRef} className="space-y-6">
+          <h2 className="text-2xl font-headline font-black text-slate-900 flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-3xl">view_timeline</span> Learning Units
           </h2>
 
           {quizzes.length === 0 ? (
-            <div className="clay-card p-12 text-center text-on-surface-variant border-dashed">
-              <span className="material-symbols-outlined text-5xl mb-3 opacity-30">inventory_2</span>
-              <p className="text-lg">No unit quizzes imported yet. Please contact your instructor.</p>
+            <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center text-slate-500 shadow-sm">
+              <span className="material-symbols-outlined text-5xl mb-3 opacity-40">inventory_2</span>
+              <p className="text-lg font-semibold">No unit quizzes imported yet. Please contact your instructor.</p>
             </div>
           ) : (
-            <div className="flex flex-col max-w-4xl mx-auto py-8 px-4 relative">
-              
-              {/* START NODE */}
-              <div className="flex gap-6 md:gap-8 items-stretch">
-                <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-full bg-brand-surface shadow-clay-outer border-2 border-primary/30 flex items-center justify-center text-primary flex-shrink-0">
-                    <span className="material-symbols-outlined text-xl font-bold">flag</span>
-                  </div>
-                  <div className="w-[4px] flex-1 my-2 bg-gradient-to-b from-primary to-primary rounded-full min-h-[40px]" />
-                </div>
-                <div className="flex-1 pb-8 animate-slideUp">
-                  <div className="clay-card p-6 max-w-md">
-                    <h3 className="font-headline font-bold text-lg text-on-surface">Path Start</h3>
-                    <p className="text-xs text-on-surface-variant mt-1 whitespace-normal">Begin your clinical journey here.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* QUIZZES */}
-              {quizzes.map((quiz, i) => {
-                const icon = UNIT_ICONS[quiz.unit] || 'school';
-                const color = UNIT_COLORS[quiz.unit] || '#b76dff';
-                const lastAttempt = quiz.lastAttempt;
+            <div className="flex flex-col lg:flex-row gap-8 items-start relative">
+              {/* Left Column (Timeline) */}
+              <div className="flex-1 w-full lg:max-w-[660px] xl:max-w-[760px] py-4 px-2 relative">
                 
-                // Calculate scorePercent using bestScorePercent (which is out of 100)
-                const scorePercent = quiz.bestScorePercent !== undefined ? Math.round(quiz.bestScorePercent) : null;
-                
-                // Lock/Unlock Logic: Teacher bypasses, the first available unit is always unlocked, Unit N is unlocked if N-1 bestScorePercent >= 75
-                let isUnlocked = false;
-                if (user?.role === 'teacher') {
-                  isUnlocked = true;
-                } else if (i === 0) {
-                  isUnlocked = true;
-                } else {
-                  const prevQuiz = quizzes[i - 1];
-                  if (prevQuiz && prevQuiz.bestScorePercent >= 75) {
-                    isUnlocked = true;
-                  }
-                }
+                {/* START NODE */}
+                <div className="flex gap-6 md:gap-8 items-stretch">
+                  <div className="flex flex-col items-center">
+                    <div className="w-12 h-12 rounded-full bg-white shadow-lg border-2 border-primary flex items-center justify-center text-primary flex-shrink-0">
+                      <span className="material-symbols-outlined text-xl font-black">flag</span>
+                    </div>
+                    <div className="w-[4px] flex-1 my-2 bg-gradient-to-b from-primary to-primary rounded-full min-h-[40px]" />
+                  </div>
+                  <div className="flex-1 pb-8 animate-slideUp">
+                    <div className="bg-white border border-slate-200 shadow-md rounded-2xl p-5 max-w-md">
+                      <h3 className="font-headline font-black text-lg text-slate-900">Path Start</h3>
+                      <p className="text-xs text-slate-600 font-medium mt-1 whitespace-normal">Begin your clinical journey here.</p>
+                    </div>
+                  </div>
+                </div>
 
-                let status = 'NOT_STARTED'; // 'LOCKED', 'NOT_STARTED', 'IN_PROGRESS', 'PASSED'
-                if (!isUnlocked) {
-                  status = 'LOCKED';
-                } else if (scorePercent >= 75) {
-                  status = 'PASSED';
-                } else if (lastAttempt) {
-                  status = 'IN_PROGRESS';
-                } else {
-                  status = 'NOT_STARTED';
-                }
-
-                // Check if the next unit is unlocked to color the connector
-                const nextQuiz = quizzes[i + 1];
-                let nextUnlocked = false;
-                if (nextQuiz) {
+                {/* QUIZZES */}
+                {quizzes.map((quiz, i) => {
+                  const icon = UNIT_ICONS[quiz.unit] || 'school';
+                  const color = UNIT_COLORS[quiz.unit] || '#7C3AED';
+                  const lastAttempt = quiz.lastAttempt;
+                  
+                  // Calculate scorePercent using bestScorePercent (which is out of 100)
+                  const scorePercent = quiz.bestScorePercent !== undefined ? Math.round(quiz.bestScorePercent) : null;
+                  
+                  // Lock/Unlock Logic: Teacher bypasses, the first available unit is always unlocked, Unit N is unlocked if N-1 bestScorePercent >= 75
+                  let isUnlocked = false;
                   if (user?.role === 'teacher') {
-                    nextUnlocked = true;
+                    isUnlocked = true;
+                  } else if (i === 0) {
+                    isUnlocked = true;
                   } else {
-                    if (quiz.bestScorePercent >= 75) {
-                      nextUnlocked = true;
+                    const prevQuiz = quizzes[i - 1];
+                    if (prevQuiz && prevQuiz.bestScorePercent >= 75) {
+                      isUnlocked = true;
                     }
                   }
-                }
 
-                return (
-                  <div key={quiz.id} className="flex gap-6 md:gap-8 items-stretch group">
-                    {/* Left Column (Timeline Track) */}
-                    <div className="flex flex-col items-center">
-                      {/* Node Circle */}
-                      <div 
-                        className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 bg-brand-surface border-2 ${
-                          status === 'LOCKED'
-                            ? 'text-slate-500 border-brand-elevated/40 shadow-clay-sunken'
-                            : 'text-primary shadow-clay-outer group-hover:scale-110'
-                        }`}
-                        style={status !== 'LOCKED' ? { borderColor: `${color}40`, color: color } : {}}
-                      >
-                        {status === 'LOCKED' ? (
-                          <span className="material-symbols-outlined text-sm">lock</span>
-                        ) : (
-                          <span className="font-mono text-sm font-bold">{quiz.unit}</span>
-                        )}
-                      </div>
+                  let status = 'NOT_STARTED'; // 'LOCKED', 'NOT_STARTED', 'IN_PROGRESS', 'PASSED'
+                  if (!isUnlocked) {
+                    status = 'LOCKED';
+                  } else if (scorePercent >= 75) {
+                    status = 'PASSED';
+                  } else if (lastAttempt) {
+                    status = 'IN_PROGRESS';
+                  } else {
+                    status = 'NOT_STARTED';
+                  }
 
-                      {/* Connector Line */}
-                      <div className={`w-[4px] flex-1 my-2 rounded-full transition-all duration-300 ${
-                        nextUnlocked
-                          ? 'bg-gradient-to-b from-primary to-secondary'
-                          : 'bg-brand-surface shadow-clay-sunken border-l border-dashed border-brand-elevated/40'
-                      }`} style={{ minHeight: '60px' }} />
-                    </div>
+                  // Check if the next unit is unlocked to color the connector
+                  const nextQuiz = quizzes[i + 1];
+                  let nextUnlocked = false;
+                  if (nextQuiz) {
+                    if (user?.role === 'teacher') {
+                      nextUnlocked = true;
+                    } else {
+                      if (quiz.bestScorePercent >= 75) {
+                        nextUnlocked = true;
+                      }
+                    }
+                  }
 
-                    {/* Right Column (Card) */}
-                    <div className="flex-1 pb-8 animate-slideUp" style={{ animationDelay: `${i * 0.05}s` }}>
-                      <div
-                        className={`clay-card p-6 flex flex-col md:flex-row gap-6 justify-between items-center group max-w-3xl cursor-pointer ${
-                          status === 'LOCKED'
-                            ? 'opacity-55 cursor-not-allowed'
-                            : 'hover:scale-[1.01] hover:shadow-clay-hover'
-                        }`}
-                        onClick={() => {
-                          if (status !== 'LOCKED') {
-                            navigate(`/quiz/${quiz.id}`);
-                          }
-                        }}
-                      >
-                        {/* Background accent glow */}
+                  return (
+                    <div key={quiz.id} className="flex gap-6 md:gap-8 items-stretch group">
+                      {/* Left Column (Timeline Track) */}
+                      <div className="flex flex-col items-center">
+                        {/* Node Circle */}
                         <div 
-                          className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-[50px] opacity-10 pointer-events-none transition-all group-hover:scale-125" 
-                          style={{ backgroundColor: color }}
-                        ></div>
-
-                        {/* Card Info */}
-                        <div className="flex-1 flex gap-4 items-start w-full">
-                          <div 
-                            className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 mt-1 bg-brand-surface shadow-clay-sunken" 
-                          >
-                            <span className="material-symbols-outlined text-xl" style={{ color: color }}>{icon}</span>
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-mono text-xs font-bold uppercase tracking-widest text-slate-400">Unit {quiz.unit < 10 ? `0${quiz.unit}` : quiz.unit}</span>
-                              <span className="text-slate-600">•</span>
-                              <span className="text-xs font-mono text-slate-400">15 Questions</span>
-                            </div>
-                            <h3 className="text-xl font-headline font-bold text-on-surface mb-2 group-hover:text-primary transition-colors whitespace-normal">
-                              {quiz.title}
-                            </h3>
-                            <p className="text-sm text-on-surface-variant line-clamp-2 whitespace-normal">
-                              {quiz.description}
-                            </p>
-                          </div>
+                          className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 bg-white border-2 ${
+                            status === 'LOCKED'
+                              ? 'text-slate-400 border-slate-300 shadow-sm'
+                              : 'text-primary shadow-md border-primary group-hover:scale-110'
+                          }`}
+                          style={status !== 'LOCKED' ? { borderColor: color, color: color } : {}}
+                        >
+                          {status === 'LOCKED' ? (
+                            <span className="material-symbols-outlined text-sm">lock</span>
+                          ) : (
+                            <span className="font-mono text-sm font-black">{quiz.unit}</span>
+                          )}
                         </div>
 
-                        {/* Card Action / Status */}
-                        <div className="flex flex-col sm:flex-row items-center gap-4 flex-shrink-0 w-full md:w-auto border-t md:border-t-0 md:border-l border-brand-elevated/20 pt-4 md:pt-0 md:pl-6">
-                          <div className="flex flex-col items-center md:items-start gap-1">
-                            {status === 'PASSED' && (
-                              <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-surface shadow-clay-sunken text-success rounded-full text-xs font-bold border-2 border-success/30">
-                                <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                                <span>{scorePercent}% Passed</span>
-                              </div>
-                            )}
-                            {status === 'IN_PROGRESS' && (
-                              <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-surface shadow-clay-sunken text-warning rounded-full text-xs font-bold border-2 border-warning/30">
-                                <span className="material-symbols-outlined text-xs animate-pulse" style={{ fontVariationSettings: "'FILL' 1" }}>pending</span>
-                                <span>{scorePercent}% Retry</span>
-                              </div>
-                            )}
-                            {status === 'NOT_STARTED' && (
-                              <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-surface shadow-clay-sunken text-primary rounded-full text-xs font-bold border-2 border-primary/30">
-                                <span className="material-symbols-outlined text-xs">radio_button_unchecked</span>
-                                <span>Unlocked</span>
-                              </div>
-                            )}
-                            {status === 'LOCKED' && (
-                              <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-surface shadow-clay-sunken text-slate-500 rounded-full text-xs font-bold border-2 border-brand-elevated/40">
-                                <span className="material-symbols-outlined text-xs">lock</span>
-                                <span>Locked</span>
-                              </div>
-                            )}
-                          </div>
+                        {/* Connector Line */}
+                        <div className={`w-[4px] flex-1 my-2 rounded-full transition-all duration-300 ${
+                          nextUnlocked
+                            ? 'bg-gradient-to-b from-primary to-emerald-400'
+                            : 'bg-slate-200 border-l border-dashed border-slate-300'
+                        }`} style={{ minHeight: '60px' }} />
+                      </div>
 
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (status !== 'LOCKED') {
-                                navigate(`/quiz/${quiz.id}`);
-                              }
-                            }}
-                            disabled={status === 'LOCKED'}
-                            className={`px-5 py-2.5 clay-button text-xs font-headline font-bold uppercase tracking-wider flex items-center gap-1.5 w-full md:w-auto justify-center ${
-                              status === 'LOCKED'
-                                ? 'clay-button-disabled opacity-50 cursor-not-allowed'
-                                : 'clay-button-primary'
-                            }`}
-                          >
-                            <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
-                              {status === 'LOCKED' ? 'lock' : status === 'NOT_STARTED' ? 'play_arrow' : 'replay'}
-                            </span>
-                            <span>{status === 'LOCKED' ? 'Locked' : status === 'NOT_STARTED' ? 'Play' : 'Retry'}</span>
-                          </button>
+                      {/* Right Column (Card) */}
+                      <div className="flex-1 pb-8 animate-slideUp" style={{ animationDelay: `${i * 0.05}s` }}>
+                        <div className={`bg-white border-2 rounded-3xl p-6 md:p-8 transition-all duration-300 relative overflow-hidden ${
+                          status === 'LOCKED'
+                            ? 'bg-slate-50 border-slate-200 opacity-75 shadow-sm'
+                            : 'border-slate-200/90 shadow-lg hover:border-primary/50 hover:shadow-2xl'
+                        }`}>
+                          
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                              <div 
+                                className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 border ${
+                                  status === 'LOCKED' ? 'bg-slate-200 border-slate-300 text-slate-500' : 'bg-slate-100 border-slate-200 text-primary'
+                                }`}
+                                style={status !== 'LOCKED' ? { color: color } : {}}
+                              >
+                                <span className="material-symbols-outlined text-2xl">{icon}</span>
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-headline font-black uppercase tracking-wider text-slate-500">
+                                    Unit {String(quiz.unit).padStart(2, '0')}
+                                  </span>
+                                  <span className="text-slate-300">•</span>
+                                  <span className="text-xs font-body font-semibold text-slate-500">
+                                    {quiz.totalQuestions || 15} Questions
+                                  </span>
+                                </div>
+                                <h3 className="font-headline font-extrabold text-xl md:text-2xl text-slate-900 leading-tight">
+                                  {quiz.title}
+                                </h3>
+                                <p className="font-body text-slate-600 text-sm font-medium mt-1 leading-relaxed max-w-xl">
+                                  {quiz.description || `15-question assessment covering ${quiz.title}`}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Action Button & Status */}
+                            <div className="flex flex-col sm:flex-row md:flex-col items-start md:items-end justify-between gap-3 shrink-0 pt-4 md:pt-0 border-t md:border-t-0 border-slate-100">
+                              {status === 'LOCKED' ? (
+                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-200 text-slate-500 text-xs font-bold font-headline">
+                                  <span className="material-symbols-outlined text-sm">lock</span>
+                                  <span>Locked</span>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => navigate(`/quiz/${quiz.id}`)}
+                                  className="w-full sm:w-auto bg-gradient-to-r from-[#7C3AED] to-[#00E5FF] hover:from-[#6D28D9] hover:to-[#00B4D8] text-white font-headline font-black px-6 py-2.5 rounded-xl shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-wider"
+                                >
+                                  <span>{status === 'PASSED' ? 'Retry Unit' : status === 'IN_PROGRESS' ? 'Continue' : 'Start Unit'}</span>
+                                  <span className="material-symbols-outlined text-base">play_arrow</span>
+                                </button>
+                              )}
+
+                              {scorePercent !== null && (
+                                <div className={`text-xs font-bold font-headline px-3 py-1 rounded-lg ${
+                                  scorePercent >= 75 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                }`}>
+                                  Best Score: {scorePercent}% {scorePercent >= 75 ? '✓' : ''}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
 
               {/* END NODE */}
               <div className="flex gap-6 md:gap-8 items-stretch">
                 <div className="flex flex-col items-center">
-                  <div className={`w-12 h-12 rounded-full bg-brand-surface shadow-clay-outer flex items-center justify-center flex-shrink-0 ${
+                  <div className={`w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center flex-shrink-0 ${
                     quizzes[quizzes.length - 1]?.bestScorePercent >= 75
-                      ? 'text-secondary border-2 border-secondary/30'
-                      : 'text-slate-500'
+                      ? 'text-amber-500 border-2 border-amber-400'
+                      : 'text-slate-400 border-2 border-slate-300'
                   }`}>
-                    <span className="material-symbols-outlined text-xl font-bold">emoji_events</span>
+                    <span className="material-symbols-outlined text-xl font-black">emoji_events</span>
                   </div>
                 </div>
-                <div className="flex-1 animate-slideUp" style={{ animationDelay: `${quizzes.length * 0.05}s` }}>
-                  <div className={`clay-card p-6 max-w-md ${
-                    quizzes[quizzes.length - 1]?.bestScorePercent >= 75
-                      ? 'opacity-100'
-                      : 'opacity-50'
-                  }`}>
-                    <h3 className="font-headline font-bold text-lg text-on-surface">Path Complete</h3>
-                    <p className="text-xs text-on-surface-variant mt-1 whitespace-normal">Graduate from clinical training!</p>
+                  <div className="flex-1 animate-slideUp" style={{ animationDelay: `${quizzes.length * 0.05}s` }}>
+                    <div className={`bg-white border border-slate-200 shadow-md rounded-2xl p-5 max-w-md ${
+                      quizzes[quizzes.length - 1]?.bestScorePercent >= 75
+                        ? 'opacity-100'
+                        : 'opacity-60'
+                    }`}>
+                      <h3 className="font-headline font-black text-lg text-slate-900">Path Complete</h3>
+                      <p className="text-xs text-slate-600 font-medium mt-1 whitespace-normal">Graduate from clinical training!</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -337,6 +317,11 @@ export default function Units() {
           )}
         </section>
       </main>
+
+      {/* Fixed Position Animation Canvas — stays locked in fixed position on screen throughout scroll */}
+      <div className="hidden lg:block fixed top-28 right-6 xl:right-[max(1.5rem,calc((100vw-1280px)/2+1.5rem))] w-[380px] xl:w-[440px] h-[550px] pointer-events-none z-20">
+        <SectionSideCanvas sectionRef={sectionRef} totalFrames={142} />
+      </div>
     </div>
   );
 }

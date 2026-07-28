@@ -234,7 +234,7 @@ export default function LiveGame() {
   const [phase, setPhase] = useState('menu'); // menu, waiting, countdown, playing, results
   const [joinCode, setJoinCode] = useState('');
   const [guestName, setGuestName] = useState(() => {
-    const stored = localStorage.getItem('nursequest_guest_name');
+    const stored = localStorage.getItem('skillquest_guest_name');
     return stored || '';
   });
   const [sessionInfo, setSessionInfo] = useState(null);
@@ -444,17 +444,17 @@ export default function LiveGame() {
         return setError('This nickname is not allowed. Try another!');
       }
 
-      let gId = localStorage.getItem('nursequest_guest_id');
+      let gId = localStorage.getItem('skillquest_guest_id');
       if (!gId) {
         gId = 'guest_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('nursequest_guest_id', gId);
+        localStorage.setItem('skillquest_guest_id', gId);
       }
 
       finalUserId = gId;
       finalUserName = trimmedGuest;
       finalAvatar = { face: 0, skin: 0, hair: 0, hairColor: '#1a1a2e', eyes: 0, mouth: 0, accessory: 'none', scrubsColor: '#6C5CE7' };
 
-      localStorage.setItem('nursequest_guest_name', trimmedGuest);
+      localStorage.setItem('skillquest_guest_name', trimmedGuest);
     }
 
     socket.emit('join-session', { 
@@ -593,7 +593,7 @@ export default function LiveGame() {
                       type="button"
                       onClick={() => {
                         const ADJECTIVES = ['Brave', 'Swift', 'Gentle', 'Mighty', 'Clever', 'Caring', 'Steady', 'Bright', 'Calm', 'Bold', 'Quick', 'Sharp', 'Warm', 'Noble', 'Keen', 'Wise', 'Pure', 'True', 'Star'];
-                        const NOUNS = ['Nurse', 'Healer', 'Medic', 'Pulse', 'Heart', 'Shield', 'Sage', 'Echo', 'Spark', 'Crest', 'Wave', 'Glow', 'Flame', 'Wing', 'Storm', 'Frost', 'Dawn', 'Tide'];
+                        const NOUNS = ['Scholar', 'Explorer', 'Thinker', 'Maven', 'Spark', 'Sage', 'Phoenix', 'Beacon', 'Ace', 'Echo', 'Flash', 'Crest', 'Wave', 'Glow', 'Flame', 'Wing', 'Storm', 'Frost', 'Dawn', 'Tide'];
                         const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
                         const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
                         const num = Math.floor(Math.random() * 100);

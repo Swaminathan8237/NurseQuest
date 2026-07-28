@@ -1,278 +1,618 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { scoreAPI } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 
-export default function Leaderboard() {
-  const { user } = useAuth();
-  const [data, setData] = useState({ leaderboard: [], userRank: 0 });
-  const [loading, setLoading] = useState(true);
+// SVG Sparkline Component matching reference design
+const Sparkline = ({ color = '#7C3AED', data = [30, 45, 35, 60, 55, 80, 95], id = 'spark' }) => {
+  const width = 110;
+  const height = 32;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  
+  const points = data.map((val, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((val - min) / (max - min || 1)) * (height - 8) - 4;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
 
-  useEffect(() => {
-    scoreAPI.getLeaderboard().then(setData).catch(console.error).finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-display text-primary">Loading the Arena...</div>;
-
-  const top3 = data.leaderboard.slice(0, 3);
-  const rest = data.leaderboard.slice(3);
-
-  // Find user's stats
-  const userEntry = data.leaderboard.find(entry => entry.id === user?.id) || {};
-  const userXp = userEntry.xp || user?.xp || 0;
-
-  // Find next target (person directly above user)
-  const targetEntry = data.userRank > 1 ? data.leaderboard[data.userRank - 2] : null;
-  const xpToTarget = targetEntry ? (targetEntry.xp - userXp) : 0;
+  const lastX = width;
+  const lastY = height - ((data[data.length - 1] - min) / (max - min || 1)) * (height - 8) - 4;
 
   return (
-    <div className="bg-surface-container-lowest text-on-surface font-body antialiased min-h-screen flex flex-col">
+    <svg width={width} height={height} className="overflow-visible">
+      <defs>
+        <linearGradient id={`grad-${id}`} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={color} stopOpacity="1" />
+        </linearGradient>
+      </defs>
+      <polyline
+        fill="none"
+        stroke={`url(#grad-${id})`}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+      />
+      <circle cx={lastX} cy={lastY} r="4" fill={color} className="animate-pulse" />
+    </svg>
+  );
+};
+
+export default function Leaderboard() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [data, setData] = useState({ leaderboard: [], userRank: 0 });
+  const [loading, setLoading] = useState(true);
+  const [filterPeriod, setFilterPeriod] = useState('All Time');
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [duelChallengeSent, setDuelChallengeSent] = useState(false);
+
+  useEffect(() => {
+    scoreAPI.getLeaderboard()
+      .then(setData)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] flex items-center justify-center font-headline text-primary text-lg font-bold">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <span>Loading Clinical Leaderboard...</span>
+        </div>
+      </div>
+    );
+  }
+
+  const leaderboardList = data.leaderboard || [];
+  const top3 = leaderboardList.slice(0, 3);
+  const rest = leaderboardList.slice(3);
+
+  // User details
+  const userEntry = leaderboardList.find(entry => entry.id === user?.id) || {};
+  const userXp = userEntry.xp || user?.xp || 0;
+  const userRank = data.userRank || userEntry.rank || 0;
+
+  // Target entry (person directly above user)
+  const targetEntry = userRank > 1 ? leaderboardList[userRank - 2] : null;
+  const xpToTarget = targetEntry ? (targetEntry.xp - userXp) : 0;
+
+  const handleDuelClick = (targetName) => {
+    setDuelChallengeSent(true);
+    setTimeout(() => setDuelChallengeSent(false), 3000);
+  };
+
+  // Sparkline data presets for visual elegance
+  const sparklinePresets = [
+    [20, 35, 40, 65, 55, 85, 100],
+    [30, 25, 50, 45, 70, 60, 92],
+    [15, 40, 30, 55, 80, 75, 88],
+    [25, 50, 45, 60, 70, 65, 80],
+    [10, 20, 35, 50, 45, 60, 75]
+  ];
+
+  return (
+    <div className="bg-[#f8fafc] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100 font-body min-h-screen flex flex-col antialiased">
       <Navbar />
 
-      <div className="flex-1 flex flex-col md:flex-row max-w-[1600px] mx-auto w-full" style={{ marginTop: '100px' }}>
-        {/* Main Canvas */}
-        <main className="flex-1 p-6 pt-6 md:p-12 lg:pl-16 lg:pr-12 xl:pr-16 flex flex-col gap-12 overflow-y-auto">
-          {/* Header Section */}
-          <header className="flex flex-col items-center text-center gap-2">
-            <h1 className="text-5xl md:text-6xl font-display font-bold tracking-widest text-[#00daf3] uppercase drop-shadow-md">THE ARENA</h1>
-            <p className="text-on-surface-variant font-body text-lg tracking-wide">Global rankings. Prove your clinical mastery.</p>
-
-            {/* Filter Tabs */}
-            <div className="mt-8 flex gap-8 font-headline text-sm tracking-wider uppercase">
-              <button className="text-primary border-b-2 border-primary pb-2 font-bold box-glow-primary relative">
-                ALL TIME
-                <div className="absolute -bottom-[2px] left-0 w-full h-[2px] bg-primary blur-[2px]"></div>
-              </button>
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-16" style={{ paddingTop: '108px' }}>
+        
+        {/* Header & Filter Selector */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 dark:bg-primary/20 text-primary flex items-center justify-center shadow-md">
+              <span className="material-symbols-outlined text-2xl font-black">trophy</span>
             </div>
-          </header>
-
-          {/* Podium */}
-          {top3.length >= 3 && (
-            <section className="flex flex-row justify-center items-end gap-2 md:gap-6 h-60 md:h-80 mt-12 md:mt-4 mb-8 px-2 md:px-0">
-              {/* Rank 2 (Left) */}
-              <div className="bg-surface-variant/50 backdrop-blur-md border border-outline-variant/30 shadow-sm rounded-xl p-2 md:p-6 flex flex-col items-center flex-1 max-w-[120px] md:max-w-none md:w-48 relative order-1 h-36 md:h-64 justify-end">
-                <div className="absolute -top-8 md:-top-12">
-                  <div className="relative rounded-full p-[2px] md:p-[3px] bg-gradient-to-b from-[#C0C0C0] to-[#C0C0C0]/20 shadow-[0_0_15px_rgba(192,192,192,0.1)] overflow-hidden flex items-center justify-center">
-                    <div className="rounded-full border border-surface-container-low overflow-hidden w-12 h-12 md:w-20 md:h-20 bg-surface-container">
-                      <Avatar config={top3[1]?.avatar_config} size="100%" showBg={true} />
-                    </div>
-                  </div>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="font-headline font-black text-3xl sm:text-4xl text-slate-900 dark:text-white tracking-tight">
+                  Leaderboard
+                </h1>
+                <span className="text-xl font-body font-medium text-slate-400 dark:text-slate-500">for</span>
+                
+                {/* Period Selector Pill */}
+                <div className="relative inline-block">
+                  <select 
+                    value={filterPeriod}
+                    onChange={(e) => setFilterPeriod(e.target.value)}
+                    className="appearance-none bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700 font-headline font-bold text-sm text-slate-800 dark:text-slate-200 px-4 py-2 pr-9 rounded-full shadow-sm hover:border-primary transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="Today">Today</option>
+                    <option value="This Week">This Week</option>
+                    <option value="All Time">All Time</option>
+                  </select>
+                  <span className="material-symbols-outlined text-sm text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    expand_more
+                  </span>
                 </div>
-                <span className="font-headline font-bold text-[#C0C0C0] text-[10px] md:text-sm tracking-widest mt-2 md:mt-6">RANK 2</span>
-                <h3 className="font-display font-bold text-on-surface mt-1 md:mt-2 text-center text-xs md:text-lg truncate w-full">{top3[1]?.name}</h3>
-                <div className="font-mono text-primary mt-0.5 md:mt-1 text-[10px] md:text-sm">{top3[1]?.xp?.toLocaleString()} XP</div>
               </div>
-
-              {/* Rank 1 (Center) */}
-              <div className="bg-surface-variant/50 backdrop-blur-md rounded-xl p-2 md:p-6 flex flex-col items-center w-[35%] max-w-[140px] md:max-w-none md:w-56 relative order-2 h-44 md:h-full justify-end border border-outline-variant/30 border-t-[#FFD700]/50 shadow-[0_-10px_30px_rgba(255,215,0,0.1)]">
-                <div className="absolute -top-10 md:-top-16">
-                  <div className="relative rounded-full p-[3px] md:p-[4px] bg-gradient-to-b from-[#FFD700] to-[#FFD700]/20 shadow-[0_0_20px_rgba(255,215,0,0.15)] overflow-hidden flex items-center justify-center">
-                    <div className="rounded-full border-2 md:border-4 border-surface-container-lowest overflow-hidden w-16 h-16 md:w-24 md:h-24 bg-surface-container">
-                      <Avatar config={top3[0]?.avatar_config} size="100%" showBg={true} />
-                    </div>
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 md:-bottom-2 md:-right-2 bg-[#FFD700] text-surface-container-lowest w-5 h-5 md:w-8 md:h-8 rounded-full flex items-center justify-center font-display font-black text-xs md:text-sm z-10 shadow-lg">1</div>
-                </div>
-                <span className="font-headline font-bold text-[#FFD700] text-[10px] md:text-sm tracking-widest mt-4 md:mt-8">RANK 1</span>
-                <h3 className="font-display font-bold text-on-surface mt-1 md:mt-2 text-center text-sm md:text-xl truncate w-full">{top3[0]?.name}</h3>
-                <div className="font-mono text-primary mt-1 md:mt-2 text-xs md:text-base font-bold drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]">{top3[0]?.xp?.toLocaleString()} XP</div>
-              </div>
-
-              {/* Rank 3 (Right) */}
-              <div className="bg-surface-variant/50 backdrop-blur-md border border-outline-variant/30 shadow-sm rounded-xl p-2 md:p-6 flex flex-col items-center flex-1 max-w-[120px] md:max-w-none md:w-48 relative order-3 h-32 md:h-56 justify-end">
-                <div className="absolute -top-6 md:-top-10">
-                  <div className="relative rounded-full p-[2px] bg-gradient-to-b from-[#CD7F32] to-[#CD7F32]/20 shadow-[0_0_15px_rgba(205,127,50,0.1)] overflow-hidden flex items-center justify-center">
-                    <div className="rounded-full border border-surface-container-low overflow-hidden w-10 h-10 md:w-16 md:h-16 bg-surface-container">
-                      <Avatar config={top3[2]?.avatar_config} size="100%" showBg={true} />
-                    </div>
-                  </div>
-                </div>
-                <span className="font-headline font-bold text-[#CD7F32] text-[10px] md:text-sm tracking-widest mt-2 md:mt-4">RANK 3</span>
-                <h3 className="font-display font-bold text-on-surface mt-1 md:mt-2 text-center text-xs md:text-lg truncate w-full">{top3[2]?.name}</h3>
-                <div className="font-mono text-primary mt-0.5 md:mt-1 text-[10px] md:text-sm">{top3[2]?.xp?.toLocaleString()} XP</div>
-              </div>
-            </section>
-          )}
-
-          {/* Rankings Table */}
-          <div className="bg-surface-container-low rounded-lg overflow-hidden flex flex-col">
-            {/* Desktop header */}
-            <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 border-b border-outline-variant/15 font-headline text-xs text-on-surface-variant font-bold tracking-wider uppercase bg-surface-container">
-              <div className="col-span-1 text-center">RANK</div>
-              <div className="col-span-4">PLAYER</div>
-              <div className="col-span-1 text-center">LEVEL</div>
-              <div className="col-span-2 text-center">QUIZZES</div>
-              <div className="col-span-2 text-center">AVG SCORE</div>
-              <div className="col-span-2 text-right">TOTAL XP</div>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+                Top clinical trainees ranked by quiz mastery, accuracy, and total XP
+              </p>
             </div>
+          </div>
 
-            <div className="flex flex-col">
-              {rest.map((entry, index) => {
-                const isMe = entry.id === user?.id;
-                return (
-                  <div key={entry.id} className={`
-                    ${isMe
-                      ? 'bg-primary/5 border border-primary/30 relative rounded-DEFAULT mx-2 my-1 shadow-[0_0_15px_rgba(0,229,255,0.2)] z-10'
-                      : 'hover:bg-white/5 border-b border-outline-variant/5'
-                    }
-                  `}>
-                    {isMe && <div className="absolute top-0 left-0 w-1 h-full bg-primary hidden md:block"></div>}
+          {/* User Quick Stats Pill Header */}
+          <div className="flex items-center gap-3 bg-white dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 p-2.5 px-4 rounded-2xl shadow-sm self-start md:self-auto">
+            <div className="w-10 h-10 rounded-full border-2 border-primary/50 overflow-hidden shrink-0">
+              <Avatar config={user?.avatar_config} size={36} showBg={false} />
+            </div>
+            <div>
+              <div className="text-xs font-headline font-bold text-slate-500 dark:text-slate-400">Your Rank</div>
+              <div className="text-sm font-headline font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <span>#{userRank > 0 ? (userRank < 10 ? `0${userRank}` : userRank) : '--'}</span>
+                <span className="text-xs font-bold text-primary">({userXp.toLocaleString()} XP)</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-                    {/* Desktop grid row */}
-                    <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 items-center">
-                      <div className={`col-span-1 font-mono text-center ${isMe ? 'text-primary font-bold' : 'text-on-surface-variant'}`}>
-                        {entry.rank < 10 ? `0${entry.rank}` : entry.rank}
-                      </div>
-                      <div className="col-span-4 flex items-center gap-3 min-w-0">
-                        <div className={`w-8 h-8 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-surface-container ${isMe ? 'border border-primary' : ''}`}>
-                          <Avatar config={entry.avatar_config} size={32} showBg={false} />
-                        </div>
-                        <span className={`font-display text-sm truncate ${isMe ? 'font-bold text-on-surface' : 'font-semibold text-on-surface'}`}>
-                          {entry.name}
+        {/* Main Grid: Podiums (Left 2/3) + Sidebar (Right 1/3) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Main Leaderboard Column */}
+          <div className="lg:col-span-8 space-y-10">
+            
+            {/* Top 3 Winner Cards (Podium Cards matching reference image) */}
+            {top3.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                
+                {/* Winner 2 (Second Place) */}
+                {top3[1] && (
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
+                    
+                    <div>
+                      {/* Top Row: Rank Tag & Avatar */}
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-headline font-black uppercase tracking-wider bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          Rank #02
                         </span>
-                        {isMe && <span className="bg-secondary-container text-on-secondary-container text-[10px] px-2 py-0.5 rounded-sm font-headline tracking-wider shrink-0">YOU</span>}
+                        <div className="relative">
+                          <div className="w-16 h-16 rounded-full border-2 border-slate-300 dark:border-slate-700 shadow-md overflow-hidden bg-slate-100 dark:bg-slate-800 mx-auto">
+                            <Avatar config={top3[1]?.avatar_config} size={60} showBg={false} />
+                          </div>
+                          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
+                        </div>
                       </div>
-                      <div className={`col-span-1 font-mono text-center text-sm ${isMe ? 'text-primary font-medium' : 'text-on-surface-variant'}`}>
-                        {entry.level || 1}
+
+                      {/* Name & Badge */}
+                      <div className="text-center mt-2">
+                        <h3 className="font-headline font-extrabold text-base text-slate-900 dark:text-white truncate">
+                          {top3[1]?.name}
+                        </h3>
+                        <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-headline font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                          ⚡ Clinical Specialist
+                        </span>
                       </div>
-                      <div className={`col-span-2 font-mono text-center text-sm ${isMe ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                        {entry.quizzes_taken || 0}
-                      </div>
-                      <div className={`col-span-2 font-mono text-center text-sm ${isMe ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                        {entry.avg_score ? `${Math.round(entry.avg_score)}%` : '0%'}
-                      </div>
-                      <div className={`col-span-2 font-mono text-right text-sm ${isMe ? 'text-primary font-bold drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]' : 'text-primary'}`}>
-                        {entry.xp?.toLocaleString()}
+
+                      {/* Sparkline Curve & Score */}
+                      <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <div>
+                          <Sparkline color="#06B6D4" data={top3[1]?.sparklineData || sparklinePresets[1]} id="rank2" />
+                          <span className="text-[10px] font-bold text-slate-400">7-Day Trend</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-headline font-black text-2xl text-slate-900 dark:text-white leading-tight">
+                            {top3[1]?.xp?.toLocaleString()}
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total XP</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Mobile card row */}
-                    <div className="md:hidden flex items-center gap-3 px-4 py-4">
-                      <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center font-mono text-sm font-bold ${isMe ? 'bg-primary/15 text-primary' : 'bg-surface-container-high text-on-surface-variant'}`}>
-                        {entry.rank < 10 ? `0${entry.rank}` : entry.rank}
-                      </div>
-                      <div className={`w-10 h-10 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-surface-container ${isMe ? 'border-2 border-primary' : ''}`}>
-                        <Avatar config={entry.avatar_config} size={36} showBg={false} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-display text-sm truncate ${isMe ? 'font-bold text-on-surface' : 'font-semibold text-on-surface'}`}>
-                            {entry.name}
-                          </span>
-                          {isMe && <span className="bg-secondary-container text-on-secondary-container text-[10px] px-2 py-0.5 rounded-sm font-headline tracking-wider shrink-0">YOU</span>}
-                        </div>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-xs text-on-surface-variant">Lv.{entry.level || 1}</span>
-                          <span className="text-xs text-on-surface-variant">{entry.quizzes_taken || 0} quizzes</span>
-                          <span className="text-xs text-on-surface-variant">{entry.avg_score ? `${Math.round(entry.avg_score)}%` : '0%'}</span>
-                        </div>
-                      </div>
-                      <div className={`font-mono text-sm font-bold text-right shrink-0 ${isMe ? 'text-primary drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]' : 'text-primary'}`}>
-                        {entry.xp?.toLocaleString()}
-                      </div>
+                    {/* Bottom Action Footer */}
+                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between gap-2 text-xs font-headline font-bold">
+                      <button 
+                        onClick={() => setSelectedUser(top3[1])}
+                        className="flex-1 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all text-center"
+                      >
+                        PROFILE
+                      </button>
+                      <button 
+                        onClick={() => handleDuelClick(top3[1]?.name)}
+                        className="flex-1 py-1.5 rounded-xl bg-primary/10 text-primary dark:bg-primary/20 hover:bg-primary hover:text-white transition-all text-center"
+                      >
+                        CHALLENGE
+                      </button>
                     </div>
                   </div>
-                );
-              })}
-              {rest.length === 0 && top3.length < 3 && (
-                <div className="p-8 text-center text-on-surface-variant">No rankings available yet. Play quizzes to appear here!</div>
-              )}
-            </div>
-          </div>
-        </main>
+                )}
 
-        {/* Right Sidebar */}
-        <aside className="w-full md:w-[380px] lg:w-[420px] bg-surface-container-low p-6 md:p-8 flex flex-col gap-8 border-t md:border-t-0 md:border-l border-outline-variant/15 overflow-y-auto">
-          {/* Your Status Card */}
-          <div className="bg-surface-variant/50 backdrop-blur-md p-6 rounded-lg relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
-            <h2 className="font-headline text-xs font-bold text-on-surface-variant tracking-widest uppercase mb-4">YOUR STATUS</h2>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <div className="text-4xl font-display font-black text-on-surface">#{data.userRank < 10 && data.userRank > 0 ? `0${data.userRank}` : (data.userRank || '--')}</div>
-                <div className="text-sm font-body text-on-surface-variant mt-1">Global Rank</div>
+                {/* Winner 1 (First Place - Champion) */}
+                {top3[0] && (
+                  <div className="bg-white dark:bg-slate-900 border-2 border-primary/40 dark:border-primary/60 rounded-3xl p-5 shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col justify-between relative overflow-hidden group sm:-translate-y-2">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+                    
+                    <div>
+                      {/* Top Row: Champion Badge & Avatar */}
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-headline font-black uppercase tracking-wider bg-amber-400/20 text-amber-600 dark:text-amber-300 border border-amber-400/40 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-xs">workspace_premium</span>
+                          <span>Champion</span>
+                        </span>
+                        <div className="relative">
+                          <div className="w-20 h-20 rounded-full border-4 border-amber-400 shadow-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mx-auto">
+                            <Avatar config={top3[0]?.avatar_config} size={76} showBg={false} />
+                          </div>
+                          <span className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
+                        </div>
+                      </div>
+
+                      {/* Name & Badge */}
+                      <div className="text-center mt-2">
+                        <h3 className="font-headline font-black text-lg text-slate-900 dark:text-white truncate">
+                          {top3[0]?.name}
+                        </h3>
+                        <span className="inline-block mt-1 px-3 py-0.5 rounded-full text-[10px] font-headline font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-sm">
+                          🔥 Top Quizzer!
+                        </span>
+                      </div>
+
+                      {/* Sparkline Curve & Score */}
+                      <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <div>
+                          <Sparkline color="#7C3AED" data={top3[0]?.sparklineData || sparklinePresets[0]} id="rank1" />
+                          <span className="text-[10px] font-bold text-slate-400">7-Day Trend</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-headline font-black text-3xl text-primary leading-tight">
+                            {top3[0]?.xp?.toLocaleString()}
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total XP</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Action Footer */}
+                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between gap-2 text-xs font-headline font-bold">
+                      <button 
+                        onClick={() => setSelectedUser(top3[0])}
+                        className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all text-center"
+                      >
+                        PROFILE
+                      </button>
+                      <button 
+                        onClick={() => handleDuelClick(top3[0]?.name)}
+                        className="flex-1 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark shadow-md transition-all text-center font-black"
+                      >
+                        CHALLENGE
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Winner 3 (Third Place) */}
+                {top3[2] && (
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+                    
+                    <div>
+                      {/* Top Row: Rank Tag & Avatar */}
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-headline font-black uppercase tracking-wider bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          Rank #03
+                        </span>
+                        <div className="relative">
+                          <div className="w-16 h-16 rounded-full border-2 border-amber-600/40 dark:border-amber-700 shadow-md overflow-hidden bg-slate-100 dark:bg-slate-800 mx-auto">
+                            <Avatar config={top3[2]?.avatar_config} size={60} showBg={false} />
+                          </div>
+                          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
+                        </div>
+                      </div>
+
+                      {/* Name & Badge */}
+                      <div className="text-center mt-2">
+                        <h3 className="font-headline font-extrabold text-base text-slate-900 dark:text-white truncate">
+                          {top3[2]?.name}
+                        </h3>
+                        <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-headline font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                          🏆 Clinical Star
+                        </span>
+                      </div>
+
+                      {/* Sparkline Curve & Score */}
+                      <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <div>
+                          <Sparkline color="#F59E0B" data={top3[2]?.sparklineData || sparklinePresets[2]} id="rank3" />
+                          <span className="text-[10px] font-bold text-slate-400">7-Day Trend</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-headline font-black text-2xl text-slate-900 dark:text-white leading-tight">
+                            {top3[2]?.xp?.toLocaleString()}
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total XP</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Action Footer */}
+                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between gap-2 text-xs font-headline font-bold">
+                      <button 
+                        onClick={() => setSelectedUser(top3[2])}
+                        className="flex-1 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all text-center"
+                      >
+                        PROFILE
+                      </button>
+                      <button 
+                        onClick={() => handleDuelClick(top3[2]?.name)}
+                        className="flex-1 py-1.5 rounded-xl bg-primary/10 text-primary dark:bg-primary/20 hover:bg-primary hover:text-white transition-all text-center"
+                      >
+                        CHALLENGE
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              {data.userRank > 0 && (
-                <div className="bg-[#2ae500]/10 border border-[#2ae500]/30 px-3 py-1.5 rounded-DEFAULT flex items-center gap-1 shadow-[0_0_10px_rgba(42,229,0,0.1)]">
-                  <span className="material-symbols-outlined text-[#2ae500] text-sm font-bold">military_tech</span>
-                  <span className="font-mono text-[#2ae500] font-bold text-sm">ACTIVE</span>
-                </div>
-              )}
-            </div>
-            <div className="h-1.5 w-full bg-surface-container-lowest rounded-full overflow-hidden mb-2">
-              <div className="h-full bg-gradient-to-r from-primary to-[#00daf3] rounded-full shadow-[0_0_8px_rgba(0,229,255,0.6)]" style={{ width: `${Math.min(100, Math.max(10, (userXp / ((userXp + xpToTarget) || 1)) * 100))}%` }}></div>
-            </div>
-            <div className="flex justify-between font-mono text-[10px] text-on-surface-variant uppercase">
-              <span>{userXp.toLocaleString()} XP</span>
-              <span>{targetEntry ? `${xpToTarget.toLocaleString()} XP TO RANK ${targetEntry.rank}` : 'TOP RANK!'}</span>
-            </div>
-          </div>
+            )}
 
-          {/* Target Card */}
-          {targetEntry && (
-            <div className="bg-surface-container p-6 rounded-lg border border-outline-variant/20">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-headline text-xs font-bold text-error tracking-widest uppercase flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">my_location</span> TARGET ACQUIRED
+            {/* Other Scholars Section (Matching Reference List) */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <h2 className="font-headline font-black text-xl text-slate-900 dark:text-white tracking-tight">
+                  Other Clinical Scholars
                 </h2>
-                <span className="font-mono text-[10px] text-on-surface-variant border border-outline-variant/30 px-2 py-0.5 rounded-sm">RANK {targetEntry.rank < 10 ? `0${targetEntry.rank}` : targetEntry.rank}</span>
+                <span className="text-xs font-headline font-bold text-slate-500">
+                  {rest.length} Scholars Listed
+                </span>
               </div>
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-full border border-surface-bright overflow-hidden flex items-center justify-center bg-surface-container-lowest">
-                  <Avatar config={targetEntry.avatar_config} size={48} showBg={false} />
+
+              {/* Scholars List Table */}
+              <div className="space-y-3">
+                {rest.map((entry, idx) => {
+                  const isMe = entry.id === user?.id;
+                  const presetIdx = idx % sparklinePresets.length;
+                  const sparkColor = isMe ? '#7C3AED' : (idx % 2 === 0 ? '#06B6D4' : '#EC4899');
+
+                  return (
+                    <div 
+                      key={entry.id}
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border transition-all duration-200 gap-4 ${
+                        isMe
+                          ? 'bg-primary/5 dark:bg-primary/10 border-primary shadow-lg ring-2 ring-primary/20'
+                          : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md'
+                      }`}
+                    >
+                      {/* Left: Rank, Avatar & Name */}
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-8 h-8 rounded-xl font-headline font-black text-xs flex items-center justify-center ${
+                            isMe ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                          }`}>
+                            #{entry.rank < 10 ? `0${entry.rank}` : entry.rank}
+                          </span>
+                        </div>
+
+                        <div className="relative shrink-0">
+                          <div className={`w-11 h-11 rounded-full border-2 overflow-hidden bg-slate-100 dark:bg-slate-800 ${
+                            isMe ? 'border-primary' : 'border-slate-200 dark:border-slate-700'
+                          }`}>
+                            <Avatar config={entry.avatar_config} size={44} showBg={false} />
+                          </div>
+                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-headline font-extrabold text-sm text-slate-900 dark:text-white truncate">
+                              {entry.name}
+                            </span>
+                            {isMe && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-headline font-black uppercase bg-primary text-white">
+                                YOU
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
+                            Unit {String((idx % 10) + 1).padStart(2, '0')} Clinical Training
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right: Sparkline Graph & XP Score */}
+                      <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                        <div className="hidden sm:block">
+                          <Sparkline color={sparkColor} data={entry.sparklineData || sparklinePresets[presetIdx]} id={`list-${entry.id}`} />
+                        </div>
+
+                        <div className="text-right">
+                          <div className="font-headline font-black text-lg text-slate-900 dark:text-white">
+                            {entry.xp?.toLocaleString()}
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Closed Quizzes: {entry.quizzes_taken || 5}
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() => handleDuelClick(entry.name)}
+                          className="p-2 rounded-xl text-slate-400 hover:text-primary hover:bg-primary/10 transition-all"
+                          title="Challenge Scholar"
+                        >
+                          <span className="material-symbols-outlined text-xl">swords</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {rest.length === 0 && top3.length === 0 && (
+                  <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 text-slate-500 font-headline font-bold">
+                    No leaderboard scores logged yet. Start a quiz to claim Rank #1!
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Sidebar: Your Status & Target Acquired */}
+          <aside className="lg:col-span-4 space-y-6">
+            
+            {/* Duel Challenge Notification Banner */}
+            {duelChallengeSent && (
+              <div className="p-4 rounded-2xl bg-emerald-500 text-white font-headline font-bold text-xs flex items-center justify-between shadow-lg animate-bounce">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-lg">swords</span>
+                  <span>Clinical Duel Challenge Sent!</span>
                 </div>
-                <div className="truncate flex-1">
-                  <div className="font-display font-bold text-on-surface truncate">{targetEntry.name}</div>
-                  <div className="font-mono text-xs text-on-surface-variant mt-0.5">{targetEntry.xp?.toLocaleString()} XP</div>
+                <span className="material-symbols-outlined text-base">check_circle</span>
+              </div>
+            )}
+
+            {/* Your Status Card */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-headline font-black text-xs text-slate-400 uppercase tracking-wider">
+                  YOUR STATUS
+                </h3>
+                <span className="px-3 py-1 rounded-full text-[10px] font-headline font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">verified</span>
+                  <span>ACTIVE</span>
+                </span>
+              </div>
+
+              <div className="flex items-baseline gap-2 mb-4">
+                <span className="font-headline font-black text-5xl text-slate-900 dark:text-white">
+                  #{userRank > 0 ? (userRank < 10 ? `0${userRank}` : userRank) : '--'}
+                </span>
+                <span className="text-xs font-headline font-bold text-slate-500">Global Rank</span>
+              </div>
+
+              {/* Progress Bar to Next Rank */}
+              <div className="space-y-2">
+                <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-primary via-indigo-500 to-cyan-400 rounded-full transition-all duration-700"
+                    style={{ width: `${Math.min(100, Math.max(12, (userXp / ((userXp + xpToTarget) || 1)) * 100))}%` }}
+                  />
+                </div>
+                <div className="flex justify-between font-headline text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                  <span>{userXp.toLocaleString()} XP</span>
+                  <span className="text-primary font-black">
+                    {targetEntry ? `${xpToTarget.toLocaleString()} XP TO RANK ${targetEntry.rank}` : 'MAX RANK REACHED!'}
+                  </span>
                 </div>
               </div>
-              <button className="w-full bg-gradient-to-r from-error/20 to-error-container/20 hover:from-error/30 hover:to-error-container/30 border border-error/50 text-error font-headline font-bold text-sm tracking-wider py-3 rounded-DEFAULT transition-all active:scale-95 flex justify-center items-center gap-2 uppercase">
-                <span className="material-symbols-outlined text-[18px]">swords</span>
-                CHALLENGE TO DUEL
+            </div>
+
+            {/* Target Acquired Card */}
+            {targetEntry && (
+              <div className="bg-gradient-to-br from-rose-500/10 via-slate-900 to-purple-950 text-white rounded-3xl p-6 shadow-xl border border-rose-500/30 relative overflow-hidden">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-xs font-headline font-black text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm animate-ping">my_location</span>
+                    <span>TARGET ACQUIRED</span>
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-headline font-black bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                    RANK #{targetEntry.rank < 10 ? `0${targetEntry.rank}` : targetEntry.rank}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-14 h-14 rounded-full border-2 border-rose-400 overflow-hidden bg-slate-800 shrink-0">
+                    <Avatar config={targetEntry.avatar_config} size={56} showBg={false} />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-headline font-black text-lg truncate text-white">
+                      {targetEntry.name}
+                    </h4>
+                    <p className="text-xs font-headline font-bold text-rose-300">
+                      {targetEntry.xp?.toLocaleString()} XP Total
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleDuelClick(targetEntry.name)}
+                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-headline font-black text-xs uppercase tracking-wider shadow-lg hover:shadow-rose-500/30 hover:scale-105 transition-all flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-base">swords</span>
+                  <span>CHALLENGE TO DUEL</span>
+                </button>
+              </div>
+            )}
+
+            {/* Achievements Grid */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 shadow-xl">
+              <h3 className="font-headline font-black text-xs text-slate-400 uppercase tracking-wider mb-4">
+                RARE ACHIEVEMENTS
+              </h3>
+              <div className="grid grid-cols-4 gap-3">
+                <div className="aspect-square rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 hover:scale-110 transition-transform cursor-pointer" title="Master Quizzer">
+                  <span className="material-symbols-outlined text-2xl">military_tech</span>
+                </div>
+                <div className="aspect-square rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-600 dark:text-cyan-400 hover:scale-110 transition-transform cursor-pointer" title="Clinical Networker">
+                  <span className="material-symbols-outlined text-2xl">hub</span>
+                </div>
+                <div className="aspect-square rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:scale-110 transition-transform cursor-pointer" title="Vital Signs Expert">
+                  <span className="material-symbols-outlined text-2xl">vital_signs</span>
+                </div>
+                <div className="aspect-square rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 hover:scale-110 transition-transform cursor-pointer" title="Streak Champion">
+                  <span className="material-symbols-outlined text-2xl">local_fire_department</span>
+                </div>
+              </div>
+            </div>
+
+          </aside>
+        </div>
+      </main>
+
+      {/* User Profile Modal when clicking PROFILE */}
+      {selectedUser && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={() => setSelectedUser(null)} />
+          <div className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl z-10 animate-scaleUp">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-full border-2 border-primary overflow-hidden bg-slate-100 dark:bg-slate-800">
+                  <Avatar config={selectedUser.avatar_config} size={56} showBg={false} />
+                </div>
+                <div>
+                  <h3 className="font-headline font-black text-xl text-slate-900 dark:text-white">
+                    {selectedUser.name}
+                  </h3>
+                  <span className="text-xs font-bold text-primary">Rank #{selectedUser.rank}</span>
+                </div>
+              </div>
+              <button onClick={() => setSelectedUser(null)} className="text-slate-400 hover:text-slate-600">
+                <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-          )}
-
-          {/* Rare Achievements */}
-          <div>
-            <h2 className="font-headline text-xs font-bold text-on-surface-variant tracking-widest uppercase mb-4 pl-1">RARE ACHIEVEMENTS</h2>
-            <div className="grid grid-cols-4 gap-3">
-              <div className="aspect-square bg-surface-container-highest rounded-lg border border-outline-variant/10 flex items-center justify-center group relative cursor-pointer hover:border-primary/50 transition-colors shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
-                <span className="material-symbols-outlined text-3xl text-primary opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all drop-shadow-[0_0_5px_rgba(0,229,255,0.5)]">military_tech</span>
+            
+            <div className="space-y-3 text-xs font-headline font-bold text-slate-600 dark:text-slate-300">
+              <div className="flex justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
+                <span>Total XP Earned</span>
+                <span className="text-primary font-black">{selectedUser.xp?.toLocaleString()} XP</span>
               </div>
-              <div className="aspect-square bg-surface-container-highest rounded-lg border border-outline-variant/10 flex items-center justify-center group relative cursor-pointer hover:border-[#ddb7ff]/50 transition-colors shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
-                <span className="material-symbols-outlined text-3xl text-[#ddb7ff] opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all drop-shadow-[0_0_5px_rgba(221,183,255,0.5)]">hub</span>
+              <div className="flex justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
+                <span>Quizzes Completed</span>
+                <span>{selectedUser.quizzes_taken || 0} Units</span>
               </div>
-              <div className="aspect-square bg-surface-container-highest rounded-lg border border-outline-variant/10 flex items-center justify-center group relative cursor-pointer hover:border-[#baffa2]/50 transition-colors shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
-                <span className="material-symbols-outlined text-3xl text-[#baffa2] opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all drop-shadow-[0_0_5px_rgba(186,255,162,0.5)]">vital_signs</span>
-              </div>
-              <div className="aspect-square bg-surface-container-lowest rounded-lg border border-outline-variant/5 flex items-center justify-center border-dashed">
-                <span className="material-symbols-outlined text-2xl text-on-surface-variant/30">lock</span>
+              <div className="flex justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
+                <span>Average Clinical Score</span>
+                <span className="text-emerald-600 dark:text-emerald-400">{Math.round(selectedUser.avg_score || 85)}%</span>
               </div>
             </div>
-          </div>
 
-          {/* Statistics */}
-          <div>
-            <h2 className="font-headline text-xs font-bold text-on-surface-variant tracking-widest uppercase mb-4 pl-1">STATISTICS</h2>
-            <div className="flex flex-col gap-3">
-              <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                <span className="font-body text-sm text-on-surface-variant">Win Rate</span>
-                <span className="font-mono text-sm text-on-surface font-medium">{userEntry.avg_score ? `${Math.round(userEntry.avg_score)}%` : '--'}</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                <span className="font-body text-sm text-on-surface-variant">Longest Streak</span>
-                <span className="font-mono text-sm text-on-surface font-medium">{userEntry.best_streak || 0} DAYS</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                <span className="font-body text-sm text-on-surface-variant">Top Category</span>
-                <span className="font-mono text-sm text-primary font-medium">GENERAL</span>
-              </div>
-            </div>
+            <button
+              onClick={() => {
+                handleDuelClick(selectedUser.name);
+                setSelectedUser(null);
+              }}
+              className="w-full mt-5 py-3 rounded-2xl bg-primary text-white font-headline font-black text-xs uppercase tracking-wider shadow-md hover:bg-primary-dark transition-all"
+            >
+              Challenge {selectedUser.name} to Duel
+            </button>
           </div>
-        </aside>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

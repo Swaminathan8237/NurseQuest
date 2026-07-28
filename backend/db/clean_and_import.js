@@ -282,13 +282,13 @@ async function cleanAndImport() {
   }
 
   const demoEmails = [
-    'teacher@nursequest.com',
-    'student1@nursequest.com',
-    'student2@nursequest.com',
-    'student3@nursequest.com',
-    'student4@nursequest.com',
-    'student5@nursequest.com',
-    'admin@nursequest.com'
+    'teacher@skillquest.io',
+    'student1@skillquest.io',
+    'student2@skillquest.io',
+    'student3@skillquest.io',
+    'student4@skillquest.io',
+    'student5@skillquest.io',
+    'admin@skillquest.io'
   ];
 
   console.log('🧹 Deleting demo accounts from auth.users...');
@@ -303,13 +303,13 @@ async function cleanAndImport() {
   console.log('👤 Seeding users into auth.users and public.users...');
   
   const targetUsers = [
-    { email: 'teacher@nursequest.com', password: 'teacher123', name: 'Dr. Sarah Johnson', role: 'teacher', avatarConfig: '{}', xp: 0, level: 1, streak: 0 },
-    { email: 'student1@nursequest.com', password: 'student123', name: 'Alex Rivera', role: 'student', avatarConfig: '{"face":0,"skin":2,"hair":3,"hairColor":"#8B4513","eyes":1,"mouth":2,"accessory":"cap","scrubsColor":"#6C5CE7"}', xp: 4800, level: 5, streak: 3 },
-    { email: 'student2@nursequest.com', password: 'student123', name: 'Priya Sharma', role: 'student', avatarConfig: '{"face":1,"skin":4,"hair":5,"hairColor":"#1a1a2e","eyes":3,"mouth":1,"accessory":"stethoscope","scrubsColor":"#00CEC9"}', xp: 3200, level: 4, streak: 2 },
-    { email: 'student3@nursequest.com', password: 'student123', name: 'Jordan Kim', role: 'student', avatarConfig: '{"face":2,"skin":1,"hair":1,"hairColor":"#D4A574","eyes":2,"mouth":3,"accessory":"badge","scrubsColor":"#00B894"}', xp: 5900, level: 6, streak: 5 },
-    { email: 'student4@nursequest.com', password: 'student123', name: 'Maya Chen', role: 'student', avatarConfig: '{"face":3,"skin":3,"hair":7,"hairColor":"#2d2d2d","eyes":4,"mouth":0,"accessory":"cap","scrubsColor":"#FF6B6B"}', xp: 2100, level: 3, streak: 1 },
-    { email: 'student5@nursequest.com', password: 'student123', name: 'Liam O\'Brien', role: 'student', avatarConfig: '{"face":0,"skin":0,"hair":2,"hairColor":"#C68642","eyes":0,"mouth":4,"accessory":"stethoscope","scrubsColor":"#FDCB6E"}', xp: 6400, level: 7, streak: 4 },
-    { email: 'admin@nursequest.com', password: 'admin123', name: 'Admin User', role: 'admin', avatarConfig: '{}', xp: 0, level: 1, streak: 0 }
+    { email: 'teacher@skillquest.io', password: 'teacher123', name: 'Dr. Sarah Johnson', role: 'teacher', avatarConfig: '{}', xp: 0, level: 1, streak: 0 },
+    { email: 'student1@skillquest.io', password: 'student123', name: 'Alex Rivera', role: 'student', avatarConfig: '{"face":0,"skin":2,"hair":3,"hairColor":"#8B4513","eyes":1,"mouth":2,"accessory":"cap","scrubsColor":"#6C5CE7"}', xp: 4800, level: 5, streak: 3 },
+    { email: 'student2@skillquest.io', password: 'student123', name: 'Priya Sharma', role: 'student', avatarConfig: '{"face":1,"skin":4,"hair":5,"hairColor":"#1a1a2e","eyes":3,"mouth":1,"accessory":"stethoscope","scrubsColor":"#00CEC9"}', xp: 3200, level: 4, streak: 2 },
+    { email: 'student3@skillquest.io', password: 'student123', name: 'Jordan Kim', role: 'student', avatarConfig: '{"face":2,"skin":1,"hair":1,"hairColor":"#D4A574","eyes":2,"mouth":3,"accessory":"badge","scrubsColor":"#00B894"}', xp: 5900, level: 6, streak: 5 },
+    { email: 'student4@skillquest.io', password: 'student123', name: 'Maya Chen', role: 'student', avatarConfig: '{"face":3,"skin":3,"hair":7,"hairColor":"#2d2d2d","eyes":4,"mouth":0,"accessory":"cap","scrubsColor":"#FF6B6B"}', xp: 2100, level: 3, streak: 1 },
+    { email: 'student5@skillquest.io', password: 'student123', name: 'Liam O\'Brien', role: 'student', avatarConfig: '{"face":0,"skin":0,"hair":2,"hairColor":"#C68642","eyes":0,"mouth":4,"accessory":"stethoscope","scrubsColor":"#FDCB6E"}', xp: 6400, level: 7, streak: 4 },
+    { email: 'admin@skillquest.io', password: 'admin123', name: 'Admin User', role: 'admin', avatarConfig: '{}', xp: 0, level: 1, streak: 0 }
   ];
 
   let teacherId = null;
@@ -357,10 +357,10 @@ async function cleanAndImport() {
 
     try {
       await sql`
-        INSERT INTO public.users (id, email, password, name, role, avatar_config, xp, level, streak)
-        VALUES (${userId}, ${u.email}, null, ${u.name}, ${u.role}, ${u.avatarConfig}, ${u.xp}, ${u.level}, ${u.streak})
+        INSERT INTO public.users (id, email, password, name, role, avatar_config, xp, level, streak, is_verified)
+        VALUES (${userId}, ${u.email}, null, ${u.name}, ${u.role}, ${u.avatarConfig}, ${u.xp}, ${u.level}, ${u.streak}, true)
         ON CONFLICT (email) DO UPDATE
-        SET id = ${userId}, name = ${u.name}, role = ${u.role}, avatar_config = ${u.avatarConfig}, xp = ${u.xp}, level = ${u.level}, streak = ${u.streak}
+        SET id = ${userId}, name = ${u.name}, role = ${u.role}, avatar_config = ${u.avatarConfig}, xp = ${u.xp}, level = ${u.level}, streak = ${u.streak}, is_verified = true
       `;
       console.log(`✅ Upserted in public.users: ${u.email}`);
     } catch (e) {
@@ -464,7 +464,7 @@ async function cleanAndImport() {
     { name: 'Speed Demon', description: 'Answer a question in under 3 seconds', icon: '⚡', type: 'speed', value: 3 },
     { name: 'Scholar', description: 'Earn 5000 XP', icon: '📚', type: 'xp', value: 5000 },
     { name: 'Dedicated', description: 'Login for 7 days straight', icon: '💪', type: 'login_streak', value: 7 },
-    { name: 'Top Nurse', description: 'Reach #1 on the leaderboard', icon: '👑', type: 'rank', value: 1 }
+    { name: 'Top Scholar', description: 'Reach #1 on the leaderboard', icon: '👑', type: 'rank', value: 1 }
   ];
 
   for (const a of achievements) {

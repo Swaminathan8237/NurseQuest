@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../supabaseClient';
 
+import logo from '../assets/skillquest-logo.png';
+
 const t = (val) => val;
 
 export default function AuthPage() {
@@ -39,6 +41,15 @@ export default function AuthPage() {
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verificationSuccess, setVerificationSuccess] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('verified') === 'true') {
+      setVerificationSuccess(true);
+      navigate('/auth', { replace: true });
+    }
+  }, [location, navigate]);
 
   // If user is already logged in and doesn't need profile setup, redirect away from auth page
   // Helper to get the correct dashboard route for a role
@@ -69,19 +80,33 @@ export default function AuthPage() {
         navigate(getDashboardRoute(loggedUser.role));
       } else {
         const registeredUser = await register(formData);
-        if (registeredUser.emailVerificationPending) {
-          setIsVerificationPending(true);
+        if (registeredUser?.isVerificationPending) {
           setPendingEmail(formData.email);
+          setIsVerificationPending(true);
+          setLoading(false);
           return;
         }
-        if (registeredUser.role === 'student') {
-          navigate('/avatar-setup');
-        } else {
-          navigate(getDashboardRoute(registeredUser.role));
+        if (registeredUser?.needProfileSetup) {
+          return;
         }
+        navigate(getDashboardRoute(registeredUser.role));
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Authentication failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOAuthProfileSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const updatedUser = await syncOAuthProfile(profileFormData.name, profileFormData.role);
+      navigate(getDashboardRoute(updatedUser.role));
+    } catch (err) {
+      setError(err.message || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
@@ -93,13 +118,13 @@ export default function AuthPage() {
     setError('');
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: window.location.origin + '/auth'
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/auth#type=recovery`,
       });
-      if (error) throw error;
+      if (resetErr) throw resetErr;
       setResetSent(true);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Failed to send password reset email');
     } finally {
       setLoading(false);
     }
@@ -109,21 +134,17 @@ export default function AuthPage() {
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
+      setError('Passwords do not match');
       return;
     }
     setError('');
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateErr) throw updateErr;
+      alert('Password updated successfully! Please sign in with your new password.');
+      window.location.hash = '';
       setIsResettingPassword(false);
-      // If profile is fully set up, redirect to dashboard. Otherwise profile setup handles it.
-      if (user && !user.needProfileSetup) {
-        navigate(getDashboardRoute(user.role));
-      }
-    } catch (err) {
-      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -191,32 +212,32 @@ export default function AuthPage() {
       <div className="w-full max-w-md clay-card p-8 md:p-10 relative z-10 animate-fadeInUp">
 
         <div className="text-center mb-8">
-          <div className="w-20 h-20 mx-auto bg-brand-surface shadow-clay-outer rounded-full flex items-center justify-center mb-4">
-            <span className="material-symbols-outlined text-4xl text-transparent bg-clip-text bg-gradient-to-br from-primary-container to-primary" style={{ fontVariationSettings: "'FILL' 1" }}>{t('medical_services')}</span>
+          <div className="w-20 h-20 mx-auto bg-brand-surface shadow-clay-outer rounded-2xl flex items-center justify-center mb-4 p-2">
+            <img src={logo} alt="SkillQuest" className="w-14 h-14 object-contain" />
           </div>
           <h1 className="text-4xl font-headline font-black tracking-tighter mb-1">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-container to-tertiary">{t('NurseQuest')}</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] to-[#F59E0B]">{t('SkillQuest')}</span>
           </h1>
-          <p className="text-on-surface-variant font-medium text-xs">{t('Gamified Interactive Learning for Nursing Excellence')}</p>
+          <p className="text-on-surface-variant font-medium text-xs tracking-wider uppercase">{t('Learn · Practice · Excel')}</p>
         </div>
 
         {/* EMAIL VERIFICATION PENDING SCREEN */}
         {isVerificationPending ? (
-          <div className="animate-fadeIn text-center py-6 flex flex-col items-center">
+          <div className="animate-fadeIn text-center p-6 rounded-2xl bg-[#A8E6CF] text-[#2C3E50] flex flex-col items-center shadow-lg border border-[#A8E6CF]/30">
             {/* Tick checkmark inside a glowing circle in the middle */}
-            <div className="w-20 h-20 bg-brand-surface shadow-clay-outer rounded-full flex items-center justify-center mb-6 animate-pulse border-2 border-success">
-              <span className="material-symbols-outlined text-4xl text-success" style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}>{t('check_circle')}</span>
+            <div className="w-16 h-16 bg-[#ffffff]/35 rounded-full flex items-center justify-center mb-5 animate-pulse">
+              <span className="material-symbols-outlined text-3xl text-[#2C3E50]" style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}>check_circle</span>
             </div>
 
-            <h2 className="text-2xl font-headline font-bold text-on-surface mb-2">{t('Check Your Email')}</h2>
-            <p className="text-sm text-on-surface-variant mb-6 px-2">
-              {t("We've sent a verification email to")} <strong className="text-on-surface">{pendingEmail}</strong>.
-              {t("Please click the link in that email to confirm your account, then you can log in.")}
+            <h2 className="text-xl font-headline font-black mb-2">{t('Check Your Email')}</h2>
+            <p className="text-sm line-height-relaxed font-semibold mb-6 px-1">
+              {t("Registration successful! We've sent a verification link to")} <strong className="underline">{pendingEmail}</strong>.
+              {t(" Please check your inbox and click the link to activate your account.")}
             </p>
 
             <button
               onClick={() => { setIsVerificationPending(false); setIsLogin(true); }}
-              className="px-6 py-3 clay-button clay-button-outline text-xs font-bold uppercase tracking-widest"
+              className="px-6 py-2.5 rounded-xl font-headline font-bold text-xs uppercase tracking-widest bg-[#2C3E50] text-[#A8E6CF] hover:opacity-90 active:scale-95 transition-all shadow-md"
             >
               {t('Back to Sign In')}
             </button>
@@ -286,7 +307,7 @@ export default function AuthPage() {
           <div className="animate-fadeIn">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-headline font-bold text-on-surface mb-1">{t('Update Password')}</h2>
-              <p className="text-xs text-on-surface-variant">{t('Enter a new secure password for your NurseQuest account.')}</p>
+              <p className="text-xs text-on-surface-variant">{t('Enter a new secure password for your SkillQuest account.')}</p>
             </div>
             <form onSubmit={handleUpdatePassword} className="space-y-5">
               <div className="space-y-1.5">
@@ -401,6 +422,13 @@ export default function AuthPage() {
         ) : (
           /* STANDARD SIGN IN / SIGN UP FORM */
           <>
+            {verificationSuccess && (
+              <div className="bg-[#E8F5E9] border border-[#A5D6A7] text-[#2E7D32] px-4 py-3.5 rounded-xl text-sm font-semibold mb-6 flex items-center gap-2.5 shadow-sm animate-fadeIn">
+                <span className="material-symbols-outlined text-[20px] text-[#2E7D32]">{t('check_circle')}</span>
+                <span>{t('Email verified successfully! You can now sign in.')}</span>
+              </div>
+            )}
+
             <div className="bg-brand-surface shadow-clay-sunken p-1 rounded-full flex relative mb-8">
               <div
                 className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-brand-elevated border-2 border-primary/30 rounded-full shadow-clay-outer transition-transform duration-300 ease-out`}
@@ -500,9 +528,9 @@ export default function AuthPage() {
               )}
 
               {error && (
-                <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-xl text-sm font-medium animate-shake flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px]">{t('error')}</span>
-                  {error}
+                <div className="bg-[#FFEBEE] border border-[#FFCDD2] text-[#C62828] px-4 py-3.5 rounded-xl text-sm font-semibold animate-shake flex items-center gap-2.5 shadow-sm">
+                  <span className="material-symbols-outlined text-[20px] text-[#C62828]">{t('error')}</span>
+                  <span>{error}</span>
                 </div>
               )}
 
@@ -547,21 +575,21 @@ export default function AuthPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <button
                     className="py-2.5 clay-button clay-button-outline text-xs font-bold flex items-center justify-center gap-2 hover:text-primary"
-                    onClick={() => setFormData({ ...formData, email: 'teacher@nursequest.com', password: 'teacher123' })}
+                    onClick={() => setFormData({ ...formData, email: 'teacher@skillquest.io', password: 'teacher123' })}
                     type="button"
                   >
-                    <span>👩‍⚕️</span> {t('Teacher')}
+                    <span>👩‍🏫</span> {t('Teacher')}
                   </button>
                   <button
                     className="py-2.5 clay-button clay-button-outline text-xs font-bold flex items-center justify-center gap-2 hover:text-tertiary"
-                    onClick={() => setFormData({ ...formData, email: 'student1@nursequest.com', password: 'student123' })}
+                    onClick={() => setFormData({ ...formData, email: 'student1@skillquest.io', password: 'student123' })}
                     type="button"
                   >
                     <span>🎓</span> {t('Student')}
                   </button>
                   <button
                     className="py-2.5 clay-button clay-button-outline text-xs font-bold flex items-center justify-center gap-2 hover:text-secondary"
-                    onClick={() => setFormData({ ...formData, email: 'admin@nursequest.com', password: 'admin123' })}
+                    onClick={() => setFormData({ ...formData, email: 'admin@skillquest.io', password: 'admin123' })}
                     type="button"
                   >
                     <span>👨‍💻</span> {t('Admin')}

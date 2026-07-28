@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: nursequest
+    name: skillquest
     env: node
     buildCommand: npm run install:all && npm run build
     startCommand: node backend/server.js

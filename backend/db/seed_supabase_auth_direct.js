@@ -4,13 +4,13 @@ const { crypto } = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 
 const targetUsers = [
-  { email: 'teacher@nursequest.com', password: 'teacher123' },
-  { email: 'student1@nursequest.com', password: 'student123' },
-  { email: 'student2@nursequest.com', password: 'student123' },
-  { email: 'student3@nursequest.com', password: 'student123' },
-  { email: 'student4@nursequest.com', password: 'student123' },
-  { email: 'student5@nursequest.com', password: 'student123' },
-  { email: 'admin@nursequest.com', password: 'admin123' }
+  { email: 'teacher@skillquest.io', password: 'teacher123' },
+  { email: 'student1@skillquest.io', password: 'student123' },
+  { email: 'student2@skillquest.io', password: 'student123' },
+  { email: 'student3@skillquest.io', password: 'student123' },
+  { email: 'student4@skillquest.io', password: 'student123' },
+  { email: 'student5@skillquest.io', password: 'student123' },
+  { email: 'admin@skillquest.io', password: 'admin123' }
 ];
 
 async function run() {

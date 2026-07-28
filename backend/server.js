@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -12,7 +12,6 @@ const authRoutes = require('./routes/auth');
 const quizRoutes = require('./routes/quizzes');
 const scoreRoutes = require('./routes/scores');
 const userRoutes = require('./routes/users');
-const moduleRoutes = require('./routes/modules');
 const adminRoutes = require('./routes/admin');
 
 // Socket.IO handlers
@@ -102,7 +101,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/scores', scoreRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/modules', moduleRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Media placeholder endpoint (returns SVG placeholders for demo)
@@ -184,11 +182,11 @@ app.use((req, res, next) => {
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, async () => {
-  console.log(`\n🏥 ═══════════════════════════════════════════`);
-  console.log(`   NurseQuest API Server`);
+  console.log(`\n📚 ═══════════════════════════════════════════`);
+  console.log(`   SkillQuest API Server — Learn · Practice · Excel`);
   console.log(`   Running on http://localhost:${PORT}`);
   console.log(`   Socket.IO ready for real-time games`);
-  console.log(`🏥 ═══════════════════════════════════════════\n`);
+  console.log(`📚 ═══════════════════════════════════════════\n`);
   
   try {
     const { initializeDB } = require('./db/init');

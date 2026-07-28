@@ -135,22 +135,12 @@ export const userAPI = {
   getDashboardStats: () => request('/users/dashboard-stats'),
 };
 
-// Modules
-export const moduleAPI = {
-  getAll: () => request('/modules'),
-  getById: (id) => request(`/modules/${id}`),
-  create: (data) => request('/modules', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id, data) => request(`/modules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id) => request(`/modules/${id}`, { method: 'DELETE' }),
-};
-
 // Admin & Request Workflow
 export const adminAPI = {
   getUsers: () => request('/admin/users'),
   updateUserRole: (id, role) => request(`/admin/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
   deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
-  getModules: () => request('/admin/modules'),
-  submitQuizRequest: (quizId, moduleId) => request('/admin/requests', { method: 'POST', body: JSON.stringify({ quizId, moduleId }) }),
+  submitQuizRequest: (quizId, unit) => request('/admin/requests', { method: 'POST', body: JSON.stringify({ quizId, unit }) }),
   getMyQuizRequests: () => request('/admin/my-requests'),
   getAllQuizRequests: () => request('/admin/requests'),
   processQuizRequest: (id, action, adminNotes, unit) => request(`/admin/requests/${id}/action`, { method: 'POST', body: JSON.stringify({ action, adminNotes, unit }) }),
@@ -158,4 +148,4 @@ export const adminAPI = {
   resetStatistics: () => request('/admin/reset-statistics', { method: 'POST' }),
 };
 
-export default { authAPI, quizAPI, scoreAPI, userAPI, moduleAPI, adminAPI };
+export default { authAPI, quizAPI, scoreAPI, userAPI, adminAPI };

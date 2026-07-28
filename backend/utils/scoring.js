@@ -1,16 +1,16 @@
 /**
- * NurseQuest Scoring Engine
+ * SkillQuest Scoring Engine
  * Kahoot-inspired scoring with time bonus and streak multipliers
  */
 
 const LEVELS = [
-  { level: 1, name: 'Nurse Intern', minXP: 0, icon: '🩺' },
-  { level: 2, name: 'Junior Nurse', minXP: 1000, icon: '💉' },
-  { level: 3, name: 'Nurse', minXP: 3000, icon: '🏥' },
-  { level: 4, name: 'Senior Nurse', minXP: 6000, icon: '⭐' },
-  { level: 5, name: 'Head Nurse', minXP: 10000, icon: '🌟' },
-  { level: 6, name: 'Nurse Specialist', minXP: 15000, icon: '💎' },
-  { level: 7, name: 'Chief Nurse', minXP: 25000, icon: '👑' },
+  { level: 1, name: 'Rookie', minXP: 0, icon: '🌱' },
+  { level: 2, name: 'Learner', minXP: 1000, icon: '📖' },
+  { level: 3, name: 'Explorer', minXP: 3000, icon: '🔭' },
+  { level: 4, name: 'Scholar', minXP: 6000, icon: '🎓' },
+  { level: 5, name: 'Expert', minXP: 10000, icon: '⭐' },
+  { level: 6, name: 'Master', minXP: 15000, icon: '💎' },
+  { level: 7, name: 'Legend', minXP: 25000, icon: '👑' },
 ];
 
 /**

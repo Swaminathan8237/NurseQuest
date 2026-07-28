@@ -1,4 +1,4 @@
--- NurseQuest Database Schema for PostgreSQL
+-- SkillQuest Database Schema for PostgreSQL
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -12,21 +12,10 @@ CREATE TABLE IF NOT EXISTS users (
   level INTEGER DEFAULT 1,
   streak INTEGER DEFAULT 0,
   last_active TIMESTAMP,
+  is_verified BOOLEAN DEFAULT false,
+  verification_token TEXT UNIQUE,
+  token_expires_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Modules table
-CREATE TABLE IF NOT EXISTS modules (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT,
-  icon TEXT DEFAULT 'school',
-  color TEXT DEFAULT '#b76dff',
-  order_index INTEGER DEFAULT 0,
-  created_by TEXT NOT NULL,
-  is_published INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
 -- Quizzes table
@@ -34,19 +23,16 @@ CREATE TABLE IF NOT EXISTS quizzes (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT,
-  category TEXT DEFAULT 'General Nursing',
+  category TEXT DEFAULT 'General Knowledge',
   difficulty TEXT DEFAULT 'medium' CHECK(difficulty IN ('easy', 'medium', 'hard')),
   unit INTEGER DEFAULT 1 CHECK(unit BETWEEN 1 AND 15),
-  module TEXT DEFAULT 'Module 1',
-  module_id TEXT,
   time_per_question INTEGER DEFAULT 30,
   created_by TEXT NOT NULL,
   is_published INTEGER DEFAULT 0,
   is_live INTEGER DEFAULT 0,
   live_code TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (created_by) REFERENCES users(id),
-  FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE SET NULL
+  FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
 -- Questions table
@@ -178,16 +164,18 @@ CREATE INDEX IF NOT EXISTS idx_quiz_requests_status ON quiz_requests(status);
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.users (id, email, name, role, avatar_config)
+  INSERT INTO public.users (id, email, name, role, avatar_config, is_verified)
   VALUES (
     new.id,
     new.email,
     COALESCE(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
     COALESCE(new.raw_user_meta_data->>'role', 'student'),
-    '{}'
+    '{}',
+    true
   )
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
+    is_verified = true,
     name = CASE WHEN public.users.name = 'New User' OR public.users.name = '' THEN EXCLUDED.name ELSE public.users.name END;
   RETURN new;
 END;

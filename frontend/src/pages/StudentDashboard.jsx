@@ -4,10 +4,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { userAPI, quizAPI, scoreAPI } from '../api';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
+import useScrollReveal from '../hooks/useScrollReveal';
+import mascotImg from '../assets/skillquest-mascot.png';
+import UnitCanvasBackground from '../components/UnitCanvasBackground';
 
 
-const LEVEL_NAMES = ['', 'Nurse Intern', 'Junior Nurse', 'Nurse', 'Senior Nurse', 'Head Nurse', 'Nurse Specialist', 'Chief Nurse'];
-const LEVEL_ICONS = ['', '🩺', '💉', '🏥', '⭐', '🌟', '💎', '👑'];
+const LEVEL_NAMES = ['', 'Rookie', 'Learner', 'Explorer', 'Scholar', 'Expert', 'Master', 'Legend'];
+const LEVEL_ICONS = ['', '🌱', '📖', '🔭', '🎓', '⭐', '💎', '👑'];
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -16,6 +19,7 @@ export default function StudentDashboard() {
   const [quizzes, setQuizzes] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
+  const scrollRevealRef = useScrollReveal();
 
   useEffect(() => {
     Promise.all([
@@ -34,7 +38,7 @@ export default function StudentDashboard() {
     return <div className="loading-screen"><div className="spinner" /><p style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</p></div>;
   }
 
-  const levelInfo = stats?.levelInfo || { level: 1, name: 'Nurse Intern', progress: 0, xpInLevel: 0, xpForNextLevel: 1000 };
+  const levelInfo = stats?.levelInfo || { level: 1, name: 'Rookie', progress: 0, xpInLevel: 0, xpForNextLevel: 1000 };
 
   // Calculate Unit-Based Learning stats
   const unitQuizzes = quizzes.filter(q => q.unit >= 1 && q.unit <= 11);
@@ -47,36 +51,54 @@ export default function StudentDashboard() {
   return (
     <div className="min-h-screen pb-24 font-body">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-6 flex flex-col gap-8 lg:gap-12 pb-12" style={{ paddingTop: '100px' }}>
-        {/* Welcome Banner */}
-        <section className="w-full clay-card p-8 relative overflow-hidden flex flex-col md:flex-row items-center gap-6 justify-between animate-slideUp">
-          <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary-container/20 rounded-full blur-[80px] pointer-events-none"></div>
-          
+      <main ref={scrollRevealRef} className="max-w-7xl mx-auto px-6 flex flex-col gap-8 lg:gap-12 pb-12" style={{ paddingTop: '100px' }}>
+        {/* Welcome Section */}
+        <section className="clay-card p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden cascade-entrance">
           <div className="flex items-center gap-6 z-10">
-            <div className="relative cursor-pointer" onClick={() => navigate('/avatar-setup')}>
-              <div className="w-20 h-20 rounded-full bg-brand-surface p-1 border-2 border-primary shadow-clay-outer overflow-hidden flex justify-center items-center">
-                <Avatar config={user?.avatar_config} size={72} showBg={false} />
-              </div>
-              <div className="absolute -bottom-2 right-0 bg-brand-surface shadow-clay-outer px-2 py-1 rounded-full border-2 border-primary text-xs font-bold text-primary flex items-center gap-1">
+            <div className="relative shrink-0 cursor-pointer" onClick={() => navigate('/avatar-setup')}>
+              <Avatar config={user?.avatar_config} size={72} showBg={true} />
+              <div className="absolute -bottom-1 -right-1 bg-primary text-on-primary text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-md">
                 <span className="material-symbols-outlined text-[10px]" style={{fontVariationSettings: "'FILL' 1"}}>star</span> {levelInfo.level}
               </div>
             </div>
             <div>
-              <h1 className="font-headline text-4xl text-on-surface font-extrabold tracking-tight mb-1">
-                Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-br from-[#b76dff] to-[#ddb7ff]">{user?.name?.split(' ')[0]}</span>! 👋
+              <h1 className="font-headline text-3xl md:text-4xl text-on-surface font-extrabold tracking-tight mb-1">
+                Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-br from-[#7C3AED] to-[#A78BFA]">{user?.name?.split(' ')[0]}</span>! 👋
               </h1>
-              <p className="font-body text-on-surface-variant text-base">Ready to level up your nursing knowledge?</p>
+              <p className="font-body text-on-surface-variant text-base">Ready to level up your knowledge and conquer clinical units?</p>
             </div>
           </div>
           
           <div className="z-10 bg-brand-surface shadow-clay-inner p-4 rounded-2xl w-full md:w-auto min-w-0 md:min-w-[280px]">
             <div className="flex justify-between items-center mb-2">
-              <span className="font-body text-sm font-semibold text-tertiary">⭐ {LEVEL_NAMES[levelInfo.level] || 'Nurse Intern'}</span>
+              <span className="font-body text-sm font-semibold text-tertiary">⭐ {LEVEL_NAMES[levelInfo.level] || 'Rookie'}</span>
               <span className="font-body text-xs text-on-surface-variant">{levelInfo.xpInLevel} / {levelInfo.xpForNextLevel} XP</span>
             </div>
             <div className="w-full h-3 bg-brand-elevated shadow-clay-sunken rounded-full overflow-hidden">
               <div className="h-full bg-gradient-to-r from-tertiary to-primary rounded-full" style={{ width: `${levelInfo.progress}%` }}></div>
             </div>
+          </div>
+        </section>
+
+        {/* Standalone Unboxed Hero CTA - Open Space Banner */}
+        <section className="flex flex-col sm:flex-row items-center justify-between gap-6 py-4 px-2 my-2 relative overflow-visible cascade-entrance">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-headline font-black text-on-surface flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-3xl">sports_esports</span> Ready to Play?
+            </h2>
+            <p className="text-sm font-body text-on-surface-variant font-medium">Jump straight into the unit assessment path and conquer new levels.</p>
+          </div>
+
+          <div className="relative shrink-0">
+            <div className="absolute -inset-2 bg-gradient-to-r from-[#00c6ff] to-[#0072ff] rounded-full blur-xl opacity-40 animate-pulse pointer-events-none"></div>
+            <button
+              onClick={() => navigate('/units')}
+              className="btn-conquer group relative z-10"
+            >
+              <span className="material-symbols-outlined text-2xl group-hover:rotate-12 transition-transform">rocket_launch</span>
+              <span>Start to Conquer the Levels</span>
+              <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            </button>
           </div>
         </section>
 
@@ -88,7 +110,7 @@ export default function StudentDashboard() {
             { label: 'Best Streak', value: `${stats?.bestStreak || 0}`, icon: 'local_fire_department', color: 'text-[#fabc4e]' },
             { label: 'Total XP', value: stats?.xp?.toLocaleString() || '0', icon: 'bolt', color: 'text-primary-container' },
           ].map((stat, i) => (
-            <div key={i} className="clay-card p-6 flex flex-col gap-4 group cursor-default" style={{ animationDelay: `${0.1 + i * 0.1}s` }}>
+            <div key={i} className={`clay-card p-6 flex flex-col gap-4 group cursor-default cascade-entrance cascade-d${i + 1}`}>
               <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-brand-surface shadow-clay-sunken group-hover:scale-110 transition-transform duration-300">
                 <span className={`material-symbols-outlined ${stat.color}`} style={{fontVariationSettings: "'FILL' 1"}}>{stat.icon}</span>
               </div>
@@ -104,14 +126,12 @@ export default function StudentDashboard() {
           {/* Left Column: Learning Progress & Recent Activity */}
           <div className="lg:col-span-2 flex flex-col gap-8">
             {/* Unit Path Card */}
-            <div className="clay-card p-8 relative overflow-hidden animate-slideUp">
+            <div className="clay-card p-8 relative overflow-hidden reveal">
+              <UnitCanvasBackground />
               <div className="absolute -right-16 -top-16 w-48 h-48 bg-primary/10 rounded-full blur-[60px] pointer-events-none"></div>
               
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
                 <div>
-                  <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-widest mb-1.5">
-                    <span className="material-symbols-outlined text-[16px]">school</span> Active Learning Curriculum
-                  </div>
                   <h2 className="text-3xl font-headline font-black text-on-surface">Unit-Based Learning Path</h2>
                   <p className="text-sm text-on-surface-variant mt-1.5">
                     Progress through the 11 clinical units covering infection control, sterile protocols, and patient safety indicators.
@@ -138,14 +158,15 @@ export default function StudentDashboard() {
                 </div>
               </div>
 
-              {/* Launch CTA */}
+              {/* Launch CTA - 3D Conquer Button */}
               <div className="mt-8 flex justify-end">
                 <button
                   onClick={() => navigate('/units')}
-                  className="px-8 py-4 clay-button clay-button-primary font-headline font-bold uppercase tracking-widest flex items-center gap-2.5"
+                  className="btn-conquer group"
                 >
-                  <span>Go to Units Section</span>
-                  <span className="material-symbols-outlined">arrow_forward</span>
+                  <span className="material-symbols-outlined text-2xl group-hover:rotate-12 transition-transform">rocket_launch</span>
+                  <span>Start to Conquer the Levels</span>
+                  <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">arrow_forward</span>
                 </button>
               </div>
             </div>
@@ -171,7 +192,7 @@ export default function StudentDashboard() {
                         <div className="flex-1">
                           <div className="flex justify-between items-start gap-2 mb-2">
                             <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 bg-brand-surface shadow-clay-sunken px-2 py-0.5 rounded">
-                              {quiz.category || 'General Nursing'}
+                              {quiz.category || 'General Knowledge'}
                             </span>
                             {hasAttempt && (
                               <div className={`flex items-center gap-1 text-xs font-bold ${passed ? 'text-success' : 'text-warning'}`}>
@@ -193,7 +214,7 @@ export default function StudentDashboard() {
                             </div>
                             <div className="flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-[14px] text-slate-500">menu_book</span>
-                              <span>Subject: <span className="text-tertiary font-bold">{quiz.module_title || quiz.category || 'General Nursing'}</span></span>
+                              <span>Unit / Topic: <span className="text-tertiary font-bold">{quiz.module_title || quiz.category || 'General Practice'}</span></span>
                             </div>
                           </div>
                         </div>
@@ -274,24 +295,7 @@ export default function StudentDashboard() {
 
           {/* Right Column */}
           <div className="flex flex-col gap-8">
-            {/* Mini Game Promo */}
-            <div className="clay-card p-6 border-2 border-primary/30 relative overflow-hidden animate-slideUp" style={{ animationDelay: '0.4s' }}>
-              <div className="absolute -right-16 -bottom-16 opacity-10">
-                <span className="material-symbols-outlined text-[120px]">vaccines</span>
-              </div>
-              <h2 className="text-xl font-headline font-bold text-on-surface mb-2 relative z-10 flex items-center gap-2">
-                <span className="material-symbols-outlined text-tertiary">science</span> IV Stabilization
-              </h2>
-              <p className="text-sm text-on-surface-variant mb-6 relative z-10">
-                Train your reflexes with a 3D simulation powered by animated monitor feedback.
-              </p>
-              <button 
-                onClick={() => navigate('/mini-game')}
-                className="w-full clay-button clay-button-outline font-bold px-4 py-2 relative z-10"
-              >
-                Launch Lab
-              </button>
-            </div>
+
 
             {/* Leaderboard Preview */}
             <div className="clay-card p-6 animate-slideUp" style={{ animationDelay: '0.5s' }}>

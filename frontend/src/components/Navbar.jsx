@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import Avatar from './Avatar';
+import ProfileDropdown from './ProfileDropdown';
+
+import logo from '../assets/skillquest-logo.png';
 
 const mobileNavLinkClass = ({ isActive }) =>
   isActive
@@ -13,7 +16,11 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const isUnitsPage = location.pathname === '/units';
+  const isLightPage = isUnitsPage || theme === 'light';
 
   const handleLogout = () => {
     setMobileMenuOpen(false);
@@ -25,24 +32,32 @@ export default function Navbar() {
   const isStudent = user?.role === 'student';
   const dashPath = isAdmin ? '/admin' : (isStudent ? '/student' : '/teacher');
 
-  const navLinkClass = ({ isActive }) =>
-    isActive
-      ? "text-primary font-bold bg-brand-surface px-4 py-1.5 rounded-full shadow-[inset_2px_2px_4px_rgba(10,10,25,0.4),_inset_-2px_-2px_4px_rgba(70,75,120,0.15)] transition-all duration-200"
-      : "text-on-surface-variant hover:text-primary px-4 py-1.5 rounded-full transition-all duration-200 hover:scale-105";
+  const navLinkClass = ({ isActive }) => {
+    if (isActive) {
+      return isLightPage
+        ? "text-white font-black bg-primary px-4 py-1.5 rounded-full shadow-md shadow-purple-500/20 transition-all duration-200"
+        : "text-white font-black bg-primary px-4 py-1.5 rounded-full shadow-[0_0_15px_rgba(124,58,237,0.5)] transition-all duration-200";
+    }
+    return isLightPage
+      ? "text-slate-600 hover:text-primary font-bold hover:bg-slate-100/80 px-4 py-1.5 rounded-full transition-all duration-200"
+      : "text-slate-300 hover:text-primary px-4 py-1.5 rounded-full transition-all duration-200 hover:scale-105";
+  };
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-4 md:px-8 py-3 max-w-7xl mx-auto navbar-glass rounded-full mt-2 md:mt-4">
+      <nav className={`fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-4 md:px-8 py-3 max-w-7xl mx-auto rounded-full mt-2 md:mt-4 transition-all duration-300 ${
+        isLightPage
+          ? 'bg-white/90 backdrop-blur-xl border border-slate-200/90 shadow-[0_8px_30px_rgba(0,0,0,0.08)] text-slate-900'
+          : 'bg-[#0F0E1A]/85 backdrop-blur-xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.4)] text-white'
+      }`}>
         <div className="flex items-center gap-4 md:gap-8">
-          <NavLink to={dashPath} className="flex items-center gap-2 group">
-            <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shadow-clay-outer">
-              <span className="material-symbols-outlined text-xl text-primary" style={{fontVariationSettings: "'FILL' 1"}}>medical_services</span>
-            </div>
-            <span className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-br from-[#b76dff] to-[#ddb7ff] font-['Manrope'] tracking-tight">
-              NurseQuest
+          <NavLink to={dashPath} className="flex items-center gap-2.5 group">
+            <img src={logo} alt="SkillQuest Logo" className="w-9 h-9 object-contain rounded-xl shadow-md transition-transform group-hover:scale-105" />
+            <span className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary via-purple-600 to-tertiary font-headline tracking-tight">
+              SkillQuest
             </span>
           </NavLink>
-          <div className="hidden lg:flex gap-1 font-['Manrope'] tracking-tight font-semibold text-sm">
+          <div className="hidden lg:flex gap-1 font-headline tracking-tight font-bold text-sm">
             <NavLink to={dashPath} className={navLinkClass}>
               Dashboard
             </NavLink>
@@ -54,11 +69,6 @@ export default function Navbar() {
             <NavLink to="/leaderboard" className={navLinkClass}>
               Leaderboard
             </NavLink>
-            {isStudent && (
-              <NavLink to="/mini-game" className={navLinkClass}>
-                Mini-Game
-              </NavLink>
-            )}
             {!isStudent && (
               <NavLink to="/quiz-builder" className={navLinkClass}>
                 Create Quiz
@@ -71,48 +81,36 @@ export default function Navbar() {
         </div>
         <div className="flex items-center gap-2 md:gap-3">
           {isStudent && (
-            <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm bg-brand-elevated text-brand-textPrimary shadow-[inset_-2px_-2px_4px_rgba(70,75,120,0.15),_inset_2px_2px_4px_rgba(10,10,25,0.3)]">
+            <div className={`hidden lg:flex items-center gap-2 px-4 py-2 rounded-full font-headline font-black text-sm transition-colors ${
+              isLightPage 
+                ? 'bg-slate-100 border border-slate-200/90 text-primary shadow-sm' 
+                : 'bg-brand-elevated text-brand-textPrimary shadow-[inset_-2px_-2px_4px_rgba(70,75,120,0.15),_inset_2px_2px_4px_rgba(10,10,25,0.3)]'
+            }`}>
               <span className="material-symbols-outlined text-sm animate-pulse" style={{fontVariationSettings: "'FILL' 1"}}>bolt</span>
               <span>{user?.xp || 0} XP</span>
             </div>
           )}
           <div className="flex items-center gap-1 md:gap-2">
-            <button 
-              className="p-2.5 rounded-full hover:bg-brand-elevated transition-all duration-200 text-on-surface-variant hover:text-primary"
-              onClick={toggleTheme} 
-              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            >
-              <span className="material-symbols-outlined text-lg">
-                {theme === 'dark' ? 'light_mode' : 'dark_mode'}
-              </span>
-            </button>
+            {!isUnitsPage && (
+              <button 
+                className={`p-2.5 rounded-full transition-all duration-200 ${
+                  isLightPage ? 'text-slate-600 hover:text-primary hover:bg-slate-100' : 'text-slate-300 hover:text-primary hover:bg-white/10'
+                }`}
+                onClick={toggleTheme} 
+                title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              >
+                <span className="material-symbols-outlined text-lg">
+                  {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+                </span>
+              </button>
+            )}
 
-            <button 
-              className="hidden lg:inline-flex p-2.5 rounded-full hover:bg-error/10 transition-all duration-200 text-on-surface-variant hover:text-error"
-              onClick={handleLogout} 
-              title="Logout"
-            >
-              <span className="material-symbols-outlined text-lg">logout</span>
-            </button>
-            
-            <div className="relative w-9 h-9 md:w-10 md:h-10 rounded-full border-2 border-primary/50 overflow-hidden cursor-pointer group shadow-clay-outer hover:border-primary transition-all duration-300"
-              onClick={() => { if (isStudent) navigate('/avatar-setup'); else if (isAdmin) navigate('/admin'); else navigate('/quiz-builder'); }}
-              title={isStudent ? 'Customize Avatar' : (isAdmin ? 'Admin Dashboard' : 'Create New Quiz')}>
-              {isStudent ? (
-                <Avatar config={user?.avatar_config} size={36} showBg={false} />
-              ) : isAdmin ? (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary to-secondary-light text-white transition-transform group-hover:scale-110">
-                  <span className="material-symbols-outlined text-sm md:text-base">admin_panel_settings</span>
-                </div>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-primary-container text-white transition-transform group-hover:scale-110">
-                  <span className="material-symbols-outlined text-sm md:text-base">edit_square</span>
-                </div>
-              )}
-            </div>
+            <ProfileDropdown />
 
             <button
-              className="lg:hidden p-2.5 rounded-full hover:bg-surface-container transition-all duration-200 text-on-surface-variant hover:text-primary"
+              className={`lg:hidden p-2.5 rounded-full transition-all duration-200 ${
+                isLightPage ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-300 hover:bg-white/10'
+              }`}
               onClick={() => setMobileMenuOpen(true)}
               title="Open Menu"
             >
@@ -166,16 +164,6 @@ export default function Navbar() {
                 <span className="material-symbols-outlined text-xl">leaderboard</span>
                 Leaderboard
               </NavLink>
-              {isStudent && (
-                <NavLink
-                  to="/mini-game"
-                  className={mobileNavLinkClass}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <span className="material-symbols-outlined text-xl">stadia_controller</span>
-                  Mini-Game
-                </NavLink>
-              )}
               {!isStudent && (
                 <NavLink
                   to="/quiz-builder"

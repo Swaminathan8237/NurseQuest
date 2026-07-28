@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { adminAPI, moduleAPI } from '../api';
+import { adminAPI } from '../api';
 import Navbar from '../components/Navbar';
 
 export default function AdminDashboard() {
@@ -265,14 +265,14 @@ export default function AdminDashboard() {
               <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 relative overflow-hidden">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-semibold text-text-muted">Total Units (Modules)</p>
+                    <p className="text-sm font-semibold text-text-muted">Total Educational Units</p>
                     <p className="text-3xl font-bold font-headline mt-2">{stats.modulesCount}</p>
                   </div>
                   <div className="p-3 bg-secondary/10 rounded-lg text-secondary">
                     <span className="material-symbols-outlined">menu_book</span>
                   </div>
                 </div>
-                <p className="text-xs font-medium text-text-muted mt-4">Structural educational modules</p>
+                <p className="text-xs font-medium text-text-muted mt-4">Structural educational units</p>
               </div>
 
               <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 relative overflow-hidden">
@@ -365,7 +365,7 @@ export default function AdminDashboard() {
                     Teachers are authorized to create and publish standalone quizzes independently.
                   </p>
                   <p>
-                    However, to safeguard curriculum standards, linking a quiz to a formal <strong>Unit (Module)</strong> requires administrator review.
+                    However, to safeguard curriculum standards, linking a quiz to a formal <strong>Unit</strong> requires administrator review.
                   </p>
                   <div className="bg-surface-container-highest/40 p-4 border border-white/5 rounded-xl space-y-3 font-semibold text-xs text-on-surface">
                     <div className="flex items-center gap-2">
@@ -498,13 +498,13 @@ export default function AdminDashboard() {
         {activeTab === 'modules' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold font-headline">Educational Modules (Units)</h3>
+              <h3 className="text-xl font-bold font-headline">Educational Units</h3>
               <button
                 className="px-5 py-2.5 bg-secondary text-white rounded-xl font-headline font-bold text-xs uppercase hover:scale-105 active:scale-95 transition-all shadow-[0_4px_15px_rgba(183,109,255,0.3)] flex items-center gap-2"
                 onClick={() => handleOpenModuleModal('create')}
               >
                 <span className="material-symbols-outlined text-base">add</span>
-                New Module
+                New Unit
               </button>
             </div>
 
@@ -797,7 +797,7 @@ export default function AdminDashboard() {
                   required
                   value={moduleForm.title}
                   onChange={(e) => setModuleForm({ ...moduleForm, title: e.target.value })}
-                  placeholder="e.g. Pediatric Nursing Care"
+                  placeholder="e.g. Introduction to Physics"
                   className="w-full p-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-secondary focus:outline-none transition-all"
                 />
               </div>

@@ -550,7 +550,11 @@ export default function LandingPage() {
   };
 
   return (
-    <div ref={scrollRevealRef} className="min-h-screen bg-[#0B0F19] text-white font-body overflow-x-hidden relative">
+    <div
+      ref={scrollRevealRef}
+      className="min-h-screen font-body overflow-x-hidden relative"
+      style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}
+    >
 
       {/* ═══════════ SCROLL-DRIVEN BACKGROUND CANVAS ═══════════ */}
       <div className="fixed inset-0 w-full h-full pointer-events-none z-0 overflow-hidden">
@@ -558,54 +562,65 @@ export default function LandingPage() {
           ref={canvasRef}
           className="w-full h-full object-cover opacity-90 filter brightness-105 saturate-110 transition-opacity duration-700"
         />
-        {/* Soft legibility overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0B0F19]/50 via-[#0B0F19]/30 to-[#0B0F19]/70 pointer-events-none" />
+        {/* Soft legibility overlay — theme-aware so text stays readable on both themes */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'linear-gradient(to bottom, color-mix(in srgb, var(--bg-base) 78%, transparent), color-mix(in srgb, var(--bg-base) 62%, transparent), color-mix(in srgb, var(--bg-base) 85%, transparent))' }}
+        />
       </div>
 
       {/* ═══════════ NAVBAR ═══════════ */}
-      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-[#0F0E1A]/80 border-b border-white/10 text-white">
+      <nav
+        className="fixed top-0 left-0 right-0 z-50"
+        style={{ background: 'var(--bg-surface)', borderBottom: '2px solid var(--border-ink-color)', color: 'var(--text-primary)' }}
+      >
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           {/* Logo */}
           <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex items-center gap-2.5 group">
-            <img src={logo} alt="SkillQuest Logo" className="w-9 h-9 object-contain rounded-xl shadow-[0_0_12px_rgba(124,58,237,0.3)] group-hover:scale-105 transition-all" />
-            <span className="font-headline font-extrabold text-lg tracking-tight">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] to-[#F59E0B]">SkillQuest</span>
+            <img
+              src={logo}
+              alt="SkillQuest Logo"
+              className="w-9 h-9 object-contain rounded-xl group-hover:scale-105 transition-transform"
+              style={{ border: '2px solid var(--border-ink-color)' }}
+            />
+            <span className="font-headline font-black text-lg tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              Skill<span style={{ color: 'var(--primary)' }}>Quest</span>
             </span>
           </button>
 
           {/* Desktop links */}
           <div className="hidden lg:flex items-center gap-8">
-            <a href="#recommends" className="text-sm font-medium text-slate-300 hover:text-primary transition-colors">Recommendations</a>
-            <a href="#quiz-details" className="text-sm font-medium text-slate-300 hover:text-primary transition-colors">Quiz Formats</a>
-            <a href="#contact" className="text-sm font-medium text-slate-300 hover:text-primary transition-colors">Contact Us</a>
+            <a href="#recommends" className="text-sm font-bold transition-colors" style={{ color: 'var(--text-secondary)' }}>Recommendations</a>
+            <a href="#quiz-details" className="text-sm font-bold transition-colors" style={{ color: 'var(--text-secondary)' }}>Quiz Formats</a>
+            <a href="#contact" className="text-sm font-bold transition-colors" style={{ color: 'var(--text-secondary)' }}>Contact Us</a>
           </div>
 
           {/* Right actions */}
-          <div className="flex items-center gap-3 lg:gap-6">
-            <div className="hidden lg:flex items-center gap-6">
+          <div className="flex items-center gap-3 lg:gap-4">
+            <div className="hidden lg:flex items-center gap-4">
               <button
                 onClick={() => setShowJoinModal(true)}
-                className="text-sm font-bold text-white hover:text-primary transition-colors cursor-pointer"
+                className="text-sm font-bold transition-colors cursor-pointer"
+                style={{ color: 'var(--text-primary)' }}
               >
                 Enter code
               </button>
               <button
                 onClick={() => navigate('/auth', { state: { tab: 'signin' } })}
-                className="text-sm font-bold text-white hover:text-primary transition-colors cursor-pointer"
+                className="btn btn-ghost btn-sm"
               >
                 Log in
               </button>
               <button
                 onClick={() => navigate('/auth', { state: { tab: 'signup' } })}
-                className="px-6 py-2.5 rounded-xl font-headline font-bold text-sm tracking-wide transition-all active:scale-95 shadow-[0_4px_15px_rgba(255,59,147,0.3)] hover:shadow-[0_4px_20px_rgba(255,59,147,0.5)] hover:scale-[1.03] cursor-pointer"
-                style={{ backgroundColor: '#ff3b93', color: 'white' }}
+                className="btn btn-primary btn-sm font-headline"
               >
                 Sign up
               </button>
             </div>
             {/* Mobile menu toggle */}
             <button
-              className="lg:hidden p-2 rounded-lg text-slate-300 hover:text-primary transition-colors"
+              className="lg:hidden btn btn-ghost btn-icon"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               <span className="material-symbols-outlined">{mobileMenuOpen ? 'close' : 'menu'}</span>
@@ -615,26 +630,28 @@ export default function LandingPage() {
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="lg:hidden bg-[#0F0E1A]/95 backdrop-blur-2xl border-t border-white/10 px-6 py-6 flex flex-col gap-4 animate-fadeIn">
-            <a href="#recommends" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-slate-300 hover:text-primary transition-colors py-2">Recommendations</a>
-            <a href="#quiz-details" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-slate-300 hover:text-primary transition-colors py-2">Quiz Formats</a>
-            <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-slate-300 hover:text-primary transition-colors py-2">Contact Us</a>
+          <div
+            className="lg:hidden px-6 py-6 flex flex-col gap-3 animate-fadeIn"
+            style={{ background: 'var(--bg-surface)', borderTop: '2px solid var(--border-ink-color)' }}
+          >
+            <a href="#recommends" onClick={() => setMobileMenuOpen(false)} className="text-sm font-bold transition-colors py-2" style={{ color: 'var(--text-secondary)' }}>Recommendations</a>
+            <a href="#quiz-details" onClick={() => setMobileMenuOpen(false)} className="text-sm font-bold transition-colors py-2" style={{ color: 'var(--text-secondary)' }}>Quiz Formats</a>
+            <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="text-sm font-bold transition-colors py-2" style={{ color: 'var(--text-secondary)' }}>Contact Us</a>
             <button
               onClick={() => { setShowJoinModal(true); setMobileMenuOpen(false); }}
-              className="w-full py-2.5 text-center text-sm font-bold text-white hover:text-primary transition-colors"
+              className="btn btn-secondary w-full"
             >
               Enter code
             </button>
             <button
               onClick={() => { navigate('/auth', { state: { tab: 'signin' } }); setMobileMenuOpen(false); }}
-              className="w-full py-2.5 text-center text-sm font-bold text-white hover:text-primary transition-colors"
+              className="btn btn-ghost w-full"
             >
               Log in
             </button>
             <button
               onClick={() => { navigate('/auth', { state: { tab: 'signup' } }); setMobileMenuOpen(false); }}
-              className="w-full py-3 rounded-xl font-headline font-bold text-sm tracking-wider text-white"
-              style={{ backgroundColor: '#ff3b93' }}
+              className="btn btn-primary w-full font-headline"
             >
               Sign up
             </button>
@@ -644,29 +661,29 @@ export default function LandingPage() {
 
       {/* ═══════════ HERO ═══════════ */}
       <section className="relative pt-32 pb-20 md:pt-44 md:pb-32 px-6 overflow-hidden">
-        {/* Animated background blobs */}
+        {/* Playful floating color blocks (flat, outlined — parallax on mouse) */}
         <div
-          className="absolute top-20 left-[10%] w-[500px] h-[500px] bg-primary/15 rounded-full blur-[120px] pointer-events-none animate-pulse"
-          style={{ transform: `translate(${mousePos.x * 0.5}px, ${mousePos.y * 0.5}px)` }}
+          className="absolute top-24 left-[8%] w-24 h-24 rounded-3xl pointer-events-none hidden md:block"
+          style={{ background: 'var(--accent-gold)', border: '2px solid var(--border-ink-color)', boxShadow: 'var(--shadow-hard)', transform: `translate(${mousePos.x * 0.5}px, ${mousePos.y * 0.5}px) rotate(-10deg)` }}
         />
         <div
-          className="absolute bottom-10 right-[5%] w-[450px] h-[450px] bg-tertiary/12 rounded-full blur-[120px] pointer-events-none animate-pulse"
-          style={{ transform: `translate(${mousePos.x * -0.3}px, ${mousePos.y * -0.3}px)`, animationDelay: '1.5s' }}
+          className="absolute bottom-16 right-[7%] w-28 h-28 rounded-full pointer-events-none hidden md:block"
+          style={{ background: 'var(--accent-sky)', border: '2px solid var(--border-ink-color)', boxShadow: 'var(--shadow-hard)', transform: `translate(${mousePos.x * -0.3}px, ${mousePos.y * -0.3}px)` }}
         />
         <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-secondary-container/8 rounded-full blur-[150px] pointer-events-none"
-          style={{ transform: `translate(calc(-50% + ${mousePos.x * 0.15}px), calc(-50% + ${mousePos.y * 0.15}px))` }}
+          className="absolute top-1/3 right-[16%] w-16 h-16 rounded-2xl pointer-events-none hidden lg:block"
+          style={{ background: 'var(--accent-coral)', border: '2px solid var(--border-ink-color)', boxShadow: 'var(--shadow-hard-sm)', transform: `translate(${mousePos.x * 0.2}px, ${mousePos.y * 0.2}px) rotate(12deg)` }}
         />
 
         <div className="max-w-7xl mx-auto text-center relative z-10">
 
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-headline font-black tracking-tight leading-[1.0] mb-6 entrance-hero entrance-hero-d1 text-white">
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-headline font-black tracking-tight leading-[1.0] mb-6 entrance-hero entrance-hero-d1" style={{ color: 'var(--text-primary)' }}>
             Learn Anything.
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E5FF] via-[#A78BFA] to-[#FFB800] drop-shadow-[0_0_25px_rgba(0,229,255,0.3)]">Play to Master.</span>
+            <span style={{ color: 'var(--primary)' }}>Play to Master.</span>
           </h1>
 
-          <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed font-body font-medium entrance-hero entrance-hero-d2">
+          <p className="text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed font-body font-semibold entrance-hero entrance-hero-d2" style={{ color: 'var(--text-secondary)' }}>
             Transform education into thrilling, real-time quiz battles.
             Host games, join with a PIN code — no sign-up needed for players.
           </p>
@@ -675,34 +692,38 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 entrance-hero entrance-hero-d3">
             <button
               onClick={() => navigate('/auth')}
-              className="px-9 py-4 bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#00E5FF] text-white rounded-2xl font-headline font-black text-lg tracking-wide shadow-[0_6px_30px_rgba(124,58,237,0.5)] hover:shadow-[0_8px_40px_rgba(0,229,255,0.6)] hover:scale-[1.04] transition-all active:scale-95 flex items-center gap-2.5 btn-spring border border-white/20"
+              className="btn btn-primary btn-lg font-headline flex items-center gap-2.5"
             >
               <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>rocket_launch</span>
               <span>Start Creating</span>
             </button>
             <a
               href="#quiz-details"
-              className="px-9 py-4 bg-surface-container-high/80 backdrop-blur-md border border-white/20 text-white rounded-2xl font-headline font-bold text-lg tracking-wide hover:border-[#00E5FF]/60 hover:bg-[#00E5FF]/10 transition-all flex items-center gap-2.5 shadow-lg"
+              className="btn btn-secondary btn-lg font-headline flex items-center gap-2.5"
             >
-              <span className="material-symbols-outlined text-2xl text-[#00E5FF]">sports_esports</span>
+              <span className="material-symbols-outlined text-2xl" style={{ color: 'var(--accent-sky)' }}>sports_esports</span>
               <span>Try a Demo</span>
             </a>
           </div>
 
-          {/* Stats bar with ultra-clear high-contrast colors */}
+          {/* Stats bar — flat outlined blocks with accent color + hard shadow */}
           <div className="mt-16 md:mt-20 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto entrance-hero entrance-hero-d5">
             {[
-              { value: 10, suffix: '+', label: 'Question Types', color: 'text-[#00E5FF]' },
-              { value: 6, suffix: '-Digit', label: 'PIN Join', color: 'text-[#A78BFA]' },
-              { value: 50, suffix: '+', label: 'Players / Room', color: 'text-[#58CC02]' },
-              { value: 0, suffix: '', label: 'Sign-ups Needed', special: true, color: 'text-[#FFB800]' },
+              { value: 10, suffix: '+', label: 'Question Types', accent: 'var(--accent-sky)' },
+              { value: 6, suffix: '-Digit', label: 'PIN Join', accent: 'var(--primary)' },
+              { value: 50, suffix: '+', label: 'Players / Room', accent: 'var(--accent-green)' },
+              { value: 0, suffix: '', label: 'Sign-ups Needed', special: true, accent: 'var(--accent-gold)' },
             ].map((s, i) => (
-              <div key={i} className="text-center bg-surface-container-low/40 border border-white/10 rounded-2xl p-4 backdrop-blur-md">
-                <div className={`text-3xl md:text-4xl font-headline font-black ${s.color} drop-shadow-sm`}>
+              <div
+                key={i}
+                className="text-center p-4"
+                style={{ background: 'var(--bg-surface)', border: '2px solid var(--border-ink-color)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-hard)' }}
+              >
+                <div className="text-3xl md:text-4xl font-headline font-black" style={{ color: s.accent }}>
                   {s.special ? '0' : <AnimatedCount target={s.value} />}
                   {s.special ? '' : s.suffix}
                 </div>
-                <p className="text-xs font-headline font-bold text-slate-300 tracking-wider uppercase mt-1">{s.label}</p>
+                <p className="text-xs font-headline font-bold tracking-wider uppercase mt-1" style={{ color: 'var(--text-secondary)' }}>{s.label}</p>
               </div>
             ))}
           </div>

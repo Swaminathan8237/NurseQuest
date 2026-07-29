@@ -41,3 +41,5 @@ frontend/testsprite_tests/tmp/
 
 # Build logs
 frontend/build_log.txt
+
+.superpowers/

@@ -20,7 +20,7 @@
         rel="stylesheet" />
     <script id="tailwind-config">
         tailwind.config = {
-            darkMode: "class",
+            darkMode: ["selector", "[data-theme=\"dark\"]"],
             theme: {
                 extend: {
                     "colors": {
@@ -67,24 +67,37 @@
                         "on-secondary": "#40215e",
                         "on-primary-fixed-variant": "#670dae",
                         "surface-tint": "#ddb7ff",
-                        "primary": "#6C5CE7",
+                        "primary": "#7C3AED",
                         "on-primary-fixed": "#2c0051",
                         "surface-container-high": "var(--bg-elevated)",
                         "on-tertiary": "#003733",
                         "brand-surface": "var(--bg-surface)",
-                        "brand-elevated": "var(--bg-elevated)"
+                        "brand-elevated": "var(--bg-elevated)",
+                        "ink": "var(--ink)",
+                        "coral": "#FF6B6B",
+                        "sky": "#4DABF7",
+                        "gold": "#FFD43B",
+                        "success": "#12B76A",
+                        "danger": "#FF5A5F"
                     },
                     "borderRadius": {
-                        "DEFAULT": "1rem",
-                        "lg": "2rem",
-                        "xl": "3rem",
+                        "DEFAULT": "12px",
+                        "lg": "16px",
+                        "xl": "20px",
+                        "2xl": "28px",
                         "full": "9999px"
                     },
+                    "boxShadow": {
+                        "hard-sm": "2px 2px 0 var(--border-ink-color)",
+                        "hard": "4px 4px 0 var(--border-ink-color)",
+                        "hard-lg": "6px 6px 0 var(--border-ink-color)",
+                        "hard-xl": "8px 8px 0 var(--border-ink-color)"
+                    },
                     "fontFamily": {
-                        "headline": ["Manrope", "sans-serif"],
-                        "display": ["Manrope", "sans-serif"],
-                        "body": ["Inter", "sans-serif"],
-                        "label": ["Inter", "sans-serif"]
+                        "headline": ["Fredoka", "Nunito", "sans-serif"],
+                        "display": ["Fredoka", "Nunito", "sans-serif"],
+                        "body": ["Nunito", "Fredoka", "sans-serif"],
+                        "label": ["Nunito", "sans-serif"]
                     }
                 }
             }

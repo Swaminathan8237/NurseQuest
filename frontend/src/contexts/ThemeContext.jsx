@@ -5,19 +5,18 @@ const ThemeContext = createContext(null);
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
     const savedTheme = localStorage.getItem('skillquest_theme');
-    if (savedTheme) return savedTheme;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    return 'light'; // Playful & Vibrant defaults to light
   });
 
   useEffect(() => {
     localStorage.setItem('skillquest_theme', theme);
-    if (theme === 'light') {
-      document.body.classList.add('light-theme');
-      document.documentElement.classList.remove('dark');
-    } else {
-      document.body.classList.remove('light-theme');
-      document.documentElement.classList.add('dark');
-    }
+    const root = document.documentElement;
+    // Single source of truth: data-theme drives design tokens.
+    root.setAttribute('data-theme', theme);
+    // Keep .dark class + body.light-theme for back-compat (Tailwind dark: variants, legacy selectors).
+    root.classList.toggle('dark', theme === 'dark');
+    document.body.classList.toggle('light-theme', theme === 'light');
   }, [theme]);
 
   const toggleTheme = () => {

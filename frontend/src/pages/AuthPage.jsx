@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../supabaseClient';
+import { Button, Input } from '../components/ui';
 
 import logo from '../assets/skillquest-logo.png';
 
@@ -189,13 +190,72 @@ export default function AuthPage() {
     }
   };
 
+  // Playful role-selector tile: chunky outlined block that presses into its shadow when active.
+  const roleTile = (active, accentVar) => ({
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '4px',
+    padding: '14px 8px',
+    borderRadius: 'var(--radius-md)',
+    border: '2px solid var(--border-ink-color)',
+    background: active ? `var(${accentVar})` : 'var(--bg-surface)',
+    color: active ? '#fff' : 'var(--text-secondary)',
+    fontWeight: 800,
+    boxShadow: active ? 'var(--shadow-hard-sm)' : 'var(--shadow-hard)',
+    transform: active ? 'translate(2px, 2px)' : 'none',
+    transition: 'transform .12s, box-shadow .12s, background .15s, color .15s',
+    cursor: 'pointer',
+  });
+
+  const eyebrowLabel = {
+    fontFamily: 'var(--font-heading)',
+    fontSize: '0.7rem',
+    fontWeight: 800,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: 'var(--text-muted)',
+    paddingLeft: '4px',
+  };
+
+  const errorBox = error && (
+    <div
+      className="animate-shake"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '12px 16px',
+        borderRadius: 'var(--radius-md)',
+        border: '2px solid var(--border-ink-color)',
+        background: 'var(--danger)',
+        color: '#fff',
+        fontWeight: 700,
+        fontSize: '0.875rem',
+        boxShadow: 'var(--shadow-hard-sm)',
+      }}
+    >
+      <span className="material-symbols-outlined text-[20px]">error</span>
+      <span>{error}</span>
+    </div>
+  );
+
+  const spinner = (
+    <div className="w-6 h-6 border-[3px] border-white/40 border-t-white rounded-full animate-spin" />
+  );
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center font-body relative overflow-hidden px-4 transition-colors duration-500">
+    <div
+      className="min-h-screen flex items-center justify-center font-body relative overflow-hidden px-4 transition-colors duration-300"
+      style={{ background: 'var(--bg-base)' }}
+    >
       {/* Theme Toggle in Top Right */}
-      <div className="absolute top-8 right-8 z-50">
+      <div className="absolute top-6 right-6 z-50">
         <button
           onClick={toggleTheme}
-          className="p-3 rounded-full bg-brand-surface shadow-clay-outer transition-all hover:scale-105 active:scale-95"
+          className="btn btn-ghost btn-icon"
           title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
           <span className="material-symbols-outlined">
@@ -204,40 +264,74 @@ export default function AuthPage() {
         </button>
       </div>
 
-      {/* Dynamic Background Glows */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[100px] pointer-events-none animate-pulse"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-tertiary/20 rounded-full blur-[100px] pointer-events-none animate-pulse" style={{ animationDelay: '2s' }}></div>
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-secondary-container/10 rounded-full blur-[120px] pointer-events-none"></div>
+      {/* Playful decorative blocks (no blur — flat color shapes) */}
+      <div
+        className="absolute -top-10 -left-10 w-40 h-40 rounded-[28px] pointer-events-none hidden md:block"
+        style={{ background: 'var(--accent-gold)', border: '2px solid var(--border-ink-color)', transform: 'rotate(-12deg)', opacity: 0.9 }}
+      />
+      <div
+        className="absolute bottom-8 right-10 w-28 h-28 rounded-full pointer-events-none hidden md:block"
+        style={{ background: 'var(--accent-sky)', border: '2px solid var(--border-ink-color)', opacity: 0.9 }}
+      />
+      <div
+        className="absolute top-1/3 right-16 w-16 h-16 rounded-2xl pointer-events-none hidden lg:block"
+        style={{ background: 'var(--accent-coral)', border: '2px solid var(--border-ink-color)', transform: 'rotate(8deg)', opacity: 0.85 }}
+      />
 
-      <div className="w-full max-w-md clay-card p-8 md:p-10 relative z-10 animate-fadeInUp">
-
+      <div
+        className="w-full max-w-md relative z-10 animate-fadeInUp p-8 md:p-10"
+        style={{
+          background: 'var(--bg-surface)',
+          border: '2px solid var(--border-ink-color)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: 'var(--shadow-hard-lg)',
+        }}
+      >
         <div className="text-center mb-8">
-          <div className="w-20 h-20 mx-auto bg-brand-surface shadow-clay-outer rounded-2xl flex items-center justify-center mb-4 p-2">
+          <div
+            className="w-20 h-20 mx-auto flex items-center justify-center mb-4 p-2.5"
+            style={{
+              background: 'var(--bg-elevated)',
+              border: '2px solid var(--border-ink-color)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-hard-sm)',
+            }}
+          >
             <img src={logo} alt="SkillQuest" className="w-14 h-14 object-contain" />
           </div>
-          <h1 className="text-4xl font-headline font-black tracking-tighter mb-1">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#7C3AED] to-[#F59E0B]">{t('SkillQuest')}</span>
+          <h1 className="text-4xl font-headline font-black tracking-tight mb-1" style={{ color: 'var(--text-primary)' }}>
+            Skill<span style={{ color: 'var(--primary)' }}>Quest</span>
           </h1>
-          <p className="text-on-surface-variant font-medium text-xs tracking-wider uppercase">{t('Learn · Practice · Excel')}</p>
+          <p style={{ ...eyebrowLabel, paddingLeft: 0 }}>{t('Learn · Practice · Excel')}</p>
         </div>
 
         {/* EMAIL VERIFICATION PENDING SCREEN */}
         {isVerificationPending ? (
-          <div className="animate-fadeIn text-center p-6 rounded-2xl bg-[#A8E6CF] text-[#2C3E50] flex flex-col items-center shadow-lg border border-[#A8E6CF]/30">
-            {/* Tick checkmark inside a glowing circle in the middle */}
-            <div className="w-16 h-16 bg-[#ffffff]/35 rounded-full flex items-center justify-center mb-5 animate-pulse">
-              <span className="material-symbols-outlined text-3xl text-[#2C3E50]" style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}>check_circle</span>
+          <div
+            className="animate-fadeIn text-center p-6 flex flex-col items-center"
+            style={{
+              background: 'var(--accent-green)',
+              color: '#fff',
+              border: '2px solid var(--border-ink-color)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-hard)',
+            }}
+          >
+            <div
+              className="w-16 h-16 flex items-center justify-center mb-5"
+              style={{ background: 'rgba(255,255,255,0.25)', border: '2px solid rgba(255,255,255,0.5)', borderRadius: 'var(--radius-full)' }}
+            >
+              <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}>check_circle</span>
             </div>
-
             <h2 className="text-xl font-headline font-black mb-2">{t('Check Your Email')}</h2>
-            <p className="text-sm line-height-relaxed font-semibold mb-6 px-1">
+            <p className="text-sm leading-relaxed font-semibold mb-6 px-1">
               {t("Registration successful! We've sent a verification link to")} <strong className="underline">{pendingEmail}</strong>.
               {t(" Please check your inbox and click the link to activate your account.")}
             </p>
-
             <button
               onClick={() => { setIsVerificationPending(false); setIsLogin(true); }}
-              className="px-6 py-2.5 rounded-xl font-headline font-bold text-xs uppercase tracking-widest bg-[#2C3E50] text-[#A8E6CF] hover:opacity-90 active:scale-95 transition-all shadow-md"
+              className="px-6 py-2.5 font-headline font-bold text-xs uppercase tracking-widest transition-transform active:translate-y-0.5"
+              style={{ background: 'var(--ink)', color: 'var(--accent-green)', border: '2px solid var(--border-ink-color)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-hard-sm)' }}
             >
               {t('Back to Sign In')}
             </button>
@@ -245,173 +339,123 @@ export default function AuthPage() {
         ) : user?.needProfileSetup ? (
           <div className="animate-fadeIn">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-headline font-bold text-on-surface mb-1">{t('Complete Your Profile')}</h2>
-              <p className="text-xs text-on-surface-variant">{t('Just a couple quick details to finalize your account setup!')}</p>
+              <h2 className="text-2xl font-headline font-black mb-1" style={{ color: 'var(--text-primary)' }}>{t('Complete Your Profile')}</h2>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{t('Just a couple quick details to finalize your account setup!')}</p>
             </div>
             <form onSubmit={handleProfileComplete} className="space-y-5">
-              <div className="space-y-1.5">
-                <label className="text-xs font-label font-bold text-slate-500 uppercase tracking-widest pl-1" htmlFor="profile-name">{t('Full Name')}</label>
-                <input
-                  id="profile-name"
-                  type="text"
-                  className="input"
-                  placeholder="Enter your full name"
-                  value={profileFormData.name}
-                  onChange={(e) => setProfileFormData({ ...profileFormData, name: e.target.value })}
-                  required
-                />
-              </div>
+              <Input
+                id="profile-name"
+                type="text"
+                label={t('Full Name')}
+                placeholder="Enter your full name"
+                value={profileFormData.name}
+                onChange={(e) => setProfileFormData({ ...profileFormData, name: e.target.value })}
+                required
+              />
 
               <div className="space-y-2 pt-1">
-                <label className="text-xs font-label font-bold text-slate-500 uppercase tracking-widest pl-1">{t('I am a...')}</label>
+                <label style={eyebrowLabel}>{t('I am a...')}</label>
                 <div className="flex gap-3">
-                  <button
-                    type="button"
-                    className={`flex-1 p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${profileFormData.role === 'student' ? 'bg-brand-surface shadow-clay-sunken text-primary border-2 border-primary' : 'bg-brand-surface shadow-clay-outer hover:scale-105 active:scale-95 text-on-surface'}`}
-                    onClick={() => setProfileFormData({ ...profileFormData, role: 'student' })}
-                  >
-                    <span className="text-2xl mb-1">🎓</span>
-                    <span className={`text-sm font-bold ${profileFormData.role === 'student' ? 'text-primary' : 'text-on-surface'}`}>{t('Student')}</span>
+                  <button type="button" style={roleTile(profileFormData.role === 'student', '--primary')} onClick={() => setProfileFormData({ ...profileFormData, role: 'student' })}>
+                    <span className="text-2xl">🎓</span>
+                    <span className="text-sm">{t('Student')}</span>
                   </button>
-                  <button
-                    type="button"
-                    className={`flex-1 p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${profileFormData.role === 'teacher' ? 'bg-brand-surface shadow-clay-sunken text-tertiary border-2 border-tertiary' : 'bg-brand-surface shadow-clay-outer hover:scale-105 active:scale-95 text-on-surface'}`}
-                    onClick={() => setProfileFormData({ ...profileFormData, role: 'teacher' })}
-                  >
-                    <span className="text-2xl mb-1">👩‍⚕️</span>
-                    <span className={`text-sm font-bold ${profileFormData.role === 'teacher' ? 'text-tertiary' : 'text-on-surface'}`}>{t('Teacher')}</span>
+                  <button type="button" style={roleTile(profileFormData.role === 'teacher', '--accent-coral')} onClick={() => setProfileFormData({ ...profileFormData, role: 'teacher' })}>
+                    <span className="text-2xl">👩‍⚕️</span>
+                    <span className="text-sm">{t('Teacher')}</span>
                   </button>
                 </div>
               </div>
 
-              {error && (
-                <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-xl text-sm font-medium animate-shake flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px]">{t('error')}</span>
-                  {error}
-                </div>
-              )}
+              {errorBox}
 
-              <button
-                type="submit"
-                className="w-full py-4 clay-button clay-button-primary font-headline font-bold uppercase tracking-widest flex items-center justify-center gap-2 mt-6"
-                disabled={loading}
-              >
-                {loading ? (
-                  <div className="w-6 h-6 border-2 border-brand-bg border-t-transparent rounded-full animate-spin" />
-                ) : t('Complete Setup')}
-              </button>
+              <Button type="submit" variant="primary" size="lg" className="w-full mt-6 font-headline uppercase tracking-widest" disabled={loading}>
+                {loading ? spinner : t('Complete Setup')}
+              </Button>
             </form>
           </div>
         ) : isResettingPassword ? (
           /* PASSWORD RESET FORM (FROM EMAIL LINK) */
           <div className="animate-fadeIn">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-headline font-bold text-on-surface mb-1">{t('Update Password')}</h2>
-              <p className="text-xs text-on-surface-variant">{t('Enter a new secure password for your SkillQuest account.')}</p>
+              <h2 className="text-2xl font-headline font-black mb-1" style={{ color: 'var(--text-primary)' }}>{t('Update Password')}</h2>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{t('Enter a new secure password for your SkillQuest account.')}</p>
             </div>
             <form onSubmit={handleUpdatePassword} className="space-y-5">
-              <div className="space-y-1.5">
-                <label className="text-xs font-label font-bold text-slate-500 uppercase tracking-widest pl-1" htmlFor="new-password">{t('New Password')}</label>
-                <input
-                  id="new-password"
-                  type="password"
-                  className="w-full bg-surface-container-high border border-outline-variant/30 rounded-xl px-4 py-3.5 text-on-surface font-body placeholder:text-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all outline-none tracking-widest"
-                  placeholder="••••••••"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                />
-              </div>
+              <Input
+                id="new-password"
+                type="password"
+                label={t('New Password')}
+                className="tracking-widest"
+                placeholder="••••••••"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+              <Input
+                id="confirm-password"
+                type="password"
+                label={t('Confirm Password')}
+                className="tracking-widest"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-label font-bold text-slate-500 uppercase tracking-widest pl-1" htmlFor="confirm-password">{t('Confirm Password')}</label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  className="w-full bg-surface-container-high border border-outline-variant/30 rounded-xl px-4 py-3.5 text-on-surface font-body placeholder:text-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all outline-none tracking-widest"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
+              {errorBox}
 
-              {error && (
-                <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-xl text-sm font-medium animate-shake flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px]">{t('error')}</span>
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="w-full py-4 clay-button clay-button-primary font-headline font-bold uppercase tracking-widest flex items-center justify-center gap-2 mt-6"
-                disabled={loading}
-              >
-                {loading ? (
-                  <div className="w-6 h-6 border-2 border-brand-bg border-t-transparent rounded-full animate-spin" />
-                ) : t('Update Password')}
-              </button>
+              <Button type="submit" variant="primary" size="lg" className="w-full mt-6 font-headline uppercase tracking-widest" disabled={loading}>
+                {loading ? spinner : t('Update Password')}
+              </Button>
             </form>
           </div>
         ) : isForgotPassword ? (
           /* FORGOT PASSWORD REQUEST FORM */
           <div className="animate-fadeIn">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-headline font-bold text-on-surface mb-1">{t('Reset Password')}</h2>
-              <p className="text-xs text-on-surface-variant">{t('We will send a password reset link to your email address.')}</p>
+              <h2 className="text-2xl font-headline font-black mb-1" style={{ color: 'var(--text-primary)' }}>{t('Reset Password')}</h2>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{t('We will send a password reset link to your email address.')}</p>
             </div>
 
             {resetSent ? (
               <div className="space-y-6 text-center py-4">
-                <span className="material-symbols-outlined text-5xl text-tertiary animate-bounce">{t('mail')}</span>
-                <p className="text-sm text-on-surface-variant">
-                  {t("We've sent a password reset link to")} <strong className="text-on-surface">{resetEmail}</strong>. {t("Please check your inbox.")}
+                <span className="material-symbols-outlined text-5xl animate-bounce" style={{ color: 'var(--accent-sky)' }}>mail</span>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  {t("We've sent a password reset link to")} <strong style={{ color: 'var(--text-primary)' }}>{resetEmail}</strong>. {t("Please check your inbox.")}
                 </p>
                 <button
                   onClick={() => { setIsForgotPassword(false); setResetSent(false); setResetEmail(''); }}
-                  className="text-primary hover:text-primary-container text-sm font-bold transition-all uppercase tracking-wider"
+                  className="text-sm font-bold transition-all uppercase tracking-wider"
+                  style={{ color: 'var(--primary)' }}
                 >
                   {t('Back to Sign In')}
                 </button>
               </div>
             ) : (
               <form onSubmit={handleForgotPassword} className="space-y-5">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-label font-bold text-slate-500 uppercase tracking-widest pl-1" htmlFor="reset-email">{t('Email Address')}</label>
-                  <input
-                    id="reset-email"
-                    type="email"
-                    className="w-full bg-surface-container-high border border-outline-variant/30 rounded-xl px-4 py-3.5 text-on-surface font-body placeholder:text-slate-500 focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all outline-none"
-                    placeholder="you@example.com"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    required
-                  />
-                </div>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  label={t('Email Address')}
+                  placeholder="you@example.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                />
 
-                {error && (
-                  <div className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-xl text-sm font-medium animate-shake flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[18px]">{t('error')}</span>
-                    {error}
-                  </div>
-                )}
+                {errorBox}
 
-                <button
-                  type="submit"
-                  className="w-full py-4 bg-gradient-to-r from-primary-container to-primary text-on-primary-container rounded-xl font-headline font-bold uppercase tracking-widest shadow-[0_4px_20px_rgba(183,109,255,0.4)] hover:shadow-[0_4px_25px_rgba(183,109,255,0.6)] hover:scale-[1.02] transition-all flex items-center justify-center gap-2 active:scale-95 mt-6"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <div className="w-6 h-6 border-2 border-on-primary-container border-t-transparent rounded-full animate-spin" />
-                  ) : t('Send Reset Link')}
-                </button>
+                <Button type="submit" variant="primary" size="lg" className="w-full mt-6 font-headline uppercase tracking-widest" disabled={loading}>
+                  {loading ? spinner : t('Send Reset Link')}
+                </Button>
 
                 <div className="text-center pt-2">
                   <button
                     type="button"
                     onClick={() => { setIsForgotPassword(false); setError(''); }}
-                    className="text-slate-400 hover:text-on-surface text-xs font-bold transition-all uppercase tracking-widest"
+                    className="text-xs font-bold transition-all uppercase tracking-widest"
+                    style={{ color: 'var(--text-muted)' }}
                   >
                     {t('Back to Sign In')}
                   </button>
@@ -423,26 +467,40 @@ export default function AuthPage() {
           /* STANDARD SIGN IN / SIGN UP FORM */
           <>
             {verificationSuccess && (
-              <div className="bg-[#E8F5E9] border border-[#A5D6A7] text-[#2E7D32] px-4 py-3.5 rounded-xl text-sm font-semibold mb-6 flex items-center gap-2.5 shadow-sm animate-fadeIn">
-                <span className="material-symbols-outlined text-[20px] text-[#2E7D32]">{t('check_circle')}</span>
+              <div
+                className="px-4 py-3.5 text-sm font-semibold mb-6 flex items-center gap-2.5 animate-fadeIn"
+                style={{ background: 'var(--accent-green)', color: '#fff', border: '2px solid var(--border-ink-color)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-hard-sm)' }}
+              >
+                <span className="material-symbols-outlined text-[20px]">check_circle</span>
                 <span>{t('Email verified successfully! You can now sign in.')}</span>
               </div>
             )}
 
-            <div className="bg-brand-surface shadow-clay-sunken p-1 rounded-full flex relative mb-8">
+            <div
+              className="p-1 flex relative mb-8"
+              style={{ background: 'var(--bg-elevated)', border: '2px solid var(--border-ink-color)', borderRadius: 'var(--radius-full)' }}
+            >
               <div
-                className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-brand-elevated border-2 border-primary/30 rounded-full shadow-clay-outer transition-transform duration-300 ease-out`}
-                style={{ transform: isLogin ? 'translateX(0)' : 'translateX(100%)' }}
-              ></div>
+                className="absolute top-1 bottom-1 w-[calc(50%-4px)] transition-transform duration-300 ease-out"
+                style={{
+                  background: 'var(--primary)',
+                  border: '2px solid var(--border-ink-color)',
+                  borderRadius: 'var(--radius-full)',
+                  boxShadow: 'var(--shadow-hard-sm)',
+                  transform: isLogin ? 'translateX(0)' : 'translateX(100%)',
+                }}
+              />
               <button
-                className={`flex-grow py-2.5 text-sm font-bold uppercase tracking-widest z-10 transition-colors ${isLogin ? 'text-primary' : 'text-slate-500 hover:text-on-surface'}`}
+                className="flex-grow py-2.5 text-sm font-bold uppercase tracking-widest z-10 transition-colors"
+                style={{ color: isLogin ? '#fff' : 'var(--text-muted)', fontFamily: 'var(--font-heading)' }}
                 onClick={() => { setIsLogin(true); setError(''); }}
                 type="button"
               >
                 {t('Sign In')}
               </button>
               <button
-                className={`flex-grow py-2.5 text-sm font-bold uppercase tracking-widest z-10 transition-colors ${!isLogin ? 'text-primary' : 'text-slate-500 hover:text-on-surface'}`}
+                className="flex-grow py-2.5 text-sm font-bold uppercase tracking-widest z-10 transition-colors"
+                style={{ color: !isLogin ? '#fff' : 'var(--text-muted)', fontFamily: 'var(--font-heading)' }}
                 onClick={() => { setIsLogin(false); setError(''); }}
                 type="button"
               >
@@ -452,12 +510,11 @@ export default function AuthPage() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {!isLogin && (
-                <div className="space-y-1.5 animate-fadeIn">
-                  <label className="text-xs font-label font-bold text-slate-500 uppercase tracking-widest pl-1" htmlFor="name">{t('Full Name')}</label>
-                  <input
+                <div className="animate-fadeIn">
+                  <Input
                     id="name"
                     type="text"
-                    className="input"
+                    label={t('Full Name')}
                     placeholder="Enter your full name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -466,27 +523,25 @@ export default function AuthPage() {
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-label font-bold text-slate-500 uppercase tracking-widest pl-1" htmlFor="email">{t('Email Address')}</label>
-                <input
-                  id="email"
-                  type="email"
-                  className="input"
-                  placeholder="you@example.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                />
-              </div>
+              <Input
+                id="email"
+                type="email"
+                label={t('Email Address')}
+                placeholder="you@example.com"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+              />
 
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center px-1">
-                  <label className="text-xs font-label font-bold text-slate-500 uppercase tracking-widest" htmlFor="password">{t('Password')}</label>
+              <div className="input-group">
+                <div className="flex justify-between items-center">
+                  <label htmlFor="password" style={{ margin: 0 }}>{t('Password')}</label>
                   {isLogin && (
                     <button
                       type="button"
                       onClick={() => { setIsForgotPassword(true); setError(''); }}
-                      className="text-xs font-bold text-primary hover:text-primary-container transition-all"
+                      className="text-xs font-bold transition-all"
+                      style={{ color: 'var(--primary)' }}
                     >
                       {t('Forgot Password?')}
                     </button>
@@ -504,101 +559,95 @@ export default function AuthPage() {
               </div>
 
               {!isLogin && (
-                <div className="space-y-2 animate-fadeIn pt-2">
-                  <label className="text-xs font-label font-bold text-slate-500 uppercase tracking-widest pl-1">{t('I am a...')}</label>
+                <div className="space-y-2 animate-fadeIn pt-1">
+                  <label style={eyebrowLabel}>{t('I am a...')}</label>
                   <div className="flex gap-3">
-                    <button
-                      type="button"
-                      className={`flex-1 p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${formData.role === 'student' ? 'bg-brand-surface shadow-clay-sunken text-primary border-2 border-primary' : 'bg-brand-surface shadow-clay-outer hover:scale-105 active:scale-95 text-on-surface'}`}
-                      onClick={() => setFormData({ ...formData, role: 'student' })}
-                    >
-                      <span className="text-2xl mb-1">🎓</span>
-                      <span className={`text-sm font-bold ${formData.role === 'student' ? 'text-primary' : 'text-on-surface'}`}>{t('Student')}</span>
+                    <button type="button" style={roleTile(formData.role === 'student', '--primary')} onClick={() => setFormData({ ...formData, role: 'student' })}>
+                      <span className="text-2xl">🎓</span>
+                      <span className="text-sm">{t('Student')}</span>
                     </button>
-                    <button
-                      type="button"
-                      className={`flex-1 p-3 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${formData.role === 'teacher' ? 'bg-brand-surface shadow-clay-sunken text-tertiary border-2 border-tertiary' : 'bg-brand-surface shadow-clay-outer hover:scale-105 active:scale-95 text-on-surface'}`}
-                      onClick={() => setFormData({ ...formData, role: 'teacher' })}
-                    >
-                      <span className="text-2xl mb-1">👩‍⚕️</span>
-                      <span className={`text-sm font-bold ${formData.role === 'teacher' ? 'text-tertiary' : 'text-on-surface'}`}>{t('Teacher')}</span>
+                    <button type="button" style={roleTile(formData.role === 'teacher', '--accent-coral')} onClick={() => setFormData({ ...formData, role: 'teacher' })}>
+                      <span className="text-2xl">👩‍⚕️</span>
+                      <span className="text-sm">{t('Teacher')}</span>
                     </button>
                   </div>
                 </div>
               )}
 
-              {error && (
-                <div className="bg-[#FFEBEE] border border-[#FFCDD2] text-[#C62828] px-4 py-3.5 rounded-xl text-sm font-semibold animate-shake flex items-center gap-2.5 shadow-sm">
-                  <span className="material-symbols-outlined text-[20px] text-[#C62828]">{t('error')}</span>
-                  <span>{error}</span>
-                </div>
-              )}
+              {errorBox}
 
-              <button
-                type="submit"
-                className="w-full py-4 clay-button clay-button-primary font-headline font-bold uppercase tracking-widest flex items-center justify-center gap-2 mt-6"
-                disabled={loading}
-              >
-                {loading ? (
-                  <div className="w-6 h-6 border-2 border-brand-bg border-t-transparent rounded-full animate-spin" />
-                ) : isLogin ? t('Sign In') : t('Create Account')}
-              </button>
+              <Button type="submit" variant="primary" size="lg" className="w-full mt-6 font-headline uppercase tracking-widest" disabled={loading}>
+                {loading ? spinner : isLogin ? t('Sign In') : t('Create Account')}
+              </Button>
             </form>
 
             <div className="mt-6">
               <div className="flex items-center my-4">
-                <div className="flex-grow border-t border-brand-elevated/40"></div>
-                <span className="px-3 text-xs font-label font-bold text-slate-500 uppercase tracking-widest">{t('Or Continue With')}</span>
-                <div className="flex-grow border-t border-brand-elevated/40"></div>
+                <div className="flex-grow border-t-2" style={{ borderColor: 'var(--border-ink-color)', opacity: 0.4 }} />
+                <span style={{ ...eyebrowLabel, padding: '0 12px' }}>{t('Or Continue With')}</span>
+                <div className="flex-grow border-t-2" style={{ borderColor: 'var(--border-ink-color)', opacity: 0.4 }} />
               </div>
 
               <div className="grid grid-cols-1">
-                <button
+                <Button
                   onClick={() => handleOAuthLogin('google')}
-                  className="py-3 px-4 clay-button clay-button-outline text-sm font-bold flex items-center justify-center gap-2"
+                  variant="secondary"
+                  className="text-sm"
                   type="button"
+                  leftIcon={
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.68 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.92-2.75 3.5-4.51 6.76-4.51z" />
+                      <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.35H12v4.46h6.44c-.28 1.47-1.11 2.71-2.36 3.55l3.66 2.84c2.14-1.98 3.39-4.89 3.39-8.5z" />
+                      <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3L1.39 2.96C.5 4.77 0 6.81 0 8.97s.5 4.2 1.39 6.01l3.85-2.99c-.24-.72-.38-1.5-.38-2.3-.01-.58.05-1.15.15-1.71c.08-.43.08-.85.22-1.28z" />
+                      <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.66-2.84c-1.1.74-2.51 1.18-4.3 1.18-3.26 0-5.84-1.76-6.76-4.51L1.39 16.9C3.37 20.8 7.35 23 12 23z" />
+                    </svg>
+                  }
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.68 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.92-2.75 3.5-4.51 6.76-4.51z" />
-                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.35H12v4.46h6.44c-.28 1.47-1.11 2.71-2.36 3.55l3.66 2.84c2.14-1.98 3.39-4.89 3.39-8.5z" />
-                    <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3L1.39 2.96C.5 4.77 0 6.81 0 8.97s.5 4.2 1.39 6.01l3.85-2.99c-.24-.72-.38-1.5-.38-2.3-.01-.58.05-1.15.15-1.71c.08-.43.08-.85.22-1.28z" />
-                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.66-2.84c-1.1.74-2.51 1.18-4.3 1.18-3.26 0-5.84-1.76-6.76-4.51L1.39 16.9C3.37 20.8 7.35 23 12 23z" />
-                  </svg>
-                  <span>{t('Google')}</span>
-                </button>
+                  {t('Google')}
+                </Button>
               </div>
             </div>
 
             {isLogin && (
-              <div className="mt-8 pt-6 border-t border-brand-elevated/40 animate-fadeIn">
-                <p className="text-xs font-label font-bold text-slate-500 uppercase tracking-widest text-center mb-4">{t('Demo Accounts')}</p>
+              <div className="mt-8 pt-6 animate-fadeIn" style={{ borderTop: '2px solid var(--border-ink-color)' }}>
+                <p style={{ ...eyebrowLabel, paddingLeft: 0, textAlign: 'center', marginBottom: '16px' }}>{t('Demo Accounts')}</p>
                 <div className="grid grid-cols-3 gap-3">
-                  <button
-                    className="py-2.5 clay-button clay-button-outline text-xs font-bold flex items-center justify-center gap-2 hover:text-primary"
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-col gap-1 !py-2.5"
                     onClick={() => setFormData({ ...formData, email: 'teacher@skillquest.io', password: 'teacher123' })}
                     type="button"
                   >
                     <span>👩‍🏫</span> {t('Teacher')}
-                  </button>
-                  <button
-                    className="py-2.5 clay-button clay-button-outline text-xs font-bold flex items-center justify-center gap-2 hover:text-tertiary"
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-col gap-1 !py-2.5"
                     onClick={() => setFormData({ ...formData, email: 'student1@skillquest.io', password: 'student123' })}
                     type="button"
                   >
                     <span>🎓</span> {t('Student')}
-                  </button>
-                  <button
-                    className="py-2.5 clay-button clay-button-outline text-xs font-bold flex items-center justify-center gap-2 hover:text-secondary"
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-col gap-1 !py-2.5"
                     onClick={() => setFormData({ ...formData, email: 'admin@skillquest.io', password: 'admin123' })}
                     type="button"
                   >
                     <span>👨‍💻</span> {t('Admin')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
           </>
         )}
+
+
+
+
       </div>
     </div>
   );

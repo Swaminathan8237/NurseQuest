@@ -7,6 +7,7 @@ import Avatar from '../components/Avatar';
 import useScrollReveal from '../hooks/useScrollReveal';
 import mascotImg from '../assets/skillquest-mascot.png';
 import UnitCanvasBackground from '../components/UnitCanvasBackground';
+import { StatTile, ProgressBar, SectionHeading, Button } from '../components/ui';
 
 
 const LEVEL_NAMES = ['', 'Rookie', 'Learner', 'Explorer', 'Scholar', 'Expert', 'Master', 'Legend'];
@@ -45,56 +46,74 @@ export default function StudentDashboard() {
   const standaloneQuizzes = quizzes.filter(q => q.unit === null || q.unit === undefined || q.unit < 1 || q.unit > 11);
   const totalUnits = 11;
   const completedUnits = unitQuizzes.filter(q => q.bestScorePercent >= 75).length;
-  
+
   const unitProgressPct = Math.round((completedUnits / totalUnits) * 100);
 
   return (
-    <div className="min-h-screen pb-24 font-body">
+    <div className="min-h-screen pb-24 font-body" style={{ background: 'var(--bg-base)' }}>
       <Navbar />
-      <main ref={scrollRevealRef} className="max-w-7xl mx-auto px-6 flex flex-col gap-8 lg:gap-12 pb-12" style={{ paddingTop: '100px' }}>
-        {/* Welcome Section */}
-        <section className="clay-card p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden cascade-entrance">
-          <div className="flex items-center gap-6 z-10">
+      <main ref={scrollRevealRef} className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col gap-6 lg:gap-8 pb-12" style={{ paddingTop: '110px' }}>
+
+        {/* Welcome Section — bold primary block */}
+        <section
+          className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden cascade-entrance"
+          style={{
+            background: 'var(--primary)',
+            border: '2px solid var(--border-ink-color)',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-hard-lg)',
+          }}
+        >
+          <div className="flex items-center gap-5 z-10">
             <div className="relative shrink-0 cursor-pointer" onClick={() => navigate('/avatar-setup')}>
-              <Avatar config={user?.avatar_config} size={72} showBg={true} />
-              <div className="absolute -bottom-1 -right-1 bg-primary text-on-primary text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-md">
-                <span className="material-symbols-outlined text-[10px]" style={{fontVariationSettings: "'FILL' 1"}}>star</span> {levelInfo.level}
+              <div style={{ border: '2px solid var(--ink)', borderRadius: '9999px', background: '#fff' }}>
+                <Avatar config={user?.avatar_config} size={72} showBg={true} />
+              </div>
+              <div
+                className="absolute -bottom-1 -right-1 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1"
+                style={{ background: 'var(--accent-gold)', color: 'var(--ink)', border: '2px solid var(--ink)' }}
+              >
+                <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span> {levelInfo.level}
               </div>
             </div>
             <div>
-              <h1 className="font-headline text-3xl md:text-4xl text-on-surface font-extrabold tracking-tight mb-1">
-                Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-br from-[#7C3AED] to-[#A78BFA]">{user?.name?.split(' ')[0]}</span>! 👋
+              <h1 className="font-headline text-2xl md:text-4xl text-white mb-1" style={{ fontWeight: 900 }}>
+                Welcome back, {user?.name?.split(' ')[0]}! <span className="inline-block">👋</span>
               </h1>
-              <p className="font-body text-on-surface-variant text-base">Ready to level up your knowledge and conquer clinical units?</p>
+              <p className="font-body text-base" style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+                Ready to level up your knowledge and conquer clinical units?
+              </p>
             </div>
           </div>
-          
-          <div className="z-10 bg-brand-surface shadow-clay-inner p-4 rounded-2xl w-full md:w-auto min-w-0 md:min-w-[280px]">
+
+          <img src={mascotImg} alt="" aria-hidden className="hidden md:block absolute right-40 -bottom-6 w-28 opacity-90 pointer-events-none select-none" />
+
+          {/* XP progress panel */}
+          <div
+            className="z-10 p-4 w-full md:w-auto min-w-0 md:min-w-[280px]"
+            style={{ background: '#fff', border: '2px solid var(--ink)', borderRadius: 'var(--radius-lg)', boxShadow: '4px 4px 0 var(--primary-dark)' }}
+          >
             <div className="flex justify-between items-center mb-2">
-              <span className="font-body text-sm font-semibold text-tertiary">⭐ {LEVEL_NAMES[levelInfo.level] || 'Rookie'}</span>
-              <span className="font-body text-xs text-on-surface-variant">{levelInfo.xpInLevel} / {levelInfo.xpForNextLevel} XP</span>
+              <span className="font-headline text-sm font-black" style={{ color: 'var(--ink)' }}>
+                {LEVEL_ICONS[levelInfo.level] || '⭐'} {LEVEL_NAMES[levelInfo.level] || 'Rookie'}
+              </span>
+              <span className="font-body text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>{levelInfo.xpInLevel} / {levelInfo.xpForNextLevel} XP</span>
             </div>
-            <div className="w-full h-3 bg-brand-elevated shadow-clay-sunken rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-tertiary to-primary rounded-full" style={{ width: `${levelInfo.progress}%` }}></div>
-            </div>
+            <ProgressBar value={levelInfo.progress} max={100} fill="gold" height={14} />
           </div>
         </section>
 
-        {/* Standalone Unboxed Hero CTA - Open Space Banner */}
-        <section className="flex flex-col sm:flex-row items-center justify-between gap-6 py-4 px-2 my-2 relative overflow-visible cascade-entrance">
+        {/* Hero CTA banner */}
+        <section className="flex flex-col sm:flex-row items-center justify-between gap-6 py-2 px-1 cascade-entrance">
           <div className="space-y-1">
-            <h2 className="text-2xl font-headline font-black text-on-surface flex items-center gap-2">
+            <h2 className="text-2xl font-headline text-on-surface flex items-center gap-2" style={{ fontWeight: 900 }}>
               <span className="material-symbols-outlined text-primary text-3xl">sports_esports</span> Ready to Play?
             </h2>
-            <p className="text-sm font-body text-on-surface-variant font-medium">Jump straight into the unit assessment path and conquer new levels.</p>
+            <p className="text-sm font-body text-on-surface-variant font-semibold">Jump straight into the unit assessment path and conquer new levels.</p>
           </div>
 
           <div className="relative shrink-0">
-            <div className="absolute -inset-2 bg-gradient-to-r from-[#00c6ff] to-[#0072ff] rounded-full blur-xl opacity-40 animate-pulse pointer-events-none"></div>
-            <button
-              onClick={() => navigate('/units')}
-              className="btn-conquer group relative z-10"
-            >
+            <button onClick={() => navigate('/units')} className="btn-conquer group relative z-10">
               <span className="material-symbols-outlined text-2xl group-hover:rotate-12 transition-transform">rocket_launch</span>
               <span>Start to Conquer the Levels</span>
               <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">arrow_forward</span>
@@ -102,68 +121,53 @@ export default function StudentDashboard() {
           </div>
         </section>
 
-        {/* Stats Grid */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
-          {[
-            { label: 'Quizzes Taken', value: stats?.quizzesTaken || 0, icon: 'quiz', color: 'text-primary' },
-            { label: 'Average Score', value: `${Math.round(stats?.avgScore || 0)}%`, icon: 'analytics', color: 'text-tertiary' },
-            { label: 'Best Streak', value: `${stats?.bestStreak || 0}`, icon: 'local_fire_department', color: 'text-[#fabc4e]' },
-            { label: 'Total XP', value: stats?.xp?.toLocaleString() || '0', icon: 'bolt', color: 'text-primary-container' },
-          ].map((stat, i) => (
-            <div key={i} className={`clay-card p-6 flex flex-col gap-4 group cursor-default cascade-entrance cascade-d${i + 1}`}>
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-brand-surface shadow-clay-sunken group-hover:scale-110 transition-transform duration-300">
-                <span className={`material-symbols-outlined ${stat.color}`} style={{fontVariationSettings: "'FILL' 1"}}>{stat.icon}</span>
-              </div>
-              <div>
-                <div className="text-3xl font-headline font-bold text-on-surface mb-1">{stat.value}</div>
-                <div className="text-sm font-body text-on-surface-variant font-medium">{stat.label}</div>
-              </div>
-            </div>
-          ))}
+        {/* Stats Grid — bold colored blocks */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-5">
+          <StatTile color="violet" icon="📚" value={stats?.quizzesTaken || 0} label="Quizzes Taken" className="cascade-entrance cascade-d1" />
+          <StatTile color="green" icon="🎯" value={`${Math.round(stats?.avgScore || 0)}%`} label="Average Score" className="cascade-entrance cascade-d2" />
+          <StatTile color="coral" icon="🔥" value={`${stats?.bestStreak || 0}`} label="Best Streak" className="cascade-entrance cascade-d3" />
+          <StatTile color="gold" icon="⚡" value={stats?.xp?.toLocaleString() || '0'} label="Total XP" className="cascade-entrance cascade-d4" />
         </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Left Column: Learning Progress & Recent Activity */}
-          <div className="lg:col-span-2 flex flex-col gap-8">
+          <div className="lg:col-span-2 flex flex-col gap-6 lg:gap-8">
             {/* Unit Path Card */}
-            <div className="clay-card p-8 relative overflow-hidden reveal">
+            <div className="clay-card p-6 md:p-8 relative overflow-hidden reveal">
               <UnitCanvasBackground />
-              <div className="absolute -right-16 -top-16 w-48 h-48 bg-primary/10 rounded-full blur-[60px] pointer-events-none"></div>
-              
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6 relative z-10">
                 <div>
-                  <h2 className="text-3xl font-headline font-black text-on-surface">Unit-Based Learning Path</h2>
-                  <p className="text-sm text-on-surface-variant mt-1.5">
+                  <h2 className="text-2xl md:text-3xl font-headline text-on-surface" style={{ fontWeight: 900 }}>Unit-Based Learning Path</h2>
+                  <p className="text-sm text-on-surface-variant mt-1.5 max-w-md">
                     Progress through the 11 clinical units covering infection control, sterile protocols, and patient safety indicators.
                   </p>
                 </div>
-                
-                <div className="text-right shrink-0">
-                  <div className="text-4xl font-display font-black text-primary">{completedUnits} / 11</div>
-                  <div className="text-[10px] font-label text-slate-500 uppercase tracking-widest mt-1">Units Passed</div>
+
+                <div
+                  className="text-center shrink-0 px-5 py-3"
+                  style={{ background: 'var(--accent-sky)', color: '#fff', border: '2px solid var(--border-ink-color)', borderRadius: 'var(--radius-lg)', boxShadow: '4px 4px 0 var(--accent-sky-shadow)' }}
+                >
+                  <div className="text-3xl font-display" style={{ fontWeight: 900 }}>{completedUnits} / 11</div>
+                  <div className="text-[10px] font-label uppercase tracking-widest mt-1 opacity-90">Units Passed</div>
                 </div>
               </div>
 
               {/* Progress Slider */}
-              <div className="space-y-3 bg-brand-surface shadow-clay-inner p-5 rounded-xl">
-                <div className="flex justify-between items-center text-xs font-bold text-on-surface-variant">
-                  <span>CURRICULUM MIGRATION DONE</span>
-                  <span className="font-mono text-primary">{unitProgressPct}% COMPLETE</span>
+              <div
+                className="space-y-3 p-5 relative z-10"
+                style={{ background: 'var(--bg-elevated)', border: '2px solid var(--border-ink-color)', borderRadius: 'var(--radius-md)' }}
+              >
+                <div className="flex justify-between items-center text-xs font-black text-on-surface-variant">
+                  <span>UNIT MASTERY</span>
+                  <span className="text-primary">{unitProgressPct}% COMPLETE</span>
                 </div>
-                <div className="w-full h-4 bg-brand-elevated shadow-clay-sunken rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-primary rounded-full transition-all duration-700"
-                    style={{ width: `${unitProgressPct}%` }}
-                  ></div>
-                </div>
+                <ProgressBar value={unitProgressPct} max={100} fill="violet" height={16} />
               </div>
 
-              {/* Launch CTA - 3D Conquer Button */}
-              <div className="mt-8 flex justify-end">
-                <button
-                  onClick={() => navigate('/units')}
-                  className="btn-conquer group"
-                >
+              {/* Launch CTA */}
+              <div className="mt-8 flex justify-end relative z-10">
+                <button onClick={() => navigate('/units')} className="btn-conquer group">
                   <span className="material-symbols-outlined text-2xl group-hover:rotate-12 transition-transform">rocket_launch</span>
                   <span>Start to Conquer the Levels</span>
                   <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">arrow_forward</span>
@@ -174,59 +178,55 @@ export default function StudentDashboard() {
             {/* Standalone / Practice Quizzes */}
             {standaloneQuizzes.length > 0 && (
               <div className="flex flex-col gap-4">
-                <h2 className="text-2xl font-headline font-bold text-on-surface flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">menu_book</span> Standalone Practice Quizzes
-                </h2>
+                <SectionHeading accent="violet" title="Standalone Practice Quizzes" eyebrow="Sharpen your skills" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {standaloneQuizzes.map((quiz, i) => {
                     const scorePercent = quiz.bestScorePercent !== undefined ? Math.round(quiz.bestScorePercent) : null;
                     const hasAttempt = quiz.lastAttempt !== null;
                     const passed = scorePercent >= 75;
-                    
+
                     return (
-                      <div 
+                      <div
                         key={quiz.id}
                         onClick={() => navigate(`/quiz/${quiz.id}`)}
-                        className="clay-card p-5 group flex flex-col justify-between h-full cursor-pointer relative overflow-hidden transition-all duration-300"
+                        className="clay-card p-5 group flex flex-col justify-between h-full cursor-pointer"
                       >
                         <div className="flex-1">
                           <div className="flex justify-between items-start gap-2 mb-2">
-                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 bg-brand-surface shadow-clay-sunken px-2 py-0.5 rounded">
-                              {quiz.category || 'General Knowledge'}
-                            </span>
+                            <span className="badge">{quiz.category || 'General Knowledge'}</span>
                             {hasAttempt && (
-                              <div className={`flex items-center gap-1 text-xs font-bold ${passed ? 'text-success' : 'text-warning'}`}>
+                              <span className={`badge ${passed ? 'badge-success' : 'badge-warning'}`}>
                                 <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>
                                   {passed ? 'check_circle' : 'pending'}
                                 </span>
-                                <span>{scorePercent}%</span>
-                              </div>
+                                {scorePercent}%
+                              </span>
                             )}
                           </div>
-                          <h3 className="text-lg font-headline font-bold text-on-surface mb-1 group-hover:text-primary transition-colors line-clamp-1">{quiz.title}</h3>
-                          <p className="text-xs text-on-surface-variant line-clamp-2 mb-2">{quiz.description}</p>
-                          
+                          <h3 className="text-lg font-headline font-black text-on-surface mb-1 group-hover:text-primary transition-colors line-clamp-1">{quiz.title}</h3>
+                          <p className="text-xs text-on-surface-variant line-clamp-2 mb-2 font-semibold">{quiz.description}</p>
+
                           {/* Publisher & Subject Info */}
-                          <div className="flex flex-col gap-1 text-[11px] text-slate-400 font-mono mt-2 border-t border-brand-elevated/10 pt-2">
+                          <div className="flex flex-col gap-1 text-[11px] text-on-surface-variant font-semibold mt-2 pt-2" style={{ borderTop: '2px dashed var(--border-ink-color)' }}>
                             <div className="flex items-center gap-1.5">
-                              <span className="material-symbols-outlined text-[14px] text-slate-500">person</span>
-                              <span>Publisher: <span className="text-primary font-bold">{quiz.creator_name || 'Instructor'}</span></span>
+                              <span className="material-symbols-outlined text-[14px]">person</span>
+                              <span>Publisher: <span className="text-primary font-black">{quiz.creator_name || 'Instructor'}</span></span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                              <span className="material-symbols-outlined text-[14px] text-slate-500">menu_book</span>
-                              <span>Unit / Topic: <span className="text-tertiary font-bold">{quiz.unit ? `Unit ${quiz.unit}` : (quiz.category || 'General Practice')}</span></span>
+                              <span className="material-symbols-outlined text-[14px]">menu_book</span>
+                              <span>Unit / Topic: <span style={{ color: 'var(--accent-gold-shadow)' }} className="font-black">{quiz.unit ? `Unit ${quiz.unit}` : (quiz.category || 'General Practice')}</span></span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between border-t border-brand-elevated/40 pt-3 mt-auto">
-                          <span className="text-[10px] font-mono text-slate-500 font-bold uppercase tracking-wider">{quiz.difficulty}</span>
+                        <div className="flex items-center justify-between pt-3 mt-3" style={{ borderTop: '2px solid var(--border-ink-color)' }}>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant">{quiz.difficulty}</span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate(`/quiz/${quiz.id}`);
                             }}
-                            className="px-4 py-2 clay-button clay-button-primary text-xs font-headline font-bold uppercase tracking-wider flex items-center gap-1"
+                            className="btn btn-primary btn-sm"
                           >
                             <span className="material-symbols-outlined text-xs">{hasAttempt ? 'replay' : 'play_arrow'}</span>
                             <span>{hasAttempt ? 'Retry' : 'Play'}</span>
@@ -241,14 +241,12 @@ export default function StudentDashboard() {
 
             {/* Recent Activity List */}
             <div className="flex flex-col gap-4">
-              <h2 className="text-2xl font-headline font-bold text-on-surface flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">history</span> Recent Attempts
-              </h2>
+              <SectionHeading accent="coral" title="Recent Attempts" eyebrow="Your latest runs" />
 
               {(!stats?.recentAttempts || stats.recentAttempts.length === 0) ? (
-                <div className="clay-card p-8 text-center text-on-surface-variant border-dashed">
+                <div className="clay-card p-8 text-center text-on-surface-variant" style={{ borderStyle: 'dashed' }}>
                   <span className="material-symbols-outlined text-4xl mb-2 opacity-50">history_edu</span>
-                  <p>No recent quiz attempts found. Start your learning path above!</p>
+                  <p className="font-semibold">No recent quiz attempts found. Start your learning path above!</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
@@ -256,32 +254,35 @@ export default function StudentDashboard() {
                     const scorePct = Math.round((attempt.correct_count / attempt.total_questions) * 100);
                     const passed = scorePct >= 75;
                     return (
-                      <div 
+                      <div
                         key={attempt.id || i}
-                        className={`clay-card p-5 flex items-center justify-between gap-4 animate-slideUp border-2 ${passed ? 'border-success/30' : 'border-warning/30'}`}
+                        className="clay-card p-5 flex items-center justify-between gap-4 animate-slideUp"
                         style={{ animationDelay: `${0.2 + i * 0.1}s` }}
                       >
                         <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 bg-brand-surface shadow-clay-sunken rounded-xl flex items-center justify-center ${passed ? 'text-success' : 'text-warning'}`}>
-                            <span className="material-symbols-outlined">
-                              {passed ? 'check_circle' : 'pending'}
-                            </span>
+                          <div
+                            className="w-11 h-11 rounded-xl flex items-center justify-center text-white shrink-0"
+                            style={{
+                              background: passed ? 'var(--accent-green)' : 'var(--warning)',
+                              border: '2px solid var(--border-ink-color)',
+                            }}
+                          >
+                            <span className="material-symbols-outlined">{passed ? 'check_circle' : 'pending'}</span>
                           </div>
                           <div>
-                            <h4 className="text-base font-bold text-on-surface leading-tight">{attempt.quiz_title}</h4>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant">
-                              <span className="font-mono bg-brand-surface shadow-clay-sunken px-2 py-0.5 rounded">Unit {attempt.unit || 1}</span>
-                              <span>·</span>
+                            <h4 className="text-base font-black text-on-surface leading-tight">{attempt.quiz_title}</h4>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant font-semibold">
+                              <span className="badge">Unit {attempt.unit || 1}</span>
                               <span>{new Date(attempt.completed_at).toLocaleDateString()}</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="text-right">
-                          <div className={`text-xl font-display font-black ${passed ? 'text-success' : 'text-warning'}`}>
+                          <div className="text-2xl font-display" style={{ fontWeight: 900, color: passed ? 'var(--accent-green)' : 'var(--warning)' }}>
                             {scorePct}%
                           </div>
-                          <div className="text-[9px] font-label text-slate-500 uppercase tracking-widest">
+                          <div className="text-[9px] font-label uppercase tracking-widest text-on-surface-variant">
                             {passed ? 'Passed' : 'Failed'}
                           </div>
                         </div>
@@ -294,30 +295,34 @@ export default function StudentDashboard() {
           </div>
 
           {/* Right Column */}
-          <div className="flex flex-col gap-8">
-
-
+          <div className="flex flex-col gap-6 lg:gap-8">
             {/* Leaderboard Preview */}
             <div className="clay-card p-6 animate-slideUp" style={{ animationDelay: '0.5s' }}>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-headline font-bold text-on-surface flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#fabc4e]">emoji_events</span> Top Students
+              <div className="flex justify-between items-center mb-5">
+                <h2 className="text-lg font-headline font-black text-on-surface flex items-center gap-2">
+                  <span className="material-symbols-outlined" style={{ color: 'var(--accent-gold-shadow)' }}>emoji_events</span> Top Students
                 </h2>
-                <button onClick={() => navigate('/leaderboard')} className="text-xs font-bold text-primary hover:text-primary-container">
+                <button onClick={() => navigate('/leaderboard')} className="text-xs font-black text-primary hover:underline">
                   View All
                 </button>
               </div>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2.5">
                 {leaderboard.map((entry, i) => (
-                  <div key={entry.id} className={`flex items-center gap-3 p-2 rounded-xl ${entry.id === user?.id ? 'bg-brand-surface shadow-clay-sunken text-primary border-2 border-primary/30' : 'hover:scale-[1.02] transition-transform'}`}>
-                    <div className="w-6 text-center font-bold text-sm text-on-surface-variant">
+                  <div
+                    key={entry.id}
+                    className="flex items-center gap-3 p-2 rounded-xl"
+                    style={entry.id === user?.id
+                      ? { background: 'var(--primary-light)', border: '2px solid var(--primary-dark)' }
+                      : {}}
+                  >
+                    <div className="w-6 text-center font-black text-sm text-on-surface-variant">
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                     </div>
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-brand-surface shadow-clay-sunken">
+                    <div className="w-8 h-8 rounded-full overflow-hidden" style={{ border: '2px solid var(--border-ink-color)' }}>
                       <Avatar config={entry.avatar_config} size={32} showBg={false} />
                     </div>
-                    <div className="flex-1 text-sm font-semibold text-on-surface truncate">{entry.name}</div>
-                    <div className="text-xs font-bold text-tertiary">{entry.xp?.toLocaleString()} XP</div>
+                    <div className="flex-1 text-sm font-bold text-on-surface truncate">{entry.name}</div>
+                    <div className="text-xs font-black" style={{ color: 'var(--accent-gold-shadow)' }}>{entry.xp?.toLocaleString()} XP</div>
                   </div>
                 ))}
               </div>
@@ -325,45 +330,55 @@ export default function StudentDashboard() {
 
             {/* Achievements */}
             <div className="clay-card p-6 animate-slideUp" style={{ animationDelay: '0.6s' }}>
-              <h2 className="text-lg font-headline font-bold text-on-surface mb-6 flex items-center gap-2">
+              <h2 className="text-lg font-headline font-black text-on-surface mb-5 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">military_tech</span> Achievements
               </h2>
               <div className="grid grid-cols-4 gap-3">
                 {(stats?.achievements || []).map((ach, i) => (
-                  <div key={i} className="aspect-square bg-brand-surface shadow-clay-outer rounded-xl flex flex-col items-center justify-center p-2 text-center cursor-help transition-all duration-300 hover:scale-110 group" title={`${ach.name}: ${ach.description}`}>
+                  <div
+                    key={i}
+                    className="aspect-square rounded-xl flex flex-col items-center justify-center p-2 text-center cursor-help transition-transform duration-200 hover:scale-110 group"
+                    style={{ background: 'var(--bg-elevated)', border: '2px solid var(--border-ink-color)', boxShadow: 'var(--shadow-hard-sm)' }}
+                    title={`${ach.name}: ${ach.description}`}
+                  >
                     {ach.icon && ach.icon.length <= 2 ? (
                       <span className="text-2xl mb-1 group-hover:scale-125 transition-transform">{ach.icon}</span>
                     ) : (
-                      <span className="material-symbols-outlined text-2xl text-tertiary mb-1 group-hover:scale-125 transition-transform">{ach.icon || 'star'}</span>
+                      <span className="material-symbols-outlined text-2xl mb-1 group-hover:scale-125 transition-transform" style={{ color: 'var(--accent-gold-shadow)' }}>{ach.icon || 'star'}</span>
                     )}
-                    <span className="text-[9px] font-bold text-on-surface-variant truncate w-full leading-tight">{ach.name}</span>
+                    <span className="text-[9px] font-black text-on-surface-variant truncate w-full leading-tight">{ach.name}</span>
                   </div>
                 ))}
                 {(!stats?.achievements || stats.achievements.length === 0) && (
-                  <div className="col-span-4 text-center text-sm text-on-surface-variant p-4">
+                  <div className="col-span-4 text-center text-sm text-on-surface-variant p-4 font-semibold">
                     Complete quizzes to earn badges!
                   </div>
                 )}
               </div>
             </div>
-
           </div>
         </div>
       </main>
 
       {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-6 pb-8 pt-4 lg:hidden bg-brand-surface shadow-[0_-6px_14px_rgba(10,10,25,0.4)] rounded-t-[2.5rem] font-body text-[10px] uppercase tracking-widest">
-        <div className="flex flex-col items-center justify-center bg-brand-elevated text-primary rounded-full p-3 px-5 shadow-clay-outer">
-          <span className="material-symbols-outlined mb-1" style={{fontVariationSettings: "'FILL' 1"}}>dashboard</span>
-          <span>Home</span>
+      <nav
+        className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-6 pb-6 pt-3 lg:hidden font-body text-[10px] uppercase tracking-widest"
+        style={{ background: 'var(--bg-surface)', borderTop: '2px solid var(--border-ink-color)', borderRadius: '24px 24px 0 0' }}
+      >
+        <div
+          className="flex flex-col items-center justify-center rounded-full p-2.5 px-5 text-white"
+          style={{ background: 'var(--primary)', border: '2px solid var(--border-ink-color)' }}
+        >
+          <span className="material-symbols-outlined mb-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>dashboard</span>
+          <span className="font-black">Home</span>
         </div>
-        <div className="flex flex-col items-center justify-center text-on-surface-variant p-3 hover:text-primary transition-all" onClick={() => navigate('/leaderboard')}>
-          <span className="material-symbols-outlined mb-1">emoji_events</span>
-          <span>Rank</span>
+        <div className="flex flex-col items-center justify-center text-on-surface-variant p-2.5 hover:text-primary transition-all" onClick={() => navigate('/leaderboard')}>
+          <span className="material-symbols-outlined mb-0.5">emoji_events</span>
+          <span className="font-bold">Rank</span>
         </div>
-        <div className="flex flex-col items-center justify-center text-on-surface-variant p-3 hover:text-primary transition-all" onClick={() => navigate('/live')}>
-          <span className="material-symbols-outlined mb-1">sports_esports</span>
-          <span>Live</span>
+        <div className="flex flex-col items-center justify-center text-on-surface-variant p-2.5 hover:text-primary transition-all" onClick={() => navigate('/live')}>
+          <span className="material-symbols-outlined mb-0.5">sports_esports</span>
+          <span className="font-bold">Live</span>
         </div>
       </nav>
     </div>

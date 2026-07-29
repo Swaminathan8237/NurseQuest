@@ -60,8 +60,8 @@ function safeWriteMedia(category, extension, buffer) {
 async function insertQuizWithQuestions(sql, userId, quizData, questions) {
   const quizId = uuidv4();
   await sql`
-    INSERT INTO quizzes (id, title, description, category, difficulty, unit, module, time_per_question, created_by, is_published, module_id)
-    VALUES (${quizId}, ${quizData.title}, ${quizData.description || ''}, ${quizData.category || 'General Knowledge'}, ${quizData.difficulty || 'medium'}, ${quizData.unit === null ? null : (quizData.unit || 1)}, ${quizData.module || 'Module 1'}, ${quizData.timePerQuestion || 30}, ${userId}, ${quizData.isPublished ? 1 : 0}, ${quizData.moduleId || null})
+    INSERT INTO quizzes (id, title, description, category, difficulty, unit, time_per_question, created_by, is_published)
+    VALUES (${quizId}, ${quizData.title}, ${quizData.description || ''}, ${quizData.category || 'General Knowledge'}, ${quizData.difficulty || 'medium'}, ${quizData.unit === null ? null : (quizData.unit || 1)}, ${quizData.timePerQuestion || 30}, ${userId}, ${quizData.isPublished ? 1 : 0})
   `;
 
   if (questions && Array.isArray(questions) && questions.length > 0) {
@@ -261,7 +261,7 @@ router.post('/import', authenticateToken, requireTeacherOrAdmin, (req, res) => {
 
 router.post('/import/confirm', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
   try {
-    const { title, description, category, difficulty, unit, timePerQuestion, questions, moduleId } = req.body;
+    const { title, description, category, difficulty, unit, timePerQuestion, questions } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'Quiz title is required.' });
@@ -362,11 +362,10 @@ router.post('/import/confirm', authenticateToken, requireTeacherOrAdmin, async (
     }
 
     const sql = getDB();
-    const finalModuleId = req.user.role === 'admin' ? moduleId : null;
     const finalUnit = req.user.role === 'admin' ? unit : null;
 
     const quiz = await insertQuizWithQuestions(sql, req.user.id, {
-      title, description, category, difficulty, unit: finalUnit, timePerQuestion, moduleId: finalModuleId, isPublished: false,
+      title, description, category, difficulty, unit: finalUnit, timePerQuestion, isPublished: false,
     }, questions);
 
     res.status(201).json(quiz);
@@ -383,13 +382,13 @@ router.get('/my-quizzes', authenticateToken, requireTeacherOrAdmin, async (req, 
   try {
     const sql = getDB();
     const quizzesResult = await sql`
-      SELECT q.*, m.title as module_title,
+      SELECT q.*,
         (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count,
         (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = q.id) as attempt_count,
         (SELECT COALESCE(AVG(score * 100.0 / NULLIF(total_points, 0)), 0) FROM quiz_attempts WHERE quiz_id = q.id) as avg_score
-      FROM quizzes q LEFT JOIN modules m ON q.module_id = m.id
+      FROM quizzes q
       WHERE q.created_by = ${req.user.id}
-        ${req.user.role === 'teacher' ? sql`AND q.unit IS NULL AND q.module_id IS NULL` : sql``}
+        ${req.user.role === 'teacher' ? sql`AND q.unit IS NULL` : sql``}
       ORDER BY q.created_at DESC
     `;
 
@@ -412,23 +411,20 @@ router.get('/my-quizzes', authenticateToken, requireTeacherOrAdmin, async (req, 
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const sql = getDB();
-    const { unit, category, difficulty, module_id } = req.query;
+    const { unit, category, difficulty } = req.query;
 
     const unitVal = unit ? parseInt(unit, 10) : null;
     const catVal = category || null;
     const diffVal = difficulty || null;
-    const modVal = module_id || null;
 
     const quizzesResult = await sql`
-      SELECT q.*, u.name as creator_name, m.title as module_title, m.icon as module_icon, m.color as module_color,
+      SELECT q.*, u.name as creator_name,
         (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count
       FROM quizzes q JOIN users u ON q.created_by = u.id
-      LEFT JOIN modules m ON q.module_id = m.id
       WHERE q.is_published = 1
         AND (${unitVal}::integer IS NULL OR q.unit = ${unitVal})
         AND (${catVal}::text IS NULL OR q.category = ${catVal})
         AND (${diffVal}::text IS NULL OR q.difficulty = ${diffVal})
-        AND (${modVal}::text IS NULL OR q.module_id = ${modVal})
       ORDER BY q.created_at DESC
     `;
 
@@ -476,7 +472,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
 
     // Draft standalone quiz protection:
-    if (quiz.is_published === 0 && quiz.unit === null && quiz.module_id === null) {
+    if (quiz.is_published === 0 && quiz.unit === null) {
       if (req.user.role === 'teacher' && quiz.created_by !== req.user.id) {
         return res.status(403).json({ error: 'Access denied to this draft quiz.' });
       }
@@ -637,15 +633,13 @@ async function generateDocxBuffer(title, textContent) {
 
 router.post('/', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
   try {
-    const { title, description, category, difficulty, unit, module, timePerQuestion, questions, moduleId } = req.body;
+    const { title, description, category, difficulty, unit, timePerQuestion, questions } = req.body;
     const sql = getDB();
 
-    const finalModuleId = req.user.role === 'admin' ? moduleId : null;
     const finalUnit = req.user.role === 'admin' ? unit : null;
-    const finalModule = req.user.role === 'admin' ? module : null;
 
     const quiz = await insertQuizWithQuestions(sql, req.user.id, {
-      title, description, category, difficulty, unit: finalUnit, module: finalModule, timePerQuestion, moduleId: finalModuleId, isPublished: false,
+      title, description, category, difficulty, unit: finalUnit, timePerQuestion, isPublished: false,
     }, questions);
 
     res.status(201).json(quiz);
@@ -659,7 +653,7 @@ router.post('/', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
 
 router.put('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
   try {
-    const { title, description, category, difficulty, unit, module, timePerQuestion, isPublished, questions, moduleId } = req.body;
+    const { title, description, category, difficulty, unit, timePerQuestion, isPublished, questions } = req.body;
     const sql = getDB();
 
     const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id}`;
@@ -670,7 +664,7 @@ router.put('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res) =>
       if (quiz.created_by !== req.user.id) {
         return res.status(403).json({ error: 'Access denied. You do not own this quiz.' });
       }
-      if (quiz.unit !== null || quiz.module_id !== null) {
+      if (quiz.unit !== null) {
         return res.status(403).json({ error: 'Access denied. Teachers cannot modify unit-based quizzes.' });
       }
       // Check if locked due to pending request
@@ -680,21 +674,17 @@ router.put('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res) =>
       }
     }
 
-    const finalModuleId = req.user.role === 'admin' ? (moduleId !== undefined ? (moduleId || null) : quiz.module_id) : quiz.module_id;
     const finalUnit = req.user.role === 'admin' ? (unit === null ? null : (unit || quiz.unit)) : quiz.unit;
-    const finalModule = req.user.role === 'admin' ? (module || quiz.module) : quiz.module;
 
     await sql`
-      UPDATE quizzes 
-      SET title = ${title || quiz.title}, 
-          description = ${description ?? quiz.description}, 
-          category = ${category || quiz.category}, 
-          difficulty = ${difficulty || quiz.difficulty}, 
-          unit = ${finalUnit}, 
-          module = ${finalModule}, 
-          time_per_question = ${timePerQuestion || quiz.time_per_question}, 
-          is_published = ${isPublished !== undefined ? (isPublished ? 1 : 0) : quiz.is_published}, 
-          module_id = ${finalModuleId} 
+      UPDATE quizzes
+      SET title = ${title || quiz.title},
+          description = ${description ?? quiz.description},
+          category = ${category || quiz.category},
+          difficulty = ${difficulty || quiz.difficulty},
+          unit = ${finalUnit},
+          time_per_question = ${timePerQuestion || quiz.time_per_question},
+          is_published = ${isPublished !== undefined ? (isPublished ? 1 : 0) : quiz.is_published}
       WHERE id = ${req.params.id}
     `;
 
@@ -733,7 +723,7 @@ router.delete('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res)
       if (quiz.created_by !== req.user.id) {
         return res.status(403).json({ error: 'Access denied. You do not own this quiz.' });
       }
-      if (quiz.unit !== null || quiz.module_id !== null) {
+      if (quiz.unit !== null) {
         return res.status(403).json({ error: 'Access denied. Teachers cannot delete unit-based quizzes.' });
       }
       // Check if locked due to pending request

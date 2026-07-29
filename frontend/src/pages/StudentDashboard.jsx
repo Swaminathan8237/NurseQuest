@@ -214,7 +214,7 @@ export default function StudentDashboard() {
                             </div>
                             <div className="flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-[14px] text-slate-500">menu_book</span>
-                              <span>Unit / Topic: <span className="text-tertiary font-bold">{quiz.module_title || quiz.category || 'General Practice'}</span></span>
+                              <span>Unit / Topic: <span className="text-tertiary font-bold">{quiz.unit ? `Unit ${quiz.unit}` : (quiz.category || 'General Practice')}</span></span>
                             </div>
                           </div>
                         </div>

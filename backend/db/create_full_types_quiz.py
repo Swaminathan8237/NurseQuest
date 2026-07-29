@@ -19,12 +19,6 @@ def seed_quiz():
     teacher_id = teacher[0]
     print(f"Using teacher ID: {teacher_id}")
 
-    # Find a module (optional)
-    cursor.execute("SELECT id FROM modules LIMIT 1")
-    module_row = cursor.fetchone()
-    module_id = module_row[0] if module_row else None
-    print(f"Linking to Module ID: {module_id}")
-
     # Delete existing quiz with same title to allow re-runs
     cursor.execute("SELECT id FROM quizzes WHERE title = ?", ('Comprehensive Nursing Skills Challenge',))
     existing_quiz = cursor.fetchone()
@@ -39,8 +33,8 @@ def seed_quiz():
     # Insert quiz
     new_quiz_id = str(uuid.uuid4())
     cursor.execute("""
-        INSERT INTO quizzes (id, title, description, category, difficulty, unit, module, time_per_question, created_by, is_published, module_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO quizzes (id, title, description, category, difficulty, unit, time_per_question, created_by, is_published)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         new_quiz_id,
         'Comprehensive Nursing Skills Challenge',
@@ -48,11 +42,9 @@ def seed_quiz():
         'General Nursing',
         'medium',
         1,
-        'Module 1',
         45, # 45 seconds per question
         teacher_id,
-        1, # is_published = 1
-        module_id
+        1 # is_published = 1
     ))
 
     print(f"Created Quiz: 'Comprehensive Nursing Skills Challenge' (ID: {new_quiz_id})")

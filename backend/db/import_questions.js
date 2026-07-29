@@ -362,8 +362,8 @@ async function importQuestions() {
   console.log(`👩‍🏫 Using teacher ID: ${teacherId}`);
 
   const insertQuiz = db.prepare(`
-    INSERT INTO quizzes (id, title, description, category, difficulty, unit, module, time_per_question, created_by, is_published)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO quizzes (id, title, description, category, difficulty, unit, time_per_question, created_by, is_published)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertQuestion = db.prepare(`
@@ -436,7 +436,7 @@ async function importQuestions() {
     const quizId = uuidv4();
     insertQuiz.run(
       quizId, title, description, 'Infection Control', 'medium',
-      unitNumber, 'Infection Control & Safety', 30, teacherId, 1
+      unitNumber, 30, teacherId, 1
     );
     totalQuizzes++;
 

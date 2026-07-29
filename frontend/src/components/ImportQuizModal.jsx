@@ -224,8 +224,7 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
     category: 'General Nursing',
     difficulty: 'medium',
     unit: 1,
-    timePerQuestion: 30,
-    moduleId: ''
+    timePerQuestion: 30
   });
 
   const [questions, setQuestions] = useState([]);
@@ -460,7 +459,6 @@ export default function ImportQuizModal({ onClose, onImportSuccess }) {
         difficulty: quizMeta.difficulty,
         unit: quizMeta.unit === null ? null : (parseInt(quizMeta.unit) || 1),
         timePerQuestion: parseInt(quizMeta.timePerQuestion) || 30,
-        moduleId: quizMeta.moduleId || null,
         questions: questions.map(q => {
           // Standardize JSON correctAnswers for matching & sequence
           let processedAns = q.correctAnswer;

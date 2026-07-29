@@ -136,14 +136,13 @@ CREATE TABLE IF NOT EXISTS user_achievements (
 CREATE TABLE IF NOT EXISTS quiz_requests (
   id TEXT PRIMARY KEY,
   quiz_id TEXT NOT NULL,
-  module_id TEXT NOT NULL,
+  unit INTEGER NOT NULL CHECK(unit BETWEEN 1 AND 15),
   teacher_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected')),
   admin_notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
-  FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE,
   FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -153,8 +152,7 @@ CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz ON quiz_attempts(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_questions_quiz ON questions(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_live_sessions_code ON live_sessions(join_code);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-CREATE INDEX IF NOT EXISTS idx_quizzes_module ON quizzes(module_id);
-CREATE INDEX IF NOT EXISTS idx_modules_created_by ON modules(created_by);
+CREATE INDEX IF NOT EXISTS idx_quizzes_unit ON quizzes(unit);
 CREATE INDEX IF NOT EXISTS idx_quiz_requests_teacher ON quiz_requests(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_requests_status ON quiz_requests(status);
 

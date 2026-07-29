@@ -67,7 +67,30 @@ export const DICEBEAR_STYLES = [
   { id: 'big-smile', name: 'Big Smile', icon: 'sentiment_very_satisfied', desc: 'Cheerful Characters' },
 ];
 
+// Coerce a possibly-missing/invalid value into a valid array index [0, len).
+// Guards against undefined / null / NaN / negative / out-of-range inputs so
+// HAIRS[idx], FACES[idx], etc. always resolve to a real entry.
+function safeIndex(value, len) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || len <= 0) return 0;
+  return ((Math.trunc(n) % len) + len) % len;
+}
+
 export default function Avatar({ config = {}, size = 200, className = '', onClick, showBg = true }) {
+  // avatar_config is stored as a JSON string (TEXT column). Some API responses
+  // (e.g. the leaderboard) return it unparsed — parse it here so callers can
+  // pass the raw value without each one having to JSON.parse defensively.
+  let cfg = config;
+  if (typeof cfg === 'string') {
+    try {
+      cfg = JSON.parse(cfg);
+    } catch {
+      cfg = {};
+    }
+  }
+  if (!cfg || typeof cfg !== 'object') cfg = {};
+  config = cfg;
+
   // ── DiceBear API Mode Support ──
   const isDicebear = config?.mode === 'dicebear' || config?.useDicebear || !!config?.dicebearStyle;
 
@@ -107,12 +130,12 @@ export default function Avatar({ config = {}, size = 200, className = '', onClic
     scrubsColor = '#6C5CE7',
   } = config;
 
-  const skinColor = SKIN_TONES[skin % SKIN_TONES.length];
+  const skinColor = SKIN_TONES[safeIndex(skin, SKIN_TONES.length)];
   const hairCol = hairColor || HAIR_COLORS[0];
-  const faceIdx = face % FACES.length;
-  const eyeIdx = eyes % EYES.length;
-  const mouthIdx = mouth % MOUTHS.length;
-  const hairIdx = hair % HAIRS.length;
+  const faceIdx = safeIndex(face, FACES.length);
+  const eyeIdx = safeIndex(eyes, EYES.length);
+  const mouthIdx = safeIndex(mouth, MOUTHS.length);
+  const hairIdx = safeIndex(hair, HAIRS.length);
 
   const svgContent = useMemo(() => {
     const bg = showBg ? `<defs><linearGradient id="avBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${scrubsColor}33"/><stop offset="100%" stop-color="${scrubsColor}11"/></linearGradient></defs><circle cx="100" cy="100" r="98" fill="url(#avBg)" stroke="${scrubsColor}44" stroke-width="2"/>` : '';

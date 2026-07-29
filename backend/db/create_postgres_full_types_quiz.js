@@ -15,11 +15,6 @@ async function seedComprehensiveQuiz() {
   const teacherId = teachers[0].id;
   console.log(`👩‍🏫 Using teacher ID: ${teacherId}`);
 
-  // Find the first module to link to
-  const modules = await sql`SELECT id FROM modules LIMIT 1`;
-  const moduleId = modules.length > 0 ? modules[0].id : null;
-  console.log(`📦 Linking to Module ID: ${moduleId}`);
-
   // Delete existing quiz with the same title to allow re-runs
   const existingQuizzes = await sql`SELECT id FROM quizzes WHERE title = 'Comprehensive Nursing Skills Challenge'`;
   if (existingQuizzes.length > 0) {
@@ -33,7 +28,7 @@ async function seedComprehensiveQuiz() {
   // Insert quiz
   const quizId = uuidv4();
   await sql`
-    INSERT INTO quizzes (id, title, description, category, difficulty, unit, module, time_per_question, created_by, is_published, module_id)
+    INSERT INTO quizzes (id, title, description, category, difficulty, unit, time_per_question, created_by, is_published)
     VALUES (
       ${quizId},
       'Comprehensive Nursing Skills Challenge',
@@ -41,11 +36,9 @@ async function seedComprehensiveQuiz() {
       'General Nursing',
       'medium',
       null,
-      'Module 1',
       45, -- 45 seconds per question
       ${teacherId},
-      1, -- is_published = 1 (published!)
-      ${moduleId}
+      1 -- is_published = 1 (published!)
     )
   `;
 

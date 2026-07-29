@@ -14,11 +14,6 @@ async function seedComprehensiveQuiz() {
   const teacherId = teacher.id;
   console.log(`👩‍🏫 Using teacher ID: ${teacherId}`);
 
-  // Find the first module to link to (optional, fallback to null)
-  const moduleObj = db.prepare("SELECT id FROM modules LIMIT 1").get();
-  const moduleId = moduleObj ? moduleObj.id : null;
-  console.log(`📦 Linking to Module ID: ${moduleId}`);
-
   // Delete existing quiz with the same title to allow re-runs
   const existingQuiz = db.prepare("SELECT id FROM quizzes WHERE title = ?").get('Comprehensive Nursing Skills Challenge');
   if (existingQuiz) {
@@ -31,8 +26,8 @@ async function seedComprehensiveQuiz() {
   // Insert quiz
   const quizId = uuidv4();
   db.prepare(`
-    INSERT INTO quizzes (id, title, description, category, difficulty, unit, module, time_per_question, created_by, is_published, module_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO quizzes (id, title, description, category, difficulty, unit, time_per_question, created_by, is_published)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     quizId,
     'Comprehensive Nursing Skills Challenge',
@@ -40,11 +35,9 @@ async function seedComprehensiveQuiz() {
     'General Nursing',
     'medium',
     null,
-    'Module 1',
     45, // 45 seconds per question
     teacherId,
-    1, // is_published = 1 (published!)
-    moduleId
+    1 // is_published = 1 (published!)
   );
 
   console.log(`✅ Created Quiz: "Comprehensive Nursing Skills Challenge" (ID: ${quizId})`);

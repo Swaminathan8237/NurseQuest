@@ -195,7 +195,7 @@ function initializeSocket(io) {
           if (quiz.created_by !== data.userId) {
             return socket.emit('error', { message: 'Access denied. You do not own this quiz.' });
           }
-          if (quiz.unit !== null || quiz.module_id !== null) {
+          if (quiz.unit !== null) {
             return socket.emit('error', { message: 'Access denied. Teachers can only host standalone quizzes.' });
           }
         } else if (user.role !== 'admin') {

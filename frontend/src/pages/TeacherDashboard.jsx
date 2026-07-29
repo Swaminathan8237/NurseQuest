@@ -291,7 +291,6 @@ export default function TeacherDashboard() {
                             <button 
                               className="flex-1 py-2 clay-button clay-button-outline text-primary text-sm font-bold flex items-center justify-center gap-1"
                               onClick={() => {
-                                setSelectedModuleId('');
                                 setShowRequestModal(quiz);
                               }}
                             >
@@ -337,7 +336,7 @@ export default function TeacherDashboard() {
                               </span>
                             </div>
                             <p className="text-xs text-slate-400">
-                              Requested for unit: <span className="text-slate-300 font-semibold">{req.module_title || 'General'}</span>
+                              Requested for unit: <span className="text-slate-300 font-semibold">Unit {req.unit}</span>
                             </p>
                             {req.admin_notes && (
                               <div className="text-xs p-2.5 rounded bg-brand-surface shadow-clay-sunken text-slate-300 border border-brand-elevated/40 mt-2">

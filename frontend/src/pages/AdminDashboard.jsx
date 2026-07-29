@@ -3,6 +3,28 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { adminAPI } from '../api';
 import Navbar from '../components/Navbar';
+import Avatar from '../components/Avatar';
+import StreakFire from '../components/StreakFire';
+
+// Unit icon + accent maps (mirrors Units.jsx)
+const UNIT_ICONS = {
+  1: 'health_and_safety', 2: 'masks', 3: 'clean_hands', 4: 'sanitizer',
+  5: 'science', 6: 'delete_outline', 7: 'medication', 8: 'bar_chart',
+  9: 'star', 10: 'rule', 11: 'badge',
+};
+const UNIT_COLORS = {
+  1: '#7C3AED', 2: '#0284C7', 3: '#059669', 4: '#D97706', 5: '#DC2626',
+  6: '#4F46E5', 7: '#0D9488', 8: '#C026D3', 9: '#E11D48', 10: '#2563EB',
+  11: '#7C3AED',
+};
+
+// Compact date label for attempt chips, e.g. "Jul 28"
+const formatDate = (d) => {
+  if (!d) return '';
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -12,7 +34,6 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
-  const [modules, setModules] = useState([]);
   const [requests, setRequests] = useState([]);
 
   // Loading & Action states
@@ -24,25 +45,106 @@ export default function AdminDashboard() {
   const [requestActionModal, setRequestActionModal] = useState(null); // { request, action: 'approve'|'reject' }
   const [adminNotes, setAdminNotes] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('none');
-  const [moduleModal, setModuleModal] = useState(null); // { mode: 'create'|'edit', module?: m }
 
-  // Module Form state
-  const [moduleForm, setModuleForm] = useState({ title: '', description: '', icon: 'school', color: '#b76dff', isPublished: false });
+  // Student Analytics state
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [studentUnits, setStudentUnits] = useState([]);
+  const [overallAvg, setOverallAvg] = useState(0);
+  const [totalAttempts, setTotalAttempts] = useState(0);
+  const [unitsLoading, setUnitsLoading] = useState(false);
+  const [expandedUnit, setExpandedUnit] = useState(null);
+  const [unitAttempts, setUnitAttempts] = useState([]);
+  const [attemptsLoading, setAttemptsLoading] = useState(false);
+  const [selectedAttempt, setSelectedAttempt] = useState(null);
+  const [attemptQuestions, setAttemptQuestions] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+
+  // Load a student's unit-by-unit summary and switch to the analytics tab
+  const openStudentAnalytics = async (student) => {
+    setActiveTab('analytics');
+    setSelectedStudent(student);
+    setStudentUnits([]);
+    setOverallAvg(0);
+    setTotalAttempts(0);
+    setExpandedUnit(null);
+    setUnitAttempts([]);
+    setSelectedAttempt(null);
+    setAttemptQuestions([]);
+    setUnitsLoading(true);
+    try {
+      const data = await adminAPI.getStudentUnits(student.id);
+      setSelectedStudent(data.student || student);
+      setStudentUnits(data.units || []);
+      setOverallAvg(data.overallAvg || 0);
+      setTotalAttempts(data.totalAttempts || 0);
+    } catch (err) {
+      console.error('Failed to load student units:', err);
+    } finally {
+      setUnitsLoading(false);
+    }
+  };
+
+  // Toggle a unit open and load its attempts
+  const toggleUnit = async (unit) => {
+    if (expandedUnit === unit) {
+      setExpandedUnit(null);
+      return;
+    }
+    setExpandedUnit(unit);
+    setUnitAttempts([]);
+    setSelectedAttempt(null);
+    setAttemptQuestions([]);
+    setAttemptsLoading(true);
+    try {
+      const data = await adminAPI.getStudentUnitAttempts(selectedStudent.id, unit);
+      setUnitAttempts(data || []);
+    } catch (err) {
+      console.error('Failed to load unit attempts:', err);
+    } finally {
+      setAttemptsLoading(false);
+    }
+  };
+
+  // Load the question-by-question breakdown for one attempt
+  const selectAttempt = async (attempt) => {
+    setSelectedAttempt(attempt);
+    setAttemptQuestions([]);
+    setQuestionsLoading(true);
+    try {
+      const data = await adminAPI.getAttemptQuestions(attempt.id);
+      setAttemptQuestions(data || []);
+    } catch (err) {
+      console.error('Failed to load attempt questions:', err);
+    } finally {
+      setQuestionsLoading(false);
+    }
+  };
+
+  // Reset analytics drill-down back to the student picker
+  const backToStudentList = () => {
+    setSelectedStudent(null);
+    setStudentUnits([]);
+    setExpandedUnit(null);
+    setUnitAttempts([]);
+    setSelectedAttempt(null);
+    setAttemptQuestions([]);
+  };
 
   // Fetch dashboard data
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [s, u, m, r] = await Promise.all([
+      const [s, u, r] = await Promise.allSettled([
         adminAPI.getStats(),
         adminAPI.getUsers(),
-        adminAPI.getModules(),
         adminAPI.getAllQuizRequests()
       ]);
-      setStats(s);
-      setUsers(u);
-      setModules(m);
-      setRequests(r);
+      if (s.status === 'fulfilled') setStats(s.value);
+      else console.error('Failed to load stats:', s.reason);
+      if (u.status === 'fulfilled') setUsers(u.value);
+      else console.error('Failed to load users:', u.reason);
+      if (r.status === 'fulfilled') setRequests(r.value);
+      else console.error('Failed to load requests:', r.reason);
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
@@ -81,55 +183,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Actions: Module/Unit Management
-  const handleOpenModuleModal = (mode, mod = null) => {
-    if (mode === 'edit' && mod) {
-      setModuleForm({
-        title: mod.title,
-        description: mod.description || '',
-        icon: mod.icon || 'school',
-        color: mod.color || '#b76dff',
-        isPublished: mod.is_published === 1
-      });
-      setModuleModal({ mode: 'edit', id: mod.id });
-    } else {
-      setModuleForm({ title: '', description: '', icon: 'school', color: '#b76dff', isPublished: true });
-      setModuleModal({ mode: 'create' });
-    }
-  };
-
-  const handleSaveModule = async (e) => {
-    e.preventDefault();
-    try {
-      if (moduleModal.mode === 'create') {
-        await moduleAPI.create(moduleForm);
-      } else {
-        await moduleAPI.update(moduleModal.id, moduleForm);
-      }
-      setModuleModal(null);
-      // Refresh modules list
-      const m = await adminAPI.getModules();
-      setModules(m);
-      const s = await adminAPI.getStats();
-      setStats(s);
-    } catch (err) {
-      alert(err.message || 'Failed to save module');
-    }
-  };
-
-  const handleDeleteModule = async (moduleId, moduleTitle) => {
-    if (!window.confirm(`Are you sure you want to delete the Unit: "${moduleTitle}"? Any quizzes associated with this module will become standalone.`)) return;
-    try {
-      await moduleAPI.delete(moduleId);
-      const m = await adminAPI.getModules();
-      setModules(m);
-      const s = await adminAPI.getStats();
-      setStats(s);
-    } catch (err) {
-      alert(err.message || 'Failed to delete module');
-    }
-  };
-
   // Actions: Request Processing
   const handleProcessRequest = async () => {
     if (!requestActionModal) return;
@@ -151,7 +204,7 @@ export default function AdminDashboard() {
 
   // Actions: Developments reset
   const handleResetStatistics = async () => {
-    if (!window.confirm('⚠️ CRITICAL WARNING: You are about to wipe out ALL student quiz attempts, history scores, and answers. User accounts, modules, and quizzes themselves will remain intact. This is irreversible. Proceed?')) return;
+    if (!window.confirm('⚠️ CRITICAL WARNING: You are about to wipe out ALL student quiz attempts, history scores, and answers. User accounts and quizzes themselves will remain intact. This is irreversible. Proceed?')) return;
     try {
       const res = await adminAPI.resetStatistics();
       alert(res.message || 'All statistics and progress reset successfully.');
@@ -168,6 +221,8 @@ export default function AdminDashboard() {
     const matchesRole = roleFilter === 'all' ? true : u.role === roleFilter;
     return matchesSearch && matchesRole;
   });
+
+  const pendingCount = requests.filter(r => r.status === 'pending').length;
 
   if (loading && !stats) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
@@ -199,13 +254,15 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-3 relative z-10">
-            <button
-              className="px-6 py-3.5 bg-secondary text-white rounded-xl font-headline font-bold uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2 active:scale-95 shadow-[0_4px_20px_rgba(183,109,255,0.3)]"
-              onClick={() => handleOpenModuleModal('create')}
-            >
-              <span className="material-symbols-outlined text-lg">add_box</span>
-              Create Unit
-            </button>
+            {pendingCount > 0 && (
+              <button
+                className="px-6 py-3.5 bg-secondary text-white rounded-xl font-headline font-bold uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2 active:scale-95 shadow-[0_4px_20px_rgba(183,109,255,0.3)]"
+                onClick={() => setActiveTab('requests')}
+              >
+                <span className="material-symbols-outlined text-lg">task</span>
+                {pendingCount} Pending
+              </button>
+            )}
             <button
               className="px-6 py-3.5 bg-surface-variant/40 border border-outline-variant/30 text-on-surface-variant rounded-xl font-headline font-bold uppercase tracking-widest hover:bg-surface-variant transition-all flex items-center gap-2 active:scale-95"
               onClick={fetchData}
@@ -221,8 +278,8 @@ export default function AdminDashboard() {
           {[
             { id: 'overview', label: 'Overview & Stats', icon: 'grid_view' },
             { id: 'users', label: 'Students & Teachers', icon: 'group' },
-            { id: 'modules', label: 'Unit Management', icon: 'folder_open' },
-            { id: 'requests', label: `Quiz Requests (${requests.filter(r => r.status === 'pending').length})`, icon: 'task' },
+            { id: 'analytics', label: 'Student Analytics', icon: 'monitoring' },
+            { id: 'requests', label: `Quiz Requests (${pendingCount})`, icon: 'task' },
             { id: 'developments', label: 'Developments & DB', icon: 'developer_mode' }
           ].map(tab => (
             <button
@@ -247,7 +304,7 @@ export default function AdminDashboard() {
               <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 relative overflow-hidden">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-semibold text-text-muted">Total Accounts</p>
+                    <p className="text-sm font-semibold text-[var(--text-muted)]">Total Accounts</p>
                     <p className="text-3xl font-bold font-headline mt-2">
                       {stats.users.student + stats.users.teacher + stats.users.admin}
                     </p>
@@ -256,7 +313,7 @@ export default function AdminDashboard() {
                     <span className="material-symbols-outlined">group</span>
                   </div>
                 </div>
-                <div className="mt-4 flex gap-4 text-xs font-semibold text-text-secondary">
+                <div className="mt-4 flex gap-4 text-xs font-semibold text-[var(--text-secondary)]">
                   <span>🎓 {stats.users.student} Students</span>
                   <span>👩‍🏫 {stats.users.teacher} Teachers</span>
                 </div>
@@ -265,27 +322,30 @@ export default function AdminDashboard() {
               <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 relative overflow-hidden">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-semibold text-text-muted">Total Educational Units</p>
-                    <p className="text-3xl font-bold font-headline mt-2">{stats.modulesCount}</p>
+                    <p className="text-sm font-semibold text-[var(--text-muted)]">Pending Requests</p>
+                    <p className="text-3xl font-bold font-headline mt-2 text-warning">{stats.requests.pending}</p>
                   </div>
-                  <div className="p-3 bg-secondary/10 rounded-lg text-secondary">
-                    <span className="material-symbols-outlined">menu_book</span>
+                  <div className="p-3 rounded-lg bg-[var(--warning-light)] text-warning">
+                    <span className="material-symbols-outlined">pending_actions</span>
                   </div>
                 </div>
-                <p className="text-xs font-medium text-text-muted mt-4">Structural educational units</p>
+                <div className="mt-4 flex gap-4 text-xs font-semibold text-[var(--text-secondary)]">
+                  <span>✅ {stats.requests.approved} Approved</span>
+                  <span>⛔ {stats.requests.rejected} Rejected</span>
+                </div>
               </div>
 
               <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 relative overflow-hidden">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-semibold text-text-muted">Quizzes Published</p>
+                    <p className="text-sm font-semibold text-[var(--text-muted)]">Total Quizzes</p>
                     <p className="text-3xl font-bold font-headline mt-2">{stats.quizzes.total}</p>
                   </div>
-                  <div className="p-3 bg-accent-orange/10 rounded-lg text-accent-orange">
+                  <div className="p-3 rounded-lg bg-[var(--warning-light)] text-[var(--secondary)]">
                     <span className="material-symbols-outlined">quiz</span>
                   </div>
                 </div>
-                <div className="mt-4 flex gap-4 text-xs font-semibold text-text-secondary">
+                <div className="mt-4 flex gap-4 text-xs font-semibold text-[var(--text-secondary)]">
                   <span>📖 {stats.quizzes.unitLinked} Linked to Units</span>
                   <span>🌐 {stats.quizzes.standalone} Standalone</span>
                 </div>
@@ -294,16 +354,16 @@ export default function AdminDashboard() {
               <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 relative overflow-hidden">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-semibold text-text-muted">Average Score</p>
+                    <p className="text-sm font-semibold text-[var(--text-muted)]">Average Score</p>
                     <p className="text-3xl font-bold font-headline mt-2 text-success">
                       {Math.round(stats.attempts.avgScore)}%
                     </p>
                   </div>
-                  <div className="p-3 bg-success-light rounded-lg text-success">
+                  <div className="p-3 bg-[var(--success-light)] rounded-lg text-success">
                     <span className="material-symbols-outlined">analytics</span>
                   </div>
                 </div>
-                <div className="mt-4 text-xs font-semibold text-text-secondary">
+                <div className="mt-4 text-xs font-semibold text-[var(--text-secondary)]">
                   📝 {stats.attempts.count} attempts | ⏱️ {stats.attempts.totalTimeMinutes} mins logged
                 </div>
               </div>
@@ -315,7 +375,7 @@ export default function AdminDashboard() {
                 <h3 className="text-xl font-bold font-headline">Pending Posting Requests</h3>
 
                 {requests.filter(r => r.status === 'pending').length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-text-muted">
+                  <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
                     <span className="material-symbols-outlined text-4xl mb-2 text-secondary/40">done_all</span>
                     <p className="font-semibold text-sm">All teacher posting requests have been processed!</p>
                   </div>
@@ -328,25 +388,25 @@ export default function AdminDashboard() {
                             <span className="px-2.5 py-0.5 rounded-full bg-secondary/15 text-secondary text-xs font-bold font-mono">
                               QUIZ SUBMISSION
                             </span>
-                            <span className="text-xs text-text-muted font-medium">
+                            <span className="text-xs text-[var(--text-muted)] font-medium">
                               {new Date(req.created_at).toLocaleDateString()}
                             </span>
                           </div>
                           <h4 className="text-base font-bold font-headline mt-1.5">{req.quiz_title}</h4>
-                          <p className="text-xs text-text-secondary mt-1">
-                            Request by: <span className="font-bold text-on-surface">{req.teacher_name}</span> | Target Unit: <span className="font-bold text-on-surface">{req.module_title}</span>
+                          <p className="text-xs text-[var(--text-secondary)] mt-1">
+                            Request by: <span className="font-bold text-on-surface">{req.teacher_name}</span> | Target Unit: <span className="font-bold text-on-surface">Unit {req.unit}</span>
                           </p>
                         </div>
                         <div className="flex gap-2 w-full sm:w-auto">
                           <button
-                            className="flex-1 sm:flex-none px-4 py-2 bg-success-light hover:bg-success/20 border border-success/30 text-success text-xs font-bold rounded-lg transition-all"
-                            onClick={() => setRequestActionModal({ request: req, action: 'approve' })}
+                            className="flex-1 sm:flex-none px-4 py-2 bg-[var(--success-light)] hover:bg-success/20 border border-success/30 text-success text-xs font-bold rounded-lg transition-all"
+                            onClick={() => { setSelectedUnit('none'); setRequestActionModal({ request: req, action: 'approve' }); }}
                           >
                             Approve
                           </button>
                           <button
-                            className="flex-1 sm:flex-none px-4 py-2 bg-danger-light hover:bg-danger/20 border border-danger/30 text-danger text-xs font-bold rounded-lg transition-all"
-                            onClick={() => setRequestActionModal({ request: req, action: 'reject' })}
+                            className="flex-1 sm:flex-none px-4 py-2 bg-[var(--danger-light)] hover:bg-danger/20 border border-danger/30 text-danger text-xs font-bold rounded-lg transition-all"
+                            onClick={() => { setSelectedUnit('none'); setRequestActionModal({ request: req, action: 'reject' }); }}
                           >
                             Reject
                           </button>
@@ -360,7 +420,7 @@ export default function AdminDashboard() {
               {/* Quick Platforms Health */}
               <div className="bg-surface-container-high/30 border border-white/5 rounded-xl p-6 space-y-6">
                 <h3 className="text-xl font-bold font-headline">Quiz Posting Workflow</h3>
-                <div className="space-y-4 text-sm text-text-secondary leading-relaxed">
+                <div className="space-y-4 text-sm text-[var(--text-secondary)] leading-relaxed">
                   <p>
                     Teachers are authorized to create and publish standalone quizzes independently.
                   </p>
@@ -393,7 +453,7 @@ export default function AdminDashboard() {
             {/* Filters */}
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="relative w-full md:max-w-md">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-text-muted">search</span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[var(--text-muted)]">search</span>
                 <input
                   type="text"
                   placeholder="Search by name or email..."
@@ -424,7 +484,7 @@ export default function AdminDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left">
                   <thead>
-                    <tr className="border-b border-white/5 bg-surface-container-high/40 font-headline font-bold text-xs uppercase tracking-wider text-text-muted">
+                    <tr className="border-b border-white/5 bg-surface-container-high/40 font-headline font-bold text-xs uppercase tracking-wider text-[var(--text-muted)]">
                       <th className="p-4 md:p-5">Name / Email</th>
                       <th className="p-4 md:p-5">Role</th>
                       <th className="p-4 md:p-5 text-center">XP Progress</th>
@@ -436,7 +496,7 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-white/5 text-sm font-medium">
                     {filteredUsers.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="p-10 text-center text-text-muted font-semibold">
+                        <td colSpan="6" className="p-10 text-center text-[var(--text-muted)] font-semibold">
                           No users found matching filters.
                         </td>
                       </tr>
@@ -450,7 +510,7 @@ export default function AdminDashboard() {
                               </div>
                               <div>
                                 <p className="font-bold text-on-surface">{u.name}</p>
-                                <p className="text-xs text-text-muted mt-0.5">{u.email}</p>
+                                <p className="text-xs text-[var(--text-muted)] mt-0.5">{u.email}</p>
                               </div>
                             </div>
                           </td>
@@ -465,7 +525,7 @@ export default function AdminDashboard() {
                               <option value="admin">Administrator</option>
                             </select>
                           </td>
-                          <td className="p-4 md:p-5 text-center font-mono text-xs text-text-secondary">
+                          <td className="p-4 md:p-5 text-center font-mono text-xs text-[var(--text-secondary)]">
                             {u.role === 'student' ? `${u.xp} XP (Lvl ${u.level})` : 'N/A'}
                           </td>
                           <td className="p-4 md:p-5 text-center font-bold font-mono">
@@ -475,14 +535,25 @@ export default function AdminDashboard() {
                             {u.role === 'teacher' ? u.quizzes_created : 'N/A'}
                           </td>
                           <td className="p-4 md:p-5 text-right">
-                            <button
-                              className="p-2 rounded-lg bg-danger-light hover:bg-danger/20 border border-danger/30 text-danger hover:scale-105 active:scale-95 transition-all"
-                              onClick={() => handleDeleteUser(u.id, u.name)}
-                              title="Delete User"
-                              disabled={u.id === user?.id}
-                            >
-                              <span className="material-symbols-outlined text-lg">delete</span>
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              {u.role === 'student' && (
+                                <button
+                                  className="p-2 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary hover:scale-105 active:scale-95 transition-all"
+                                  onClick={() => openStudentAnalytics(u)}
+                                  title="View Analytics"
+                                >
+                                  <span className="material-symbols-outlined text-lg">monitoring</span>
+                                </button>
+                              )}
+                              <button
+                                className="p-2 rounded-lg bg-[var(--danger-light)] hover:bg-danger/20 border border-danger/30 text-danger hover:scale-105 active:scale-95 transition-all"
+                                onClick={() => handleDeleteUser(u.id, u.name)}
+                                title="Delete User"
+                                disabled={u.id === user?.id}
+                              >
+                                <span className="material-symbols-outlined text-lg">delete</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -494,60 +565,264 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Unit Management Tab */}
-        {activeTab === 'modules' && (
+        {/* Student Analytics Tab */}
+        {activeTab === 'analytics' && (
           <div className="space-y-6 animate-fadeIn">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold font-headline">Educational Units</h3>
-              <button
-                className="px-5 py-2.5 bg-secondary text-white rounded-xl font-headline font-bold text-xs uppercase hover:scale-105 active:scale-95 transition-all shadow-[0_4px_15px_rgba(183,109,255,0.3)] flex items-center gap-2"
-                onClick={() => handleOpenModuleModal('create')}
-              >
-                <span className="material-symbols-outlined text-base">add</span>
-                New Unit
-              </button>
-            </div>
+            {!selectedStudent ? (
+              /* ---- Student picker ---- */
+              <>
+                <div className="relative w-full md:max-w-md">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[var(--text-muted)]">search</span>
+                  <input
+                    type="text"
+                    placeholder="Search students by name or email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-primary focus:outline-none transition-all"
+                  />
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {modules.map(mod => (
-                <div key={mod.id} className="bg-surface-container-high/30 border border-white/5 rounded-2xl p-6 space-y-4 hover:border-white/10 transition-all flex flex-col justify-between shadow-lg">
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-inner" style={{ backgroundColor: `${mod.color}15`, border: `1px solid ${mod.color}30` }}>
-                        <span className="material-symbols-outlined text-2xl" style={{ color: mod.color }}>{mod.icon || 'school'}</span>
-                      </div>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${mod.is_published === 1 ? 'bg-success-light text-success' : 'bg-white/10 text-text-muted'}`}>
-                        {mod.is_published === 1 ? 'Published' : 'Draft'}
-                      </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {users
+                    .filter(u => u.role === 'student')
+                    .filter(u =>
+                      u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => openStudentAnalytics(s)}
+                        className="group text-left bg-surface-container-high/40 hover:bg-surface-container-high/70 rounded-xl p-4 border border-white/5 hover:border-primary/40 transition-all flex items-center gap-4 hover:scale-[1.02]"
+                      >
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-white/5 flex-shrink-0">
+                          <Avatar config={s.avatar_config || {}} size={48} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-on-surface truncate">{s.name}</p>
+                          <p className="text-xs text-[var(--text-muted)] truncate">{s.email}</p>
+                          <div className="flex items-center gap-3 mt-1 text-xs font-mono text-[var(--text-muted)]">
+                            <span>Lvl {s.level || 1}</span>
+                            <span>{(s.xp || 0).toLocaleString()} XP</span>
+                          </div>
+                        </div>
+                        <span className="material-symbols-outlined text-[var(--text-muted)] group-hover:text-primary transition-colors">chevron_right</span>
+                      </button>
+                    ))}
+                  {users.filter(u => u.role === 'student').length === 0 && (
+                    <div className="col-span-full text-center py-12 text-[var(--text-muted)]">
+                      <span className="material-symbols-outlined text-4xl mb-2 block">school</span>
+                      No students found.
                     </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* ---- Selected student drill-down ---- */
+              <>
+                <button
+                  onClick={backToStudentList}
+                  className="inline-flex items-center gap-2 text-sm font-bold text-[var(--text-muted)] hover:text-primary transition-colors"
+                >
+                  <span className="material-symbols-outlined text-lg">arrow_back</span>
+                  All students
+                </button>
 
-                    <h4 className="text-lg font-bold font-headline mt-4">{mod.title}</h4>
-                    <p className="text-sm text-text-secondary mt-2 line-clamp-2">{mod.description || 'No description provided.'}</p>
-
-                    <div className="mt-4 flex gap-4 text-xs font-semibold text-text-muted">
-                      <span>📝 {mod.quiz_count} Quizzes Linked</span>
-                      <span>👨‍🏫 By {mod.creator_name || 'System'}</span>
+                {/* Student header */}
+                <div className="bg-surface-container-high/40 rounded-2xl p-6 border border-white/5 flex flex-col sm:flex-row items-center gap-6">
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-white/5 flex-shrink-0">
+                    <Avatar config={selectedStudent.avatar_config || {}} size={80} />
+                  </div>
+                  <div className="flex-1 text-center sm:text-left">
+                    <h2 className="text-2xl font-headline font-bold text-on-surface">{selectedStudent.name}</h2>
+                    <p className="text-sm text-[var(--text-muted)]">{selectedStudent.email}</p>
+                    <div className="flex items-center justify-center sm:justify-start gap-4 mt-3 flex-wrap">
+                      <span className="px-3 py-1 rounded-lg bg-white/5 text-xs font-mono font-bold">Level {selectedStudent.level || 1}</span>
+                      <span className="px-3 py-1 rounded-lg bg-white/5 text-xs font-mono font-bold">{(selectedStudent.xp || 0).toLocaleString()} XP</span>
+                      {selectedStudent.streak > 0 && (
+                        <span className="inline-flex items-center gap-1"><StreakFire streak={selectedStudent.streak} /></span>
+                      )}
+                      <span className="px-3 py-1 rounded-lg bg-white/5 text-xs font-mono font-bold">{totalAttempts} attempts</span>
                     </div>
                   </div>
-
-                  <div className="flex gap-2 pt-4 border-t border-white/5">
-                    <button
-                      className="flex-1 px-4 py-2 bg-surface-variant/40 hover:bg-surface-variant border border-outline-variant/30 text-on-surface-variant text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
-                      onClick={() => handleOpenModuleModal('edit', mod)}
-                    >
-                      <span className="material-symbols-outlined text-base">edit</span>
-                      Edit
-                    </button>
-                    <button
-                      className="px-3 py-2 bg-danger-light hover:bg-danger/20 border border-danger/30 text-danger text-xs font-bold rounded-lg transition-all"
-                      onClick={() => handleDeleteModule(mod.id, mod.title)}
-                    >
-                      <span className="material-symbols-outlined text-base">delete</span>
-                    </button>
+                  {/* Overall accuracy donut */}
+                  <div className="relative w-28 h-28 flex-shrink-0">
+                    <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+                      <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="12" />
+                      <circle
+                        cx="60" cy="60" r="52" fill="none" stroke="#7C3AED" strokeWidth="12" strokeLinecap="round"
+                        strokeDasharray={2 * Math.PI * 52}
+                        strokeDashoffset={2 * Math.PI * 52 * (1 - overallAvg / 100)}
+                        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-2xl font-bold text-on-surface">{overallAvg}%</span>
+                      <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Avg Score</span>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                {/* Units */}
+                {unitsLoading ? (
+                  <div className="flex justify-center py-16">
+                    <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                  </div>
+                ) : studentUnits.length === 0 ? (
+                  <div className="text-center py-16 text-[var(--text-muted)]">
+                    <span className="material-symbols-outlined text-4xl mb-2 block">quiz</span>
+                    This student hasn't attempted any units yet.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {studentUnits.map(u => {
+                      const color = UNIT_COLORS[u.unit] || '#7C3AED';
+                      const icon = UNIT_ICONS[u.unit] || 'school';
+                      const isOpen = expandedUnit === u.unit;
+                      return (
+                        <div key={u.unit} className="bg-surface-container-high/40 rounded-2xl border border-white/5 overflow-hidden">
+                          {/* Unit summary row */}
+                          <button
+                            onClick={() => toggleUnit(u.unit)}
+                            className="w-full text-left p-5 flex items-center gap-4 hover:bg-white/[0.03] transition-colors"
+                          >
+                            <div
+                              className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: `${color}22`, color }}
+                            >
+                              <span className="material-symbols-outlined">{icon}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <p className="font-bold text-on-surface">Unit {u.unit}</p>
+                                {u.best_streak > 0 && <StreakFire streak={u.best_streak} />}
+                              </div>
+                              {/* Avg score bar */}
+                              <div className="mt-2 h-2 w-full rounded-full bg-white/5 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${u.avg_score}%`, background: `linear-gradient(90deg, ${color}, ${color}cc)`, transition: 'width 0.5s ease' }}
+                                ></div>
+                              </div>
+                            </div>
+                            <div className="hidden sm:flex items-center gap-6 text-center flex-shrink-0">
+                              <div>
+                                <p className="text-lg font-bold" style={{ color }}>{u.avg_score}%</p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Avg</p>
+                              </div>
+                              <div>
+                                <p className="text-lg font-bold text-on-surface">{u.best_score}%</p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Best</p>
+                              </div>
+                              <div>
+                                <p className="text-lg font-bold text-on-surface">{u.attempts}</p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Tries</p>
+                              </div>
+                            </div>
+                            <span className={`material-symbols-outlined text-[var(--text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`}>expand_more</span>
+                          </button>
+
+                          {/* Attempts + question breakdown */}
+                          {isOpen && (
+                            <div className="border-t border-white/5 p-5 space-y-4 bg-black/10">
+                              {attemptsLoading ? (
+                                <div className="flex justify-center py-8">
+                                  <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                                </div>
+                              ) : unitAttempts.length === 0 ? (
+                                <p className="text-center text-[var(--text-muted)] py-4 text-sm">No attempts recorded.</p>
+                              ) : (
+                                <>
+                                  {/* Attempt picker */}
+                                  <div className="flex gap-2 flex-wrap">
+                                    {unitAttempts.map((a, i) => {
+                                      const active = selectedAttempt?.id === a.id;
+                                      return (
+                                        <button
+                                          key={a.id}
+                                          onClick={() => selectAttempt(a)}
+                                          className={`px-3 py-2 rounded-lg border text-xs font-bold transition-all ${active
+                                            ? 'bg-primary border-primary text-white'
+                                            : 'bg-white/5 border-white/10 text-on-surface hover:bg-white/10'}`}
+                                          title={a.quiz_title || ''}
+                                        >
+                                          <span className="font-mono">#{unitAttempts.length - i}</span>
+                                          <span className="mx-1.5 opacity-50">·</span>
+                                          {a.score_percent}%
+                                          <span className="ml-1.5 opacity-60">{formatDate(a.completed_at)}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Question table */}
+                                  {selectedAttempt && (
+                                    questionsLoading ? (
+                                      <div className="flex justify-center py-8">
+                                        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                                      </div>
+                                    ) : (
+                                      <div className="bg-surface-container-high/40 border border-white/5 rounded-xl overflow-hidden">
+                                        <div className="overflow-x-auto">
+                                          <table className="w-full border-collapse text-left text-sm">
+                                            <thead>
+                                              <tr className="border-b border-white/5 bg-white/[0.03] text-xs uppercase tracking-wider text-[var(--text-muted)]">
+                                                <th className="p-3 w-10">#</th>
+                                                <th className="p-3">Question</th>
+                                                <th className="p-3 text-center">Result</th>
+                                                <th className="p-3 text-center">Marks</th>
+                                                <th className="p-3 text-center">Accuracy</th>
+                                                <th className="p-3 text-center">Time</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {attemptQuestions.map((q, i) => (
+                                                <tr key={q.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                                                  <td className="p-3 font-mono text-[var(--text-muted)]">{i + 1}</td>
+                                                  <td className="p-3 max-w-md">
+                                                    <p className="text-on-surface line-clamp-2">{q.question_text}</p>
+                                                    <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{q.type}</span>
+                                                  </td>
+                                                  <td className="p-3 text-center">
+                                                    {q.is_correct ? (
+                                                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-success/15 text-success">
+                                                        <span className="material-symbols-outlined text-sm">check</span>Correct
+                                                      </span>
+                                                    ) : (
+                                                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-danger/15 text-danger">
+                                                        <span className="material-symbols-outlined text-sm">close</span>Wrong
+                                                      </span>
+                                                    )}
+                                                  </td>
+                                                  <td className="p-3 text-center font-mono">
+                                                    {q.points_earned.toLocaleString()}<span className="text-[var(--text-muted)]">/{q.points.toLocaleString()}</span>
+                                                  </td>
+                                                  <td className="p-3 text-center font-mono font-bold" style={{ color: q.accuracy >= 50 ? '#10B981' : '#EF4444' }}>
+                                                    {q.accuracy}%
+                                                  </td>
+                                                  <td className="p-3 text-center font-mono text-[var(--text-muted)]">{q.time_taken}s</td>
+                                                </tr>
+                                              ))}
+                                              {attemptQuestions.length === 0 && (
+                                                <tr><td colSpan={6} className="p-6 text-center text-[var(--text-muted)]">No question data.</td></tr>
+                                              )}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </div>
+                                    )
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -560,7 +835,7 @@ export default function AdminDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left">
                   <thead>
-                    <tr className="border-b border-white/5 bg-surface-container-high/40 font-headline font-bold text-xs uppercase tracking-wider text-text-muted">
+                    <tr className="border-b border-white/5 bg-surface-container-high/40 font-headline font-bold text-xs uppercase tracking-wider text-[var(--text-muted)]">
                       <th className="p-4 md:p-5">Quiz Title</th>
                       <th className="p-4 md:p-5">Requested Unit</th>
                       <th className="p-4 md:p-5">Teacher</th>
@@ -572,7 +847,7 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-white/5 text-sm font-medium">
                     {requests.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="p-10 text-center text-text-muted font-semibold">
+                        <td colSpan="6" className="p-10 text-center text-[var(--text-muted)] font-semibold">
                           No requests submitted yet.
                         </td>
                       </tr>
@@ -580,20 +855,20 @@ export default function AdminDashboard() {
                       requests.map(req => (
                         <tr key={req.id} className="hover:bg-white/[0.01] transition-all">
                           <td className="p-4 md:p-5 font-bold text-on-surface">{req.quiz_title}</td>
-                          <td className="p-4 md:p-5 text-text-secondary">{req.module_title}</td>
+                          <td className="p-4 md:p-5 text-[var(--text-secondary)]">Unit {req.unit}</td>
                           <td className="p-4 md:p-5">
                             <p className="font-semibold">{req.teacher_name}</p>
-                            <p className="text-xs text-text-muted">{req.teacher_email}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{req.teacher_email}</p>
                           </td>
-                          <td className="p-4 md:p-5 text-text-muted font-mono text-xs">
+                          <td className="p-4 md:p-5 text-[var(--text-muted)] font-mono text-xs">
                             {new Date(req.created_at).toLocaleString()}
                           </td>
                           <td className="p-4 md:p-5 text-center">
                             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${req.status === 'approved'
-                                ? 'bg-success-light text-success'
+                                ? 'bg-[var(--success-light)] text-success'
                                 : req.status === 'rejected'
-                                  ? 'bg-danger-light text-danger'
-                                  : 'bg-warning-light text-warning'
+                                  ? 'bg-[var(--danger-light)] text-danger'
+                                  : 'bg-[var(--warning-light)] text-warning'
                               }`}>
                               {req.status}
                             </span>
@@ -602,7 +877,7 @@ export default function AdminDashboard() {
                             {req.status === 'pending' ? (
                               <div className="flex gap-1.5 justify-end">
                                 <button
-                                  className="px-3 py-1.5 bg-success-light hover:bg-success/20 border border-success/30 text-success text-xs font-bold rounded-lg transition-all"
+                                  className="px-3 py-1.5 bg-[var(--success-light)] hover:bg-success/20 border border-success/30 text-success text-xs font-bold rounded-lg transition-all"
                                   onClick={() => {
                                     setSelectedUnit('none');
                                     setRequestActionModal({ request: req, action: 'approve' });
@@ -611,7 +886,7 @@ export default function AdminDashboard() {
                                   Approve
                                 </button>
                                 <button
-                                  className="px-3 py-1.5 bg-danger-light hover:bg-danger/20 border border-danger/30 text-danger text-xs font-bold rounded-lg transition-all"
+                                  className="px-3 py-1.5 bg-[var(--danger-light)] hover:bg-danger/20 border border-danger/30 text-danger text-xs font-bold rounded-lg transition-all"
                                   onClick={() => {
                                     setSelectedUnit('none');
                                     setRequestActionModal({ request: req, action: 'reject' });
@@ -621,7 +896,7 @@ export default function AdminDashboard() {
                                 </button>
                               </div>
                             ) : (
-                              <p className="text-xs text-text-muted italic max-w-[150px] truncate" title={req.admin_notes || ''}>
+                              <p className="text-xs text-[var(--text-muted)] italic max-w-[150px] truncate" title={req.admin_notes || ''}>
                                 {req.admin_notes ? `"${req.admin_notes}"` : 'No notes'}
                               </p>
                             )}
@@ -644,7 +919,7 @@ export default function AdminDashboard() {
               <div className="bg-surface-container-high/30 border border-white/5 rounded-2xl p-6 space-y-6">
                 <div>
                   <h3 className="text-xl font-bold font-headline">PostgreSQL Database Schema</h3>
-                  <p className="text-sm text-text-muted mt-1">Real-time table rows count verified directly from database instances</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Real-time table rows count verified directly from database instances</p>
                 </div>
 
                 <div className="space-y-3">
@@ -663,17 +938,17 @@ export default function AdminDashboard() {
               <div className="bg-surface-container-high/30 border border-white/5 rounded-2xl p-6 space-y-6">
                 <div>
                   <h3 className="text-xl font-bold font-headline text-danger">Administrator Systems Tools</h3>
-                  <p className="text-sm text-text-muted mt-1">Direct system hooks and administrative cleanup scripts</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">Direct system hooks and administrative cleanup scripts</p>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="border border-danger/25 bg-danger-light/10 p-5 rounded-xl space-y-4">
+                  <div className="border border-danger/25 bg-[var(--danger-light)] p-5 rounded-xl space-y-4">
                     <div className="flex gap-3">
                       <span className="material-symbols-outlined text-danger text-2xl">warning</span>
                       <div>
                         <h4 className="text-sm font-bold text-on-surface">Reset Attempts & Scores Statistics</h4>
-                        <p className="text-xs text-text-secondary mt-1">
-                          This operation clears all quiz attempts and answer logs, resetting user XP and student dashboards to clean slates. Accounts, quizzes, and modules are kept intact.
+                        <p className="text-xs text-[var(--text-secondary)] mt-1">
+                          This operation clears all quiz attempts and answer logs, resetting user XP and student dashboards to clean slates. Accounts and quizzes are kept intact.
                         </p>
                       </div>
                     </div>
@@ -687,7 +962,7 @@ export default function AdminDashboard() {
 
                   <div className="border border-white/5 bg-surface-container-highest/20 p-5 rounded-xl space-y-3">
                     <h4 className="text-sm font-bold text-on-surface">Admin System Status</h4>
-                    <div className="space-y-2 text-xs font-semibold text-text-secondary">
+                    <div className="space-y-2 text-xs font-semibold text-[var(--text-secondary)]">
                       <div className="flex justify-between">
                         <span>API Base URL</span>
                         <span className="font-mono text-on-surface">/api</span>
@@ -698,7 +973,7 @@ export default function AdminDashboard() {
                       </div>
                       <div className="flex justify-between">
                         <span>Environment Mode</span>
-                        <span className="font-mono text-success bg-success-light px-2 py-0.5 rounded">Production (Live)</span>
+                        <span className="font-mono text-success bg-[var(--success-light)] px-2 py-0.5 rounded">Production (Live)</span>
                       </div>
                     </div>
                   </div>
@@ -714,40 +989,40 @@ export default function AdminDashboard() {
       {requestActionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setRequestActionModal(null)}></div>
-          <div className="bg-surface-container-low border border-white/10 p-6 rounded-2xl w-full max-w-md relative z-10 space-y-6 shadow-2xl animate-scaleUp">
+          <div className="bg-surface-container-low border border-white/10 p-6 rounded-2xl w-full max-w-md relative z-10 space-y-6 shadow-2xl animate-fadeInScale">
             <h3 className="text-xl font-bold font-headline capitalize">
               {requestActionModal.action} Request
             </h3>
 
-            <div className="space-y-1.5 text-sm text-text-secondary">
+            <div className="space-y-1.5 text-sm text-[var(--text-secondary)]">
               <p>Quiz: <strong>{requestActionModal.request.quiz_title}</strong></p>
-              <p>Target Unit: <strong>{requestActionModal.request.module_title}</strong></p>
+              <p>Target Unit: <strong>Unit {requestActionModal.request.unit}</strong></p>
               <p>Teacher: <strong>{requestActionModal.request.teacher_name}</strong></p>
             </div>
 
             {requestActionModal.action === 'approve' && (
               <div className="space-y-2">
-                <label className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
                   Assign to Student Learning Path Unit (Optional)
                 </label>
                 <select
                   value={selectedUnit}
                   onChange={(e) => setSelectedUnit(e.target.value)}
-                  className="w-full p-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-secondary focus:outline-none cursor-pointer text-slate-300"
+                  className="w-full p-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-secondary focus:outline-none cursor-pointer text-on-surface"
                 >
                   <option value="none">None (Standalone / Practice Only)</option>
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(u => (
                     <option key={u} value={u}>Unit {u}</option>
                   ))}
                 </select>
-                <p className="text-[10px] text-text-muted mt-1">
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">
                   Assigning a unit (1-15) places the quiz sequentially on the Student Unit dashboard.
                 </p>
               </div>
             )}
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-text-muted uppercase tracking-wider">
+              <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
                 Admin Notes / Feedback (Optional)
               </label>
               <textarea
@@ -777,110 +1052,6 @@ export default function AdminDashboard() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Module/Unit Form Modal */}
-      {moduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModuleModal(null)}></div>
-          <form onSubmit={handleSaveModule} className="bg-surface-container-low border border-white/10 p-6 rounded-2xl w-full max-w-lg relative z-10 space-y-6 shadow-2xl animate-scaleUp">
-            <h3 className="text-xl font-bold font-headline">
-              {moduleModal.mode === 'create' ? 'Create New Educational Unit' : 'Edit Unit Details'}
-            </h3>
-
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-muted uppercase tracking-wider">Unit Title</label>
-                <input
-                  type="text"
-                  required
-                  value={moduleForm.title}
-                  onChange={(e) => setModuleForm({ ...moduleForm, title: e.target.value })}
-                  placeholder="e.g. Introduction to Physics"
-                  className="w-full p-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-secondary focus:outline-none transition-all"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-text-muted uppercase tracking-wider">Description</label>
-                <textarea
-                  value={moduleForm.description}
-                  onChange={(e) => setModuleForm({ ...moduleForm, description: e.target.value })}
-                  placeholder="Summarize the core topics covered in this unit..."
-                  rows="3"
-                  className="w-full p-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-secondary focus:outline-none resize-none transition-all"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-muted uppercase tracking-wider">Material Symbol Icon</label>
-                  <select
-                    value={moduleForm.icon}
-                    onChange={(e) => setModuleForm({ ...moduleForm, icon: e.target.value })}
-                    className="w-full p-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-secondary focus:outline-none transition-all"
-                  >
-                    <option value="school">School / Book</option>
-                    <option value="health_and_safety">Health & Safety</option>
-                    <option value="biotech">Biotech / Science</option>
-                    <option value="medication">Medication / Rx</option>
-                    <option value="clinical_notes">Clinical Notes</option>
-                    <option value="cardiology">Cardiology / Heart</option>
-                    <option value="psychology">Psychology / Brain</option>
-                    <option value="emergency">Emergency / Cross</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-muted uppercase tracking-wider">Theme Color</label>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="color"
-                      value={moduleForm.color}
-                      onChange={(e) => setModuleForm({ ...moduleForm, color: e.target.value })}
-                      className="w-12 h-11 bg-surface-container-high border border-white/5 rounded-xl cursor-pointer p-1"
-                    />
-                    <input
-                      type="text"
-                      value={moduleForm.color}
-                      onChange={(e) => setModuleForm({ ...moduleForm, color: e.target.value })}
-                      className="w-full p-3 bg-surface-container-high border border-white/5 rounded-xl text-sm font-mono focus:border-secondary focus:outline-none transition-all"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 bg-surface-container-high/40 p-4 border border-white/5 rounded-xl">
-                <input
-                  type="checkbox"
-                  id="isPublished"
-                  checked={moduleForm.isPublished}
-                  onChange={(e) => setModuleForm({ ...moduleForm, isPublished: e.target.checked })}
-                  className="w-4 h-4 rounded text-secondary focus:ring-secondary cursor-pointer"
-                />
-                <label htmlFor="isPublished" className="text-sm font-bold text-on-surface cursor-pointer select-none">
-                  Publish Immediately (Visible to students)
-                </label>
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                className="flex-1 py-3 bg-surface-variant/40 hover:bg-surface-variant text-on-surface font-headline font-bold text-xs uppercase rounded-xl transition-all"
-                onClick={() => setModuleModal(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="flex-1 py-3 bg-secondary hover:bg-secondary/80 text-white font-headline font-bold text-xs uppercase rounded-xl transition-all shadow-[0_4px_15px_rgba(183,109,255,0.3)]"
-              >
-                Save Unit
-              </button>
-            </div>
-          </form>
         </div>
       )}
 

@@ -278,8 +278,7 @@ export default function QuizBuilder() {
           category: data.category || 'Patient Care',
           difficulty: data.difficulty || 'medium',
           unit: data.unit !== undefined ? data.unit : 1,
-          timePerQuestion: data.time_per_question || 30,
-          moduleId: data.module_id || ''
+          timePerQuestion: data.time_per_question || 30
         });
         if (data.questions && data.questions.length > 0) {
           setQuestions(data.questions.map(q => ({

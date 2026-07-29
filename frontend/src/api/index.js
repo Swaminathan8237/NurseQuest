@@ -146,6 +146,10 @@ export const adminAPI = {
   processQuizRequest: (id, action, adminNotes, unit) => request(`/admin/requests/${id}/action`, { method: 'POST', body: JSON.stringify({ action, adminNotes, unit }) }),
   getStats: () => request('/admin/stats'),
   resetStatistics: () => request('/admin/reset-statistics', { method: 'POST' }),
+  // Student analytics
+  getStudentUnits: (id) => request(`/admin/students/${id}/units`),
+  getStudentUnitAttempts: (id, unit) => request(`/admin/students/${id}/units/${unit}/attempts`),
+  getAttemptQuestions: (attemptId) => request(`/admin/attempts/${attemptId}/questions`),
 };
 
 export default { authAPI, quizAPI, scoreAPI, userAPI, adminAPI };

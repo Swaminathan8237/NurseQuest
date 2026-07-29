@@ -439,7 +439,6 @@ router.post('/sync-profile', authenticateToken, async (req, res) => {
 
           // 3. Update references in dependency order
           await tx`UPDATE quiz_attempts SET user_id = ${req.user.id} WHERE user_id = ${oldId}`;
-          await tx`UPDATE modules SET created_by = ${req.user.id} WHERE created_by = ${oldId}`;
           await tx`UPDATE quizzes SET created_by = ${req.user.id} WHERE created_by = ${oldId}`;
           await tx`UPDATE live_participants SET user_id = ${req.user.id} WHERE user_id = ${oldId}`;
           await tx`UPDATE live_sessions SET host_id = ${req.user.id} WHERE host_id = ${oldId}`;
@@ -522,7 +521,6 @@ router.get('/me', authenticateToken, async (req, res) => {
 
               // 3. Update references in dependency order
               await tx`UPDATE quiz_attempts SET user_id = ${req.user.id} WHERE user_id = ${oldId}`;
-              await tx`UPDATE modules SET created_by = ${req.user.id} WHERE created_by = ${oldId}`;
               await tx`UPDATE quizzes SET created_by = ${req.user.id} WHERE created_by = ${oldId}`;
               await tx`UPDATE live_participants SET user_id = ${req.user.id} WHERE user_id = ${oldId}`;
               await tx`UPDATE live_sessions SET host_id = ${req.user.id} WHERE host_id = ${oldId}`;

@@ -48,23 +48,15 @@ async function seed() {
       await sql`INSERT INTO users (id, email, password, name, role, avatar_config, xp, level, streak) VALUES (${id}, ${`student${i + 1}@skillquest.io`}, ${password}, ${name}, 'student', ${avatarConfigs[i]}, ${xps[i]}, ${Math.floor(xps[i] / 1000) + 1}, ${Math.floor(Math.random() * 10)})`;
     }
 
-    // Create demo modules
-    const mod1Id = uuidv4();
-    const mod2Id = uuidv4();
-    const mod3Id = uuidv4();
-    await sql`INSERT INTO modules (id, title, description, icon, color, order_index, created_by, is_published) VALUES (${mod1Id}, 'Fundamentals of Nursing', 'Core nursing concepts covering patient care, safety, and clinical procedures', 'health_and_safety', '#b76dff', 0, ${teacherId}, 1)`;
-    await sql`INSERT INTO modules (id, title, description, icon, color, order_index, created_by, is_published) VALUES (${mod2Id}, 'Anatomy & Physiology', 'Human body systems, structures, and physiological processes', 'biotech', '#71d7cd', 1, ${teacherId}, 1)`;
-    await sql`INSERT INTO modules (id, title, description, icon, color, order_index, created_by, is_published) VALUES (${mod3Id}, 'Pharmacology', 'Drug classifications, mechanisms, dosages, and interactions', 'medication', '#FF6B6B', 2, ${teacherId}, 1)`;
-
-    // Create demo quizzes (linked to modules)
+    // Create demo quizzes (grouped by unit)
     const quiz1Id = uuidv4();
-    await sql`INSERT INTO quizzes (id, title, description, category, difficulty, unit, module, time_per_question, created_by, is_published, module_id) VALUES (${quiz1Id}, 'Fundamentals of Patient Care', 'Test your knowledge on basic patient care procedures and protocols', 'Patient Care', 'easy', 1, 'Module 1', 30, ${teacherId}, 1, ${mod1Id})`;
+    await sql`INSERT INTO quizzes (id, title, description, category, difficulty, unit, time_per_question, created_by, is_published) VALUES (${quiz1Id}, 'Fundamentals of Patient Care', 'Test your knowledge on basic patient care procedures and protocols', 'Patient Care', 'easy', 1, 30, ${teacherId}, 1)`;
 
     const quiz2Id = uuidv4();
-    await sql`INSERT INTO quizzes (id, title, description, category, difficulty, unit, module, time_per_question, created_by, is_published, module_id) VALUES (${quiz2Id}, 'Anatomy & Physiology Challenge', 'Identify anatomical structures and understand body systems', 'Anatomy', 'medium', 2, 'Module 2', 25, ${teacherId}, 1, ${mod2Id})`;
+    await sql`INSERT INTO quizzes (id, title, description, category, difficulty, unit, time_per_question, created_by, is_published) VALUES (${quiz2Id}, 'Anatomy & Physiology Challenge', 'Identify anatomical structures and understand body systems', 'Anatomy', 'medium', 2, 25, ${teacherId}, 1)`;
 
     const quiz3Id = uuidv4();
-    await sql`INSERT INTO quizzes (id, title, description, category, difficulty, unit, module, time_per_question, created_by, is_published, module_id) VALUES (${quiz3Id}, 'Pharmacology Essentials', 'Drug classifications, dosages, and interactions', 'Pharmacology', 'hard', 3, 'Module 3', 20, ${teacherId}, 1, ${mod3Id})`;
+    await sql`INSERT INTO quizzes (id, title, description, category, difficulty, unit, time_per_question, created_by, is_published) VALUES (${quiz3Id}, 'Pharmacology Essentials', 'Drug classifications, dosages, and interactions', 'Pharmacology', 'hard', 3, 20, ${teacherId}, 1)`;
 
     // Create questions
     const questions = [

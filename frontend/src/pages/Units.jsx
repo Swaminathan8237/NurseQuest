@@ -43,9 +43,25 @@ export default function Units() {
   useEffect(() => {
     quizAPI.getAll()
       .then((data) => {
-        // Filter unit-based quizzes (unit 1 to 15) and sort ascending
-        const unitQuizzes = data
-          .filter(q => q.unit >= 1 && q.unit <= 15)
+        // Keep unit-based quizzes (unit 1 to 15). A unit must appear exactly
+        // once in the learning path, so if the API returns more than one quiz
+        // for the same unit (e.g. a real assessment plus leftover demo data),
+        // collapse to a single quiz per unit — preferring the one with more
+        // questions, then the one that has attempt history.
+        const scoreOf = (q) =>
+          (q.totalQuestions || q.question_count || 0) * 1000 +
+          (q.lastAttempt ? 1 : 0);
+
+        const byUnit = new Map();
+        for (const q of data) {
+          if (!(q.unit >= 1 && q.unit <= 15)) continue;
+          const existing = byUnit.get(q.unit);
+          if (!existing || scoreOf(q) > scoreOf(existing)) {
+            byUnit.set(q.unit, q);
+          }
+        }
+
+        const unitQuizzes = Array.from(byUnit.values())
           .sort((a, b) => a.unit - b.unit);
         setQuizzes(unitQuizzes);
       })

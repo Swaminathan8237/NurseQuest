@@ -266,7 +266,7 @@ async function cleanAndImport() {
   console.log('🧹 Clearing existing data for Unit-Based Learning migration...');
 
   try {
-    await sql`TRUNCATE TABLE question_answers, quiz_attempts, live_participants, live_sessions, questions, quizzes, user_achievements, achievements, modules, users CASCADE`;
+    await sql`TRUNCATE TABLE question_answers, quiz_attempts, live_participants, live_sessions, questions, quizzes, user_achievements, achievements, users CASCADE`;
   } catch (err) {
     console.warn('Truncate failed, executing manual deletes:', err.message);
     await sql`DELETE FROM question_answers`;
@@ -277,7 +277,6 @@ async function cleanAndImport() {
     await sql`DELETE FROM quizzes`;
     await sql`DELETE FROM user_achievements`;
     await sql`DELETE FROM achievements`;
-    await sql`DELETE FROM modules`;
     await sql`DELETE FROM users`;
   }
 
@@ -389,8 +388,8 @@ async function cleanAndImport() {
 
     const quizId = uuidv4();
     await sql`
-      INSERT INTO quizzes (id, title, description, category, difficulty, unit, module, time_per_question, created_by, is_published)
-      VALUES (${quizId}, ${title}, ${description}, 'Infection Control', 'medium', ${unitNumber}, 'Infection Control & Safety', 30, ${teacherId}, 1)
+      INSERT INTO quizzes (id, title, description, category, difficulty, unit, time_per_question, created_by, is_published)
+      VALUES (${quizId}, ${title}, ${description}, 'Infection Control', 'medium', ${unitNumber}, 30, ${teacherId}, 1)
     `;
 
     const questions = parseDocument(rawText);

@@ -1,11 +1,14 @@
-require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+const path = require('path');
+const dotenv = require('dotenv');
+dotenv.config({ path: path.join(__dirname, '../.env') });
+dotenv.config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const path = require('path');
 const fs = require('fs');
 const cookieParser = require('cookie-parser');
+const { sanitizeLogInput } = require('./utils/logger');
 
 // Routes
 const authRoutes = require('./routes/auth');
@@ -91,8 +94,16 @@ app.post('/api/upload', authUpload, (req, res) => {
     const filePath = req.file.path.replace(/\\/g, '/');
     const relativePath = filePath.substring(filePath.indexOf('uploads/'));
     const url = `/${relativePath}`;
-    console.log(`✅ File uploaded: ${req.file.originalname} -> ${url}`);
+    console.log(`✅ File uploaded: ${sanitizeLogInput(req.file.originalname)} -> ${sanitizeLogInput(url)}`);
     res.json({ url, filename: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype });
+  });
+});
+
+// Public client runtime configuration
+app.get('/api/config', (req, res) => {
+  res.json({
+    supabaseUrl: process.env.SUPABASE_URL || '',
+    supabaseAnonKey: process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || ''
   });
 });
 

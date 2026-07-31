@@ -10,7 +10,7 @@ const bcrypt = require('bcryptjs');
 const router = express.Router();
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {

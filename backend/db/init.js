@@ -1,23 +1,31 @@
 const postgres = require('postgres');
 const path = require('path');
 const fs = require('fs');
+const { QueryBuilder } = require('./queryBuilder');
 
 let sqlInstance = null;
+let prismaInstance = null;
+
+function getFormattedDbUrl() {
+  let dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL is not defined in environment variables');
+  }
+  
+  // Auto-rewrite direct Supabase direct host (IPv6 only on many networks) to IPv4 Connection Pooler
+  const directHostMatch = dbUrl.match(/:\/\/postgres:([^@]+)@db\.([a-z0-9]+)\.supabase\.co:5432\/(.+)$/);
+  if (directHostMatch) {
+    const [, password, projectRef, dbName] = directHostMatch;
+    console.log(`🔄 Rewriting direct Supabase host db.${projectRef}.supabase.co to IPv4 Connection Pooler...`);
+    dbUrl = `postgresql://postgres.${projectRef}:${password}@aws-1-ap-south-1.pooler.supabase.com:5432/${dbName}`;
+  }
+
+  return dbUrl;
+}
 
 function getDB() {
   if (!sqlInstance) {
-    let dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) {
-      throw new Error('DATABASE_URL is not defined in environment variables');
-    }
-    
-    // Auto-rewrite direct Supabase IPv6 host to IPv4 Connection Pooler
-    if (dbUrl.includes('db.iqnovjmpubdiaooywfeh.supabase.co')) {
-      console.log('🔄 Detected direct Supabase IPv6 host. Rewriting to IPv4 Connection Pooler...');
-      dbUrl = dbUrl.replace('db.iqnovjmpubdiaooywfeh.supabase.co:5432', 'aws-0-ap-south-1.pooler.supabase.com:6543')
-                   .replace('://postgres:', '://postgres.iqnovjmpubdiaooywfeh:');
-    }
-
+    const dbUrl = getFormattedDbUrl();
     const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
     sqlInstance = postgres(dbUrl, {
       ssl: isLocal ? false : { rejectUnauthorized: false }, // Disable SSL for local connections
@@ -26,6 +34,28 @@ function getDB() {
     });
   }
   return sqlInstance;
+}
+
+function getPrisma() {
+  if (!prismaInstance) {
+    try {
+      const { PrismaClient } = require('@prisma/client');
+      prismaInstance = new PrismaClient({
+        datasources: {
+          db: {
+            url: getFormattedDbUrl()
+          }
+        }
+      });
+    } catch (err) {
+      console.warn('PrismaClient initialization notice:', err.message);
+    }
+  }
+  return prismaInstance;
+}
+
+function qb(tableName) {
+  return QueryBuilder.table(tableName);
 }
 
 async function initializeDB() {
@@ -49,7 +79,6 @@ async function initializeDB() {
 
   // Seeding check
   try {
-    // Check if the users table has the default admin/teacher, or quizzes count
     const quizCountResult = await sql`SELECT COUNT(*) as count FROM quizzes`;
     const quizCount = parseInt(quizCountResult[0].count, 10);
     if (quizCount === 0) {
@@ -63,4 +92,10 @@ async function initializeDB() {
   }
 }
 
-module.exports = { getDB, initializeDB };
+module.exports = { 
+  getDB, 
+  getPrisma, 
+  QueryBuilder, 
+  qb, 
+  initializeDB 
+};

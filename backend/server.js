@@ -5,6 +5,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const helmet = require('helmet');
 const fs = require('fs');
 const cookieParser = require('cookie-parser');
 const { sanitizeLogInput } = require('./utils/logger');
@@ -30,6 +31,7 @@ const io = new Server(server, {
 });
 
 // Middleware
+app.use(helmet());
 app.use(cookieParser());
 app.use(cors({ 
   origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5050'],

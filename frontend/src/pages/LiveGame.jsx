@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, memo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, memo, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,6 +7,7 @@ import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import { gsap } from 'gsap';
 import { Flip } from 'gsap/Flip';
+import ProcedureOrder from '../components/ProcedureOrder';
 
 gsap.registerPlugin(Flip);
 
@@ -21,7 +22,7 @@ const AudioPlayer = memo(({ src }) => {
         src={src} 
         controls 
         autoPlay 
-        className="w-full max-w-md relative z-30"
+        className="w-full max-w-xl relative z-30"
       />
     </div>
   );
@@ -30,12 +31,12 @@ const AudioPlayer = memo(({ src }) => {
 const VideoPlayer = memo(({ src }) => {
   if (!src) return null;
   return (
-    <div className="w-full flex justify-center bg-surface-container rounded-xl overflow-hidden max-h-72 relative border border-outline-variant/20 z-30">
-      <video 
-        src={src} 
-        controls 
-        autoPlay 
-        className="w-full max-h-72 object-contain relative z-30"
+    <div className="w-full max-w-3xl mx-auto flex justify-center bg-surface-container rounded-xl overflow-hidden max-h-[55vh] relative border border-outline-variant/20 z-30">
+      <video
+        src={src}
+        controls
+        autoPlay
+        className="w-full max-h-[55vh] object-contain relative z-30"
       />
     </div>
   );
@@ -251,8 +252,42 @@ export default function LiveGame() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [jumbledLetters, setJumbledLetters] = useState([]);
   const [placedLetters, setPlacedLetters] = useState([]);
-  const [sequenceItems, setSequenceItems] = useState([]);
-  const [dragItemIndex, setDragItemIndex] = useState(null);
+  // Sequence questions defer the phase switch so the student's board can animate into the
+  // correct order in place. `sequenceReveal` is raised by `question-results`; the pending
+  // payload is held until the animation reports back (or the fallback timer fires).
+  const [sequenceReveal, setSequenceReveal] = useState(false);
+  const pendingRevealRef = useRef(null);
+  const revealTimerRef = useRef(null);
+  // Socket handlers are registered once, so they read the live question through a ref
+  // rather than closing over a stale `question` value.
+  const questionRef = useRef(null);
+  const finishSequenceRevealRef = useRef(null);
+
+  // Keep the ref in step with state so the once-registered socket handlers see the live value.
+  useEffect(() => { questionRef.current = question; }, [question]);
+
+  // Called when the board's reveal animation finishes (or the fallback timer fires):
+  // hand over to the normal answer-reveal screen exactly once.
+  const finishSequenceReveal = useCallback(() => {
+    clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = null;
+    const payload = pendingRevealRef.current;
+    if (!payload) return;
+    pendingRevealRef.current = null;
+    setSequenceReveal(false);
+    setAnswerRevealData(payload);
+    setPhase('answer-reveal');
+  }, []);
+  useEffect(() => { finishSequenceRevealRef.current = finishSequenceReveal; }, [finishSequenceReveal]);
+
+  // A late-arriving question must never leave a stale reveal timer running.
+  useEffect(() => () => clearTimeout(revealTimerRef.current), []);
+
+  const handleSequenceRevealComplete = useCallback(() => {
+    // Let the corrected order sit on screen briefly before moving to the reveal screen.
+    clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = setTimeout(() => finishSequenceRevealRef.current?.(), 900);
+  }, []);
   const [sliderValue, setSliderValue] = useState(50);
   const [matchingSelections, setMatchingSelections] = useState({});
   const [selectedLeft, setSelectedLeft] = useState(null);
@@ -269,7 +304,10 @@ export default function LiveGame() {
   const [captchaPanStart, setCaptchaPanStart] = useState({ x: 0, y: 0 });
   const captchaContainerRef = useRef(null);
 
-  const isTeacher = user?.role === 'teacher';
+  const isHost = user?.role === 'teacher' || user?.role === 'admin';
+  const homePath = user?.role === 'admin' ? '/admin'
+    : user?.role === 'teacher' ? '/teacher'
+    : user ? '/student' : '/';
 
   useEffect(() => {
     socket = io('/', { transports: ['websocket', 'polling'] });
@@ -296,10 +334,25 @@ export default function LiveGame() {
       setPhase('playing');
     });
     socket.on('answer-count', (data) => {
-      if (isTeacher) setAnswerCount(data);
+      if (isHost) setAnswerCount(data);
     });
     socket.on('answer-result', (r) => setAnswerResult(r));
     socket.on('question-results', (r) => {
+      // A student on a sequence question stays on the board for a moment so their cards can
+      // animate into the correct order — every student animates their OWN arrangement at the
+      // same instant. The host (no board) and every other type switch immediately, as before.
+      const isSequenceBoard = !isHost && questionRef.current?.type === 'jumbled_sequence';
+      if (isSequenceBoard) {
+        pendingRevealRef.current = r;
+        // Make sure the board has the key even if the student never answered (timeout), since
+        // `answer-result` is only emitted for those who did submit.
+        setAnswerResult(prev => prev || { correctAnswer: r.correctAnswer, isCorrect: false });
+        setSequenceReveal(true);
+        // Fallback: never strand a student here if the animation is interrupted.
+        clearTimeout(revealTimerRef.current);
+        revealTimerRef.current = setTimeout(() => finishSequenceRevealRef.current?.(), 2500);
+        return;
+      }
       setAnswerRevealData(r);
       setPhase('answer-reveal');
     });
@@ -311,7 +364,7 @@ export default function LiveGame() {
     socket.on('error', (e) => setError(e.message));
     socket.on('session-ended', () => { setPhase('menu'); setError('Session ended'); });
 
-    if (isTeacher) quizAPI.getMyQuizzes().then(setQuizzes).catch(console.error);
+    if (isHost) quizAPI.getMyQuizzes().then(setQuizzes).catch(console.error);
 
     return () => { if (socket) socket.disconnect(); };
   }, []);
@@ -338,16 +391,7 @@ export default function LiveGame() {
       setPlacedLetters([]);
     }
 
-    if (question.type === 'jumbled_sequence') {
-      const items = [...(question.options || [])];
-      for (let i = items.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [items[i], items[j]] = [items[j], items[i]];
-      }
-      setSequenceItems(items);
-    } else {
-      setSequenceItems([]);
-    }
+    // Sequence questions: ProcedureOrder owns its own shuffle and board state.
 
     if (question.type === 'slider') {
       const min = parseFloat(question.sliderMin ?? question.slider_min) || 0;
@@ -369,8 +413,6 @@ export default function LiveGame() {
       setMatchingSelections({});
       setSelectedLeft(null);
     }
-
-    setDragItemIndex(null);
 
     // Captcha reset
     if (question?.type === 'captcha') {
@@ -396,14 +438,14 @@ export default function LiveGame() {
   }, [phase, question]);
 
   useEffect(() => {
-    if (phase === 'playing' && timeLeft === 0 && !answered && !isTeacher) {
+    if (phase === 'playing' && timeLeft === 0 && !answered && !isHost) {
       if (question?.type === 'captcha' && captchaBox && captchaBox.w > 0.01 && captchaBox.h > 0.01) {
         submitAnswer(JSON.stringify({ x: +captchaBox.x.toFixed(4), y: +captchaBox.y.toFixed(4), w: +captchaBox.w.toFixed(4), h: +captchaBox.h.toFixed(4) }));
       } else {
         submitAnswer(null);
       }
     }
-  }, [timeLeft, phase, answered, isTeacher, captchaBox, question]);
+  }, [timeLeft, phase, answered, isHost, captchaBox, question]);
 
   useEffect(() => {
     if (phase !== 'get-ready') return;
@@ -470,7 +512,7 @@ export default function LiveGame() {
   const submitAnswer = (answer) => {
     if (answered || !question) return;
 
-    if (!isTeacher && timeLeft <= 0) {
+    if (!isHost && timeLeft <= 0) {
       setAnswered(true);
       setAnswerResult({ isCorrect: false, tooLate: true, message: 'Too late - time is up for this question.' });
       return;
@@ -500,29 +542,6 @@ export default function LiveGame() {
     submitAnswer(placedLetters.map(l => l.letter).join(''));
   };
 
-  const handleDragStart = (index) => {
-    if (answered || timeLeft <= 0) return;
-    setDragItemIndex(index);
-  };
-
-  const handleDragOver = (event, overIndex) => {
-    event.preventDefault();
-    if (answered || timeLeft <= 0 || dragItemIndex === null || dragItemIndex === overIndex) return;
-
-    setSequenceItems(prev => {
-      const items = [...prev];
-      const dragged = items[dragItemIndex];
-      items.splice(dragItemIndex, 1);
-      items.splice(overIndex, 0, dragged);
-      return items;
-    });
-    setDragItemIndex(overIndex);
-  };
-
-  const submitSequence = () => {
-    if (answered || timeLeft <= 0) return;
-    submitAnswer(sequenceItems);
-  };
 
   const TopBar = () => (
     <header className="flex justify-between items-center px-8 h-16 w-full bg-slate-950/60 backdrop-blur-md z-50 shrink-0">
@@ -530,7 +549,7 @@ export default function LiveGame() {
         CLINICAL PULSE ARENA
       </div>
       <div className="flex items-center gap-4 text-on-surface-variant">
-        <button onClick={() => navigate(isTeacher ? '/teacher' : user ? '/student' : '/')} className="hover:text-primary transition-colors flex items-center gap-2">
+        <button onClick={() => navigate(homePath)} className="hover:text-primary transition-colors flex items-center gap-2">
           <span className="material-symbols-outlined font-[300]">logout</span>
           <span className="text-sm font-headline tracking-widest uppercase font-bold">Exit</span>
         </button>
@@ -551,7 +570,7 @@ export default function LiveGame() {
           
           {error && <div className="bg-error-container/30 border border-error/50 text-error p-3 rounded-lg mb-6">{error}</div>}
 
-          {isTeacher ? (
+          {isHost ? (
             <div className="flex flex-col gap-6 text-left">
               <h2 className="text-xl font-headline font-bold text-on-surface">Host a Game</h2>
               <div className="flex flex-col gap-2">
@@ -661,7 +680,7 @@ export default function LiveGame() {
           </div>
         </div>
 
-        {isTeacher && participants.length > 0 && (
+        {isHost && participants.length > 0 && (
           <div className="fixed bottom-8 left-1/2 -translate-x-1/2">
             <button 
               className="bg-gradient-to-r from-tertiary-fixed-dim/90 to-tertiary-fixed/90 hover:from-tertiary-fixed-dim hover:to-tertiary-fixed text-on-tertiary-fixed font-headline font-black text-xl tracking-wider px-12 py-4 rounded-full transition-all active:scale-95 shadow-[0_0_30px_rgba(42,229,0,0.4)] flex items-center gap-3 uppercase"
@@ -804,8 +823,8 @@ export default function LiveGame() {
 
             {/* Media Area */}
             {question.type === 'image' && question.mediaUrl && (
-              <div className="w-full flex justify-center bg-surface-container rounded-xl overflow-hidden max-h-64 relative border border-outline-variant/20">
-                <img src={question.mediaUrl} alt="Question" className="object-contain h-full w-full max-h-64" />
+              <div className="w-full max-w-3xl mx-auto flex justify-center bg-surface-container rounded-xl overflow-hidden max-h-[55vh] relative border border-outline-variant/20">
+                <img src={question.mediaUrl} alt="Question" className="object-contain w-full h-auto max-h-[55vh]" />
               </div>
             )}
             {question.type === 'video' && (
@@ -830,7 +849,7 @@ export default function LiveGame() {
             )}
 
             {/* Options Area (Student) */}
-            {!isTeacher && !answered && timeLeft > 0 && ['mcq', 'image', 'video', 'audio'].includes(question.type) && (
+            {!isHost && !answered && timeLeft > 0 && ['mcq', 'image', 'video', 'audio'].includes(question.type) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                 {question.options?.map((opt, i) => {
                   const borderColors = ['border-primary', 'border-tertiary-fixed-dim', 'border-error', 'border-amber-400'];
@@ -854,7 +873,7 @@ export default function LiveGame() {
             )}
 
             {/* Jumbled Letters Area */}
-            {!isTeacher && question.type === 'jumbled_letters' && (
+            {!isHost && question.type === 'jumbled_letters' && (
               <div className="flex flex-col gap-8 mt-4">
                 <div className="flex flex-wrap gap-2 justify-center p-8 bg-surface-container/50 rounded-xl border border-outline-variant/20 min-h-[100px]">
                   {placedLetters.map((l, i) => (
@@ -898,34 +917,23 @@ export default function LiveGame() {
             )}
 
             {/* Sequence Area */}
-            {!isTeacher && question.type === 'jumbled_sequence' && (
+            {!isHost && question.type === 'jumbled_sequence' && (
               <div className="flex flex-col gap-3 mt-4">
-                {sequenceItems.map((item, i) => (
-                  <div
-                    key={`${item}-${i}`}
-                    className={`flex items-center gap-4 bg-surface-container p-4 rounded-lg border transition-all ${dragItemIndex === i ? 'border-primary shadow-[0_0_15px_rgba(0,229,255,0.2)] scale-[1.02] z-10' : 'border-outline-variant/20'} ${answered ? 'opacity-80' : 'cursor-move hover:border-outline-variant/50'}`}
-                    draggable={!answered}
-                    onDragStart={() => handleDragStart(i)}
-                    onDragOver={(e) => handleDragOver(e, i)}
-                    onDragEnd={() => setDragItemIndex(null)}
-                  >
-                    <span className="font-mono text-on-surface-variant/50 font-bold text-xl">{i + 1}</span>
-                    <span className="material-symbols-outlined text-on-surface-variant/30">drag_indicator</span>
-                    <span className="font-body text-lg text-on-surface flex-1">{item}</span>
-                  </div>
-                ))}
-                {!answered && timeLeft > 0 && (
-                  <div className="flex justify-center mt-6">
-                    <button className="bg-primary text-on-primary px-8 py-3 rounded-full font-headline font-bold tracking-widest uppercase hover:bg-primary-container transition-colors shadow-[0_0_15px_rgba(0,229,255,0.4)]" onClick={submitSequence}>
-                      Submit Order
-                    </button>
-                  </div>
-                )}
+                <ProcedureOrder
+                  mode="live"
+                  options={question.options}
+                  correctAnswer={answerResult?.correctAnswer ?? null}
+                  answered={answered}
+                  disabled={timeLeft <= 0}
+                  revealSignal={sequenceReveal}
+                  onSubmit={(orderedTexts) => submitAnswer(orderedTexts)}
+                  onRevealComplete={handleSequenceRevealComplete}
+                />
               </div>
             )}
 
             {/* Slider Area */}
-            {!isTeacher && question.type === 'slider' && (
+            {!isHost && question.type === 'slider' && (
               <div className="flex flex-col items-center gap-6 mt-4">
                 <div className="w-full bg-surface-container/50 rounded-xl border border-outline-variant/20 p-8">
                   {/* Value Display */}
@@ -1007,7 +1015,7 @@ export default function LiveGame() {
             )}
 
             {/* Matching Area */}
-            {!isTeacher && question.type === 'matching' && (
+            {!isHost && question.type === 'matching' && (
               <div className="flex flex-col gap-4 mt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Left Column */}
@@ -1093,8 +1101,8 @@ export default function LiveGame() {
             )}
 
             {/* Captcha — Image Region Selection (Student View) */}
-            {question.type === 'captcha' && question.mediaUrl && !isTeacher && (
-              <div className="flex flex-col gap-4">
+            {question.type === 'captcha' && question.mediaUrl && !isHost && (
+              <div className="flex flex-col gap-4 w-full max-w-3xl mx-auto">
                 {/* Zoom controls */}
                 <div className="flex items-center justify-center gap-3">
                   <button
@@ -1277,14 +1285,14 @@ export default function LiveGame() {
             )}
 
             {/* Captcha — Teacher View (just shows the image) */}
-            {question.type === 'captcha' && question.mediaUrl && isTeacher && (
-              <div className="w-full flex justify-center bg-surface-container rounded-xl overflow-hidden max-h-64 relative border border-outline-variant/20">
-                <img src={question.mediaUrl} alt="Captcha Question" className="object-contain h-full w-full max-h-64" />
+            {question.type === 'captcha' && question.mediaUrl && isHost && (
+              <div className="w-full max-w-3xl mx-auto flex justify-center bg-surface-container rounded-xl overflow-hidden max-h-[55vh] relative border border-outline-variant/20">
+                <img src={question.mediaUrl} alt="Captcha Question" className="object-contain w-full h-auto max-h-[55vh]" />
               </div>
             )}
 
             {/* Waiting/Result States */}
-            {!isTeacher && !answered && timeLeft <= 0 && (
+            {!isHost && !answered && timeLeft <= 0 && (
               <div className="flex items-center justify-center p-8 bg-surface-container/50 border border-outline-variant/20 rounded-xl mt-4">
                 <span className="material-symbols-outlined text-amber-400 mr-3 animate-spin">hourglass_empty</span>
                 <p className="font-mono text-on-surface-variant">Time is up. Waiting for results...</p>
@@ -1311,7 +1319,7 @@ export default function LiveGame() {
             )}
             
             {/* Teacher Controls */}
-            {isTeacher && (
+            {isHost && (
               <div className="mt-8 p-6 bg-surface-container rounded-xl border border-outline-variant/20 flex flex-col items-center gap-6">
                 <div className="flex items-center gap-4 text-on-surface-variant font-mono">
                   <span className="material-symbols-outlined animate-spin">sync</span>
@@ -1360,7 +1368,7 @@ export default function LiveGame() {
 
   if (phase === 'answer-reveal' && answerRevealData) {
     const { correctAnswer, distribution } = answerRevealData;
-    const isStudent = !isTeacher;
+    const isStudent = !isHost;
     const activeRankings = answerRevealData.rankings || [];
 
     return (
@@ -1383,7 +1391,7 @@ export default function LiveGame() {
                 </div>
               </div>
 
-              {isTeacher && (
+              {isHost && (
                 <div className="bg-surface-variant/30 p-8 rounded-2xl border border-outline-variant/20">
                   <h3 className="font-headline text-lg font-bold text-on-surface mb-6 uppercase tracking-wider">Class Responses</h3>
                   <div className="flex flex-col gap-4">
@@ -1508,7 +1516,7 @@ export default function LiveGame() {
           
           <RankingsList rankings={rankings} variant="interim" currentUserId={user?.id} />
 
-          {isTeacher && (
+          {isHost && (
             <div className="mt-16 z-10">
               <button className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-10 py-4 rounded-full font-headline font-bold text-lg tracking-widest uppercase hover:brightness-110 transition-all active:scale-95 shadow-[0_0_20px_rgba(0,229,255,0.4)] flex items-center gap-3" onClick={nextQuestion}>
                 <span>Next Question</span>
@@ -1535,7 +1543,7 @@ export default function LiveGame() {
         <RankingsList rankings={rankings} variant="final" currentUserId={user?.id} />
 
         <div className="mt-16 z-10">
-          <button className="bg-surface-variant text-on-surface border border-outline-variant/30 px-10 py-4 rounded-full font-headline font-bold tracking-widest uppercase hover:bg-surface-container-high transition-colors flex items-center gap-3" onClick={() => navigate(isTeacher ? '/teacher' : user ? '/student' : '/')}>
+          <button className="bg-surface-variant text-on-surface border border-outline-variant/30 px-10 py-4 rounded-full font-headline font-bold tracking-widest uppercase hover:bg-surface-container-high transition-colors flex items-center gap-3" onClick={() => navigate(homePath)}>
             <span className="material-symbols-outlined">home</span>
             <span>Return to Dashboard</span>
           </button>

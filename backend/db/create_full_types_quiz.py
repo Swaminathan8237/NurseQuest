@@ -58,7 +58,7 @@ def seed_quiz():
             'options': json.dumps(['Administer epinephrine IM', 'Apply a warm compress', 'Place in Trendelenburg position', 'Give oral antihistamine']),
             'correct_answer': 'Administer epinephrine IM',
             'explanation': 'Epinephrine is the first-line treatment for anaphylaxis and should be administered intramuscularly immediately.',
-            'points': 1000,
+            'points': 1,
             'order_index': 0,
             'slider_min': None, 'slider_max': None, 'slider_step': None, 'slider_unit': None, 'matching_pairs': None
         },
@@ -70,7 +70,7 @@ def seed_quiz():
             'options': json.dumps(['Normal Sinus Rhythm', 'Ventricular Fibrillation', 'Atrial Fibrillation', 'Bradycardia']),
             'correct_answer': 'Normal Sinus Rhythm',
             'explanation': 'The illustration displays a normal sinus rhythm with regular P waves, QRS complexes, and T waves.',
-            'points': 1000,
+            'points': 1,
             'order_index': 1,
             'slider_min': None, 'slider_max': None, 'slider_step': None, 'slider_unit': None, 'matching_pairs': None
         },
@@ -82,7 +82,7 @@ def seed_quiz():
             'options': json.dumps(['Check vital signs', 'Introduce yourself and verify patient identity', 'Administer medication', 'Review medical history']),
             'correct_answer': 'Introduce yourself and verify patient identity',
             'explanation': 'Patient identification and introduction are the foundational first steps of any patient assessment.',
-            'points': 1000,
+            'points': 1,
             'order_index': 2,
             'slider_min': None, 'slider_max': None, 'slider_step': None, 'slider_unit': None, 'matching_pairs': None
         },
@@ -94,7 +94,7 @@ def seed_quiz():
             'options': json.dumps(['Normal heart sounds', 'Heart murmur', 'Atrial fibrillation', 'Pericardial friction rub']),
             'correct_answer': 'Heart murmur',
             'explanation': 'A heart murmur is characterized by turbulent blood flow causing a whooshing or swishing sound.',
-            'points': 1000,
+            'points': 1,
             'order_index': 3,
             'slider_min': None, 'slider_max': None, 'slider_step': None, 'slider_unit': None, 'matching_pairs': None
         },
@@ -106,7 +106,7 @@ def seed_quiz():
             'options': json.dumps(['A', 'C', 'E', 'T', 'A', 'M', 'I', 'N', 'O', 'P', 'H', 'E', 'N']),
             'correct_answer': 'ACETAMINOPHEN',
             'explanation': 'Acetaminophen (also known as paracetamol) is a common analgesic and antipyretic medication.',
-            'points': 1000,
+            'points': 1,
             'order_index': 4,
             'slider_min': None, 'slider_max': None, 'slider_step': None, 'slider_unit': None, 'matching_pairs': None
         },
@@ -118,7 +118,7 @@ def seed_quiz():
             'options': json.dumps(['Wet hands with water', 'Apply soap', 'Rub hands palm to palm', 'Clean thumbs', 'Rinse hands with water']),
             'correct_answer': json.dumps(['Wet hands with water', 'Apply soap', 'Rub hands palm to palm', 'Clean thumbs', 'Rinse hands with water']),
             'explanation': 'The correct sequence ensures all surfaces of the hands are properly decontaminated.',
-            'points': 1000,
+            'points': 1,
             'order_index': 5,
             'slider_min': None, 'slider_max': None, 'slider_step': None, 'slider_unit': None, 'matching_pairs': None
         },
@@ -130,7 +130,7 @@ def seed_quiz():
             'options': '[]',
             'correct_answer': '37',
             'explanation': 'The normal average oral body temperature for a healthy adult is 37°C (98.6°F).',
-            'points': 1000,
+            'points': 1,
             'order_index': 6,
             'slider_min': 35,
             'slider_max': 42,
@@ -151,7 +151,7 @@ def seed_quiz():
                 'Bradycardia': 'Slow heart rate'
             }),
             'explanation': 'Correctly matching terms is key to professional nursing communication.',
-            'points': 1000,
+            'points': 1,
             'order_index': 7,
             'slider_min': None, 'slider_max': None, 'slider_step': None, 'slider_unit': None,
             'matching_pairs': json.dumps(['High blood pressure', 'Low blood sugar', 'Dry mouth and thirst', 'Slow heart rate'])
@@ -164,7 +164,7 @@ def seed_quiz():
             'options': '[]',
             'correct_answer': json.dumps({'x': 0.35, 'y': 0.2, 'w': 0.3, 'h': 0.5}),
             'explanation': 'The heart lies in the thoracic cavity between the lungs, slightly to the left of the midline.',
-            'points': 1000,
+            'points': 1,
             'order_index': 8,
             'slider_min': None, 'slider_max': None, 'slider_step': None, 'slider_unit': None, 'matching_pairs': None
         }

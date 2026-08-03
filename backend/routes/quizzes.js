@@ -8,6 +8,7 @@ const { Document, Packer, Paragraph, TextRun, HeadingLevel } = require('docx');
 const { getDB } = require('../db/init');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { parseQuizText, quizToText, FORMAT, normalize } = require('../utils/quizParser');
+const { PASS_PERCENT } = require('../utils/scoring');
 
 const requireTeacherOrAdmin = (req, res, next) => {
   if (!req.user || (req.user.role !== 'teacher' && req.user.role !== 'admin')) {
@@ -71,7 +72,7 @@ async function insertQuizWithQuestions(sql, userId, quizData, questions) {
       const matchingPairsJson = q.matchingPairs && (Array.isArray(q.matchingPairs) ? q.matchingPairs.length > 0 : true) ? JSON.stringify(q.matchingPairs) : null;
       await sql`
         INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs)
-        VALUES (${uuidv4()}, ${quizId}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1000}, ${orderIndex}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
+        VALUES (${uuidv4()}, ${quizId}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1}, ${orderIndex}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
       `;
       orderIndex++;
     }
@@ -115,6 +116,44 @@ function detectFileType(buffer) {
   return 'unknown';
 }
 
+// ─── ZIP-bomb guard ─────────────────────────────────────────────────
+// adm-zip decompresses lazily on getData(); a crafted archive can declare a
+// tiny compressed size but gigabytes uncompressed (ZIP bomb → memory-exhaustion
+// DoS, GHSA-xcpc-8h2w-3j85). The multer limit only caps the *compressed* upload,
+// which is exactly what amplification defeats. getEntries() parses the central
+// directory WITHOUT decompressing, so we inspect each entry's declared
+// uncompressed size + the entry count and reject implausible archives BEFORE any
+// getData()/mammoth decompression runs. Limits are far above any real quiz
+// bundle (single-digit MB, a handful of media files) so legitimate imports are
+// never affected.
+const ZIP_MAX_ENTRIES = 512;
+const ZIP_MAX_TOTAL_UNCOMPRESSED = 200 * 1024 * 1024; // 200 MB across all entries
+const ZIP_MAX_ENTRY_UNCOMPRESSED = 100 * 1024 * 1024; // 100 MB for any single entry
+
+function assertSafeZip(entries) {
+  if (!Array.isArray(entries)) return;
+  if (entries.length > ZIP_MAX_ENTRIES) {
+    const e = new Error(`ZIP archive has too many entries (${entries.length}); maximum is ${ZIP_MAX_ENTRIES}.`);
+    e.statusCode = 400;
+    throw e;
+  }
+  let total = 0;
+  for (const entry of entries) {
+    const declared = entry && entry.header ? entry.header.size : 0;
+    if (declared > ZIP_MAX_ENTRY_UNCOMPRESSED) {
+      const e = new Error('A file inside the ZIP is too large when uncompressed.');
+      e.statusCode = 400;
+      throw e;
+    }
+    total += declared;
+    if (total > ZIP_MAX_TOTAL_UNCOMPRESSED) {
+      const e = new Error('The ZIP archive is too large when uncompressed.');
+      e.statusCode = 400;
+      throw e;
+    }
+  }
+}
+
 // ─── POST /import — Upload & parse file ─────────────────────────────
 // Returns parsed preview (no DB write). Teacher-only.
 // Must be registered BEFORE /:id routes.
@@ -142,6 +181,9 @@ router.post('/import', authenticateToken, requireTeacherOrAdmin, (req, res) => {
         const AdmZip = require('adm-zip');
         const zip = new AdmZip(buffer);
         const entries = zip.getEntries();
+
+        // Reject ZIP bombs before any entry is decompressed (see assertSafeZip).
+        assertSafeZip(entries);
 
         // Check if it's a DOCX (has word/document.xml)
         const isDocx = entries.some(e => e.entryName === 'word/document.xml');
@@ -251,6 +293,9 @@ router.post('/import', authenticateToken, requireTeacherOrAdmin, (req, res) => {
 
     } catch (err) {
       console.error('Import parse error:', err);
+      if (err.statusCode === 400) {
+        return res.status(400).json({ error: err.message });
+      }
       res.status(500).json({ error: 'Failed to parse file: ' + err.message });
     }
   });
@@ -443,11 +488,18 @@ router.get('/', authenticateToken, async (req, res) => {
         `;
         quiz.lastAttempt = attemptResult[0] || null;
 
+        // Naming rule across the codebase: *ScorePercent is MARKS-based (score / total_points),
+        // *Accuracy is COUNT-based (correct_count / total_questions). bestScorePercent decides
+        // passing and unlocking; bestAccuracy is reported alongside it so a consumer that wants
+        // the count basis asks for it by name instead of silently reinterpreting this field.
+        // NULLIF guards a zero denominator, which would otherwise be a division-by-zero error.
         const bestAttemptResult = await sql`
-          SELECT MAX(correct_count * 100.0 / total_questions) as max_score_pct
+          SELECT MAX(score * 100.0 / NULLIF(total_points, 0))            AS max_score_pct,
+                 MAX(correct_count * 100.0 / NULLIF(total_questions, 0)) AS max_accuracy
           FROM quiz_attempts WHERE quiz_id = ${quiz.id} AND user_id = ${req.user.id}
         `;
         quiz.bestScorePercent = bestAttemptResult[0] ? parseFloat(bestAttemptResult[0].max_score_pct || 0) : 0;
+        quiz.bestAccuracy = bestAttemptResult[0] ? parseFloat(bestAttemptResult[0].max_accuracy || 0) : 0;
       }
     }
 
@@ -485,13 +537,15 @@ router.get('/:id', authenticateToken, async (req, res) => {
       `;
       const prevQuiz = prevQuizzes[0];
       if (prevQuiz) {
+        // Marks basis (score / total_points), matching bestScorePercent in the list endpoint
+        // and u.bestScorePercent in the admin report, so all three agree on who has passed.
         const bestAttempts = await sql`
-          SELECT MAX(correct_count * 100.0 / total_questions) as max_score_pct 
+          SELECT MAX(score * 100.0 / NULLIF(total_points, 0)) AS max_score_pct
           FROM quiz_attempts WHERE quiz_id = ${prevQuiz.id} AND user_id = ${req.user.id}
         `;
         const scorePct = bestAttempts[0] ? parseFloat(bestAttempts[0].max_score_pct || 0) : 0;
-        if (scorePct < 75) {
-          return res.status(403).json({ error: `Unit ${quiz.unit} is locked. You must score at least 75% on Unit ${prevQuiz.unit} to unlock.` });
+        if (scorePct < PASS_PERCENT) {
+          return res.status(403).json({ error: `Unit ${quiz.unit} is locked. You must score at least ${PASS_PERCENT}% on Unit ${prevQuiz.unit} to unlock.` });
         }
       }
     }
@@ -504,9 +558,49 @@ router.get('/:id', authenticateToken, async (req, res) => {
       q.matching_pairs = JSON.parse(q.matching_pairs || '[]');
     });
 
+    // SECURITY: this is the student play path. Strip the answer key so it never
+    // ships to the client before the student answers. correct_answer/explanation
+    // are revealed one-at-a-time, post-answer, via POST /api/scores/check.
+    // Teachers/admins editing a quiz use GET /:id/edit, which keeps these fields.
+    questions.forEach(q => {
+      delete q.correct_answer;
+      delete q.explanation;
+    });
+
     res.json({ ...quiz, questions });
   } catch (err) {
     console.error('Get quiz error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─── GET /:id/edit — Full quiz WITH answer key (teacher/admin editing) ──────
+
+router.get('/:id/edit', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
+  try {
+    const sql = getDB();
+    const quizzes = await sql`
+      SELECT q.*, u.name as creator_name FROM quizzes q
+      JOIN users u ON q.created_by = u.id WHERE q.id = ${req.params.id}
+    `;
+    const quiz = quizzes[0];
+    if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+
+    // Owner-or-admin only: a teacher may only edit quizzes they created.
+    if (req.user.role === 'teacher' && quiz.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied. You do not own this quiz.' });
+    }
+
+    const questions = await sql`SELECT * FROM questions WHERE quiz_id = ${req.params.id} ORDER BY order_index`;
+    questions.forEach(q => {
+      q.options = JSON.parse(q.options || '[]');
+      q.matching_pairs = JSON.parse(q.matching_pairs || '[]');
+    });
+
+    // Editing path intentionally includes correct_answer/explanation.
+    res.json({ ...quiz, questions });
+  } catch (err) {
+    console.error('Get quiz for edit error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -676,32 +770,43 @@ router.put('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res) =>
 
     const finalUnit = req.user.role === 'admin' ? (unit === null ? null : (unit || quiz.unit)) : quiz.unit;
 
-    await sql`
-      UPDATE quizzes
-      SET title = ${title || quiz.title},
-          description = ${description ?? quiz.description},
-          category = ${category || quiz.category},
-          difficulty = ${difficulty || quiz.difficulty},
-          unit = ${finalUnit},
-          time_per_question = ${timePerQuestion || quiz.time_per_question},
-          is_published = ${isPublished !== undefined ? (isPublished ? 1 : 0) : quiz.is_published}
-      WHERE id = ${req.params.id}
-    `;
+    await sql.begin(async (sql) => {
+      await sql`
+        UPDATE quizzes
+        SET title = ${title || quiz.title},
+            description = ${description ?? quiz.description},
+            category = ${category || quiz.category},
+            difficulty = ${difficulty || quiz.difficulty},
+            unit = ${finalUnit},
+            time_per_question = ${timePerQuestion || quiz.time_per_question},
+            is_published = ${isPublished !== undefined ? (isPublished ? 1 : 0) : quiz.is_published}
+        WHERE id = ${req.params.id}
+      `;
 
-    // Update questions if provided
-    if (questions && Array.isArray(questions)) {
-      await sql`DELETE FROM questions WHERE quiz_id = ${req.params.id}`;
-      let orderIndex = 0;
-      for (const q of questions) {
-        if (!q || typeof q !== 'object') continue;
-        const matchingPairsJson = q.matchingPairs && q.matchingPairs.length > 0 ? JSON.stringify(q.matchingPairs) : null;
+      // Update questions if provided
+      if (questions && Array.isArray(questions)) {
+        // Clear per-question answer records first. question_answers.question_id
+        // references questions(id) WITHOUT ON DELETE CASCADE, so deleting the
+        // questions below raises an FK violation once the quiz has any attempts
+        // (this surfaced as a 500 "Server error" when editing an attempted unit
+        // quiz). Aggregate quiz_attempts rows are intentionally preserved.
         await sql`
-          INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs) 
-          VALUES (${uuidv4()}, ${req.params.id}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1000}, ${orderIndex}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
+          DELETE FROM question_answers
+          WHERE question_id IN (SELECT id FROM questions WHERE quiz_id = ${req.params.id})
         `;
-        orderIndex++;
+        await sql`DELETE FROM questions WHERE quiz_id = ${req.params.id}`;
+        let orderIndex = 0;
+        for (const q of questions) {
+          if (!q || typeof q !== 'object') continue;
+          const matchingPairsJson = q.matchingPairs && q.matchingPairs.length > 0 ? JSON.stringify(q.matchingPairs) : null;
+          await sql`
+            INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs)
+            VALUES (${uuidv4()}, ${req.params.id}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1}, ${orderIndex}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
+          `;
+          orderIndex++;
+        }
       }
-    }
+    });
 
     res.json({ success: true });
   } catch (err) {
@@ -733,9 +838,17 @@ router.delete('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res)
       }
     }
 
-    await sql`DELETE FROM questions WHERE quiz_id = ${req.params.id}`;
-    await sql`DELETE FROM quiz_attempts WHERE quiz_id = ${req.params.id}`;
-    await sql`DELETE FROM quizzes WHERE id = ${req.params.id}`;
+    // Delete in FK-safe order inside a transaction. Neither live_sessions.quiz_id
+    // nor question_answers.question_id cascades from quizzes/questions, so removing
+    // their parents first would raise an FK violation on an attempted or hosted
+    // quiz. live_participants cascades from live_sessions, and question_answers
+    // cascades from quiz_attempts — so clearing those parents clears the children.
+    await sql.begin(async (sql) => {
+      await sql`DELETE FROM live_sessions WHERE quiz_id = ${req.params.id}`;
+      await sql`DELETE FROM quiz_attempts WHERE quiz_id = ${req.params.id}`;
+      await sql`DELETE FROM questions WHERE quiz_id = ${req.params.id}`;
+      await sql`DELETE FROM quizzes WHERE id = ${req.params.id}`;
+    });
 
     res.json({ success: true });
   } catch (err) {

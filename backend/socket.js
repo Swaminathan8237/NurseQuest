@@ -5,7 +5,7 @@
 
 const { getDB } = require('./db/init');
 const { v4: uuidv4 } = require('uuid');
-const { calculateLiveScoreKahootStyle, generateJoinCode } = require('./utils/scoring');
+const { calculateLiveScoreKahootStyle, generateJoinCode, DEFAULT_QUESTION_MARKS } = require('./utils/scoring');
 
 const liveSessions = new Map(); // sessionId -> session data
 
@@ -58,7 +58,7 @@ function finalizeUnansweredForCurrentQuestion(session, finishedAt = Date.now()) 
     participant.streak = 0;
     participant.totalResponseMs += elapsedAtFinalize;
 
-    const timeoutScore = calculateLiveScoreKahootStyle(false, elapsedAtFinalize, questionLimitMs, question.points || 1000);
+    const timeoutScore = calculateLiveScoreKahootStyle(false, elapsedAtFinalize, questionLimitMs, question.points || DEFAULT_QUESTION_MARKS);
     participant.answers[session.currentQuestion] = {
       answer: null,
       isCorrect: false,
@@ -152,7 +152,7 @@ function initializeSocket(io) {
         mediaUrl: question.media_url,
         options: question.options,
         timeLimit: session.timePerQuestion,
-        maxPoints: question.points || 1000,
+        maxPoints: question.points || DEFAULT_QUESTION_MARKS,
         questionStartedAt: session.questionStartedAt,
         questionEndsAt: session.questionEndsAt,
         sliderMin: question.slider_min,
@@ -333,7 +333,7 @@ function initializeSocket(io) {
         participant.streak = 0;
         participant.totalResponseMs += questionLimitMs;
 
-        const lateScore = calculateLiveScoreKahootStyle(false, questionLimitMs, questionLimitMs, question.points || 1000);
+        const lateScore = calculateLiveScoreKahootStyle(false, questionLimitMs, questionLimitMs, question.points || DEFAULT_QUESTION_MARKS);
         participant.answers[questionIndex] = {
           answer: data.answer ?? null,
           isCorrect: false,
@@ -409,7 +409,7 @@ function initializeSocket(io) {
       if (isCorrect) participant.streak++;
       else participant.streak = 0;
 
-      const scoreResult = calculateLiveScoreKahootStyle(isCorrect, responseMs, questionLimitMs, question.points || 1000);
+      const scoreResult = calculateLiveScoreKahootStyle(isCorrect, responseMs, questionLimitMs, question.points || DEFAULT_QUESTION_MARKS);
       participant.score += scoreResult.totalScore;
       participant.totalResponseMs += responseMs;
       if (scoreResult.totalScore > 0) participant.lastScoreReachedAt = now;

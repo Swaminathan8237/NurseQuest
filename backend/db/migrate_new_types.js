@@ -76,7 +76,7 @@ function migrate() {
         options TEXT,
         correct_answer TEXT NOT NULL,
         explanation TEXT,
-        points INTEGER DEFAULT 1000,
+        points INTEGER DEFAULT 1,
         order_index INTEGER DEFAULT 0,
         slider_min REAL,
         slider_max REAL,

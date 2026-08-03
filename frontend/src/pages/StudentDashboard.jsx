@@ -5,13 +5,22 @@ import { userAPI, quizAPI, scoreAPI } from '../api';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import useScrollReveal from '../hooks/useScrollReveal';
-import mascotImg from '../assets/skillquest-mascot.png';
 import UnitCanvasBackground from '../components/UnitCanvasBackground';
 import { StatTile, ProgressBar, SectionHeading, Button } from '../components/ui';
+import { PASS_PERCENT } from '../constants';
 
 
 const LEVEL_NAMES = ['', 'Rookie', 'Learner', 'Explorer', 'Scholar', 'Expert', 'Master', 'Legend'];
 const LEVEL_ICONS = ['', '🌱', '📖', '🔭', '🎓', '⭐', '💎', '👑'];
+
+// Average seconds per attempt -> "45s" / "2m 05s". Shows an em-dash when there is no data
+// yet, so a new student sees "—" rather than a misleading "0s".
+function formatAvgTime(seconds) {
+  const s = Math.round(Number(seconds) || 0);
+  if (s <= 0) return '—';
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+}
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -45,9 +54,12 @@ export default function StudentDashboard() {
   const unitQuizzes = quizzes.filter(q => q.unit >= 1 && q.unit <= 11);
   const standaloneQuizzes = quizzes.filter(q => q.unit === null || q.unit === undefined || q.unit < 1 || q.unit > 11);
   const totalUnits = 11;
-  const completedUnits = unitQuizzes.filter(q => q.bestScorePercent >= 75).length;
+  const completedUnits = unitQuizzes.filter(q => q.bestScorePercent >= PASS_PERCENT).length;
 
   const unitProgressPct = Math.round((completedUnits / totalUnits) * 100);
+
+  // Consecutive days played (Duolingo-style), maintained server-side on quiz submit.
+  const dailyStreak = stats?.dailyStreak || 0;
 
   return (
     <div className="min-h-screen pb-24 font-body" style={{ background: 'var(--bg-base)' }}>
@@ -81,12 +93,10 @@ export default function StudentDashboard() {
                 Welcome back, {user?.name?.split(' ')[0]}! <span className="inline-block">👋</span>
               </h1>
               <p className="font-body text-base" style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
-                Ready to level up your knowledge and conquer clinical units?
+                Ready to level up your knowledge and conquer clinical levels?
               </p>
             </div>
           </div>
-
-          <img src={mascotImg} alt="" aria-hidden className="hidden md:block absolute right-40 -bottom-6 w-28 opacity-90 pointer-events-none select-none" />
 
           {/* XP progress panel */}
           <div
@@ -109,7 +119,7 @@ export default function StudentDashboard() {
             <h2 className="text-2xl font-headline text-on-surface flex items-center gap-2" style={{ fontWeight: 900 }}>
               <span className="material-symbols-outlined text-primary text-3xl">sports_esports</span> Ready to Play?
             </h2>
-            <p className="text-sm font-body text-on-surface-variant font-semibold">Jump straight into the unit assessment path and conquer new levels.</p>
+            <p className="text-sm font-body text-on-surface-variant font-semibold">Jump straight into the level assessment path and conquer new levels.</p>
           </div>
 
           <div className="relative shrink-0">
@@ -123,10 +133,16 @@ export default function StudentDashboard() {
 
         {/* Stats Grid — bold colored blocks */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-5">
-          <StatTile color="violet" icon="📚" value={stats?.quizzesTaken || 0} label="Quizzes Taken" className="cascade-entrance cascade-d1" />
-          <StatTile color="green" icon="🎯" value={`${Math.round(stats?.avgScore || 0)}%`} label="Average Score" className="cascade-entrance cascade-d2" />
-          <StatTile color="coral" icon="🔥" value={`${stats?.bestStreak || 0}`} label="Best Streak" className="cascade-entrance cascade-d3" />
-          <StatTile color="gold" icon="⚡" value={stats?.xp?.toLocaleString() || '0'} label="Total XP" className="cascade-entrance cascade-d4" />
+          <StatTile
+            color="coral"
+            icon={dailyStreak > 0 ? '🔥' : '🌱'}
+            value={dailyStreak}
+            label={dailyStreak === 1 ? 'Day Streak' : 'Days Streak'}
+            className="cascade-entrance cascade-d1"
+          />
+          <StatTile color="violet" icon="🎯" value={`${completedUnits} / ${totalUnits}`} label="Levels Completed" className="cascade-entrance cascade-d2" />
+          <StatTile color="sky" icon="⏱️" value={formatAvgTime(stats?.avgTime)} label="Average Time" className="cascade-entrance cascade-d3" />
+          <StatTile color="green" icon="📊" value={`${Math.round(stats?.avgScore || 0)}%`} label="Average Score" className="cascade-entrance cascade-d4" />
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -138,9 +154,9 @@ export default function StudentDashboard() {
 
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6 relative z-10">
                 <div>
-                  <h2 className="text-2xl md:text-3xl font-headline text-on-surface" style={{ fontWeight: 900 }}>Unit-Based Learning Path</h2>
+                  <h2 className="text-2xl md:text-3xl font-headline text-on-surface" style={{ fontWeight: 900 }}>Level-Based Learning Path</h2>
                   <p className="text-sm text-on-surface-variant mt-1.5 max-w-md">
-                    Progress through the 11 clinical units covering infection control, sterile protocols, and patient safety indicators.
+                    Progress through the 11 clinical levels covering infection control, sterile protocols, and patient safety indicators.
                   </p>
                 </div>
 
@@ -149,7 +165,7 @@ export default function StudentDashboard() {
                   style={{ background: 'var(--accent-sky)', color: '#fff', border: '2px solid var(--border-ink-color)', borderRadius: 'var(--radius-lg)', boxShadow: '4px 4px 0 var(--accent-sky-shadow)' }}
                 >
                   <div className="text-3xl font-display" style={{ fontWeight: 900 }}>{completedUnits} / 11</div>
-                  <div className="text-[10px] font-label uppercase tracking-widest mt-1 opacity-90">Units Passed</div>
+                  <div className="text-[10px] font-label uppercase tracking-widest mt-1 opacity-90">Levels Passed</div>
                 </div>
               </div>
 
@@ -183,7 +199,7 @@ export default function StudentDashboard() {
                   {standaloneQuizzes.map((quiz, i) => {
                     const scorePercent = quiz.bestScorePercent !== undefined ? Math.round(quiz.bestScorePercent) : null;
                     const hasAttempt = quiz.lastAttempt !== null;
-                    const passed = scorePercent >= 75;
+                    const passed = scorePercent >= PASS_PERCENT;
 
                     return (
                       <div
@@ -214,7 +230,7 @@ export default function StudentDashboard() {
                             </div>
                             <div className="flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-[14px]">menu_book</span>
-                              <span>Unit / Topic: <span style={{ color: 'var(--accent-gold-shadow)' }} className="font-black">{quiz.unit ? `Unit ${quiz.unit}` : (quiz.category || 'General Practice')}</span></span>
+                              <span>Level / Topic: <span style={{ color: 'var(--accent-gold-shadow)' }} className="font-black">{quiz.unit ? `Level ${quiz.unit}` : (quiz.category || 'General Practice')}</span></span>
                             </div>
                           </div>
                         </div>
@@ -251,8 +267,12 @@ export default function StudentDashboard() {
               ) : (
                 <div className="flex flex-col gap-4">
                   {stats.recentAttempts.map((attempt, i) => {
-                    const scorePct = Math.round((attempt.correct_count / attempt.total_questions) * 100);
-                    const passed = scorePct >= 75;
+                    // Marks basis, matching the pass rule everywhere else. Guarded because an
+                    // attempt with no marks available would otherwise render "NaN%".
+                    const scorePct = attempt.total_points > 0
+                      ? Math.round((attempt.score / attempt.total_points) * 100)
+                      : 0;
+                    const passed = scorePct >= PASS_PERCENT;
                     return (
                       <div
                         key={attempt.id || i}
@@ -272,7 +292,7 @@ export default function StudentDashboard() {
                           <div>
                             <h4 className="text-base font-black text-on-surface leading-tight">{attempt.quiz_title}</h4>
                             <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant font-semibold">
-                              <span className="badge">Unit {attempt.unit || 1}</span>
+                              <span className="badge">Level {attempt.unit || 1}</span>
                               <span>{new Date(attempt.completed_at).toLocaleDateString()}</span>
                             </div>
                           </div>

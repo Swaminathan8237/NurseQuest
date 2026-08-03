@@ -417,7 +417,7 @@ async function cleanAndImport() {
 
       await sql`
         INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs)
-        VALUES (${questionId}, ${quizId}, ${q.type}, ${q.questionText}, null, ${optionsJson}, ${q.correctAnswer || ''}, ${q.explanation || null}, 1000, ${q.orderIndex || 0}, ${sliderMin}, ${sliderMax}, ${sliderStep}, ${sliderUnit}, ${matchingPairsJson})
+        VALUES (${questionId}, ${quizId}, ${q.type}, ${q.questionText}, null, ${optionsJson}, ${q.correctAnswer || ''}, ${q.explanation || null}, ${q.points || 1}, ${q.orderIndex || 0}, ${sliderMin}, ${sliderMax}, ${sliderStep}, ${sliderUnit}, ${matchingPairsJson})
       `;
     }
     console.log(`✅ Imported: Unit ${unitNumber} - "${title}" with ${questions.length} questions.`);
@@ -441,8 +441,10 @@ async function cleanAndImport() {
         correctCount = 10 + Math.floor(Math.random() * 6); // 10 to 15 correct answers
       }
       const totalQuestions = 15;
-      const score = correctCount * 1000 + Math.floor(Math.random() * 500);
-      const totalPoints = totalQuestions * 1000;
+      // Fixed marks: 1 mark per question, awarded in full for a correct answer
+      // and 0 otherwise. No time bonus, so score is exactly the correct count.
+      const score = correctCount;
+      const totalPoints = totalQuestions;
       const streakMax = 5 + Math.floor(Math.random() * 6);
       const timeTaken = 150 + Math.floor(Math.random() * 100);
 

@@ -53,7 +53,7 @@ async function seedComprehensiveQuiz() {
       options: JSON.stringify(['Administer epinephrine IM', 'Apply a warm compress', 'Place in Trendelenburg position', 'Give oral antihistamine']),
       correct_answer: 'Administer epinephrine IM',
       explanation: 'Epinephrine is the first-line treatment for anaphylaxis and should be administered intramuscularly immediately.',
-      points: 1000,
+      points: 1,
       order_index: 0,
       slider_min: null, slider_max: null, slider_step: null, slider_unit: null, matching_pairs: null
     },
@@ -65,7 +65,7 @@ async function seedComprehensiveQuiz() {
       options: JSON.stringify(['Normal Sinus Rhythm', 'Ventricular Fibrillation', 'Atrial Fibrillation', 'Bradycardia']),
       correct_answer: 'Normal Sinus Rhythm',
       explanation: 'The illustration displays a normal sinus rhythm with regular P waves, QRS complexes, and T waves.',
-      points: 1000,
+      points: 1,
       order_index: 1,
       slider_min: null, slider_max: null, slider_step: null, slider_unit: null, matching_pairs: null
     },
@@ -77,7 +77,7 @@ async function seedComprehensiveQuiz() {
       options: JSON.stringify(['Check vital signs', 'Introduce yourself and verify patient identity', 'Administer medication', 'Review medical history']),
       correct_answer: 'Introduce yourself and verify patient identity',
       explanation: 'Patient identification and introduction are the foundational first steps of any patient assessment.',
-      points: 1000,
+      points: 1,
       order_index: 2,
       slider_min: null, slider_max: null, slider_step: null, slider_unit: null, matching_pairs: null
     },
@@ -89,7 +89,7 @@ async function seedComprehensiveQuiz() {
       options: JSON.stringify(['Normal heart sounds', 'Heart murmur', 'Atrial fibrillation', 'Pericardial friction rub']),
       correct_answer: 'Heart murmur',
       explanation: 'A heart murmur is characterized by turbulent blood flow causing a whooshing or swishing sound.',
-      points: 1000,
+      points: 1,
       order_index: 3,
       slider_min: null, slider_max: null, slider_step: null, slider_unit: null, matching_pairs: null
     },
@@ -101,7 +101,7 @@ async function seedComprehensiveQuiz() {
       options: JSON.stringify(['A', 'C', 'E', 'T', 'A', 'M', 'I', 'N', 'O', 'P', 'H', 'E', 'N']),
       correct_answer: 'ACETAMINOPHEN',
       explanation: 'Acetaminophen (also known as paracetamol) is a common analgesic and antipyretic medication.',
-      points: 1000,
+      points: 1,
       order_index: 4,
       slider_min: null, slider_max: null, slider_step: null, slider_unit: null, matching_pairs: null
     },
@@ -113,7 +113,7 @@ async function seedComprehensiveQuiz() {
       options: JSON.stringify(['Wet hands with water', 'Apply soap', 'Rub hands palm to palm', 'Clean thumbs', 'Rinse hands with water']),
       correct_answer: JSON.stringify(['Wet hands with water', 'Apply soap', 'Rub hands palm to palm', 'Clean thumbs', 'Rinse hands with water']),
       explanation: 'The correct sequence ensures all surfaces of the hands are properly decontaminated.',
-      points: 1000,
+      points: 1,
       order_index: 5,
       slider_min: null, slider_max: null, slider_step: null, slider_unit: null, matching_pairs: null
     },
@@ -125,7 +125,7 @@ async function seedComprehensiveQuiz() {
       options: '[]',
       correct_answer: '37',
       explanation: 'The normal average oral body temperature for a healthy adult is 37°C (98.6°F).',
-      points: 1000,
+      points: 1,
       order_index: 6,
       slider_min: 35,
       slider_max: 42,
@@ -146,7 +146,7 @@ async function seedComprehensiveQuiz() {
         'Bradycardia': 'Slow heart rate'
       }),
       explanation: 'Correctly matching terms is key to professional nursing communication.',
-      points: 1000,
+      points: 1,
       order_index: 7,
       slider_min: null, slider_max: null, slider_step: null, slider_unit: null,
       matching_pairs: JSON.stringify(['High blood pressure', 'Low blood sugar', 'Dry mouth and thirst', 'Slow heart rate'])
@@ -159,7 +159,7 @@ async function seedComprehensiveQuiz() {
       options: '[]',
       correct_answer: JSON.stringify({ x: 0.35, y: 0.2, w: 0.3, h: 0.5 }),
       explanation: 'The heart lies in the thoracic cavity between the lungs, slightly to the left of the midline.',
-      points: 1000,
+      points: 1,
       order_index: 8,
       slider_min: null, slider_max: null, slider_step: null, slider_unit: null, matching_pairs: null
     }

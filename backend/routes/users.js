@@ -1,5 +1,5 @@
 const express = require('express');
-const { getDB, qb } = require('../db/init');
+const { getDB } = require('../db/init');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { getLevelInfo } = require('../utils/scoring');
 
@@ -9,24 +9,23 @@ const router = express.Router();
 router.get('/students', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
     const db = getDB();
-    const query = qb('users')
-      .select(
-        'users.id', 
-        'users.name', 
-        'users.email', 
-        'users.avatar_config', 
-        'users.xp', 
-        'users.level', 
-        'users.streak', 
-        'users.last_active', 
-        'users.created_at',
-        '(SELECT COUNT(*) FROM quiz_attempts WHERE user_id = users.id) AS quizzes_taken',
-        '(SELECT COALESCE(AVG(score * 100.0 / NULLIF(total_points, 0)), 0) FROM quiz_attempts WHERE user_id = users.id) AS avg_score'
-      )
-      .where('users.role', '=', 'student')
-      .orderBy('users.xp', 'DESC');
-
-    const studentsResult = await query.execute(db);
+    const studentsResult = await db`
+      SELECT
+        users.id,
+        users.name,
+        users.email,
+        users.avatar_config,
+        users.xp,
+        users.level,
+        users.streak,
+        users.last_active,
+        users.created_at,
+        (SELECT COUNT(*) FROM quiz_attempts WHERE user_id = users.id) AS quizzes_taken,
+        (SELECT COALESCE(AVG(score * 100.0 / NULLIF(total_points, 0)), 0) FROM quiz_attempts WHERE user_id = users.id) AS avg_score
+      FROM users
+      WHERE users.role = ${'student'}
+      ORDER BY users.xp DESC
+    `;
 
     const students = studentsResult.map(s => ({
       ...s,
@@ -50,11 +49,11 @@ router.get('/students', authenticateToken, requireRole('teacher'), async (req, r
 router.get('/students/:id', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
     const db = getDB();
-    const studentResult = await qb('users')
-      .select('id', 'name', 'email', 'avatar_config', 'xp', 'level', 'streak', 'created_at')
-      .where('id', '=', req.params.id)
-      .where('role', '=', 'student')
-      .execute(db);
+    const studentResult = await db`
+      SELECT id, name, email, avatar_config, xp, level, streak, created_at
+      FROM users
+      WHERE id = ${req.params.id} AND role = ${'student'}
+    `;
 
     const student = studentResult[0];
     if (!student) return res.status(404).json({ error: 'Student not found' });
@@ -65,12 +64,13 @@ router.get('/students/:id', authenticateToken, requireRole('teacher'), async (re
     student.streak = parseInt(student.streak || 0, 10);
     student.levelInfo = getLevelInfo(student.xp);
 
-    const attemptsResult = await qb('quiz_attempts')
-      .select('quiz_attempts.*', 'quizzes.title AS quiz_title', 'quizzes.category')
-      .join('quizzes', 'quizzes.id', '=', 'quiz_attempts.quiz_id')
-      .where('quiz_attempts.user_id', '=', req.params.id)
-      .orderBy('quiz_attempts.completed_at', 'DESC')
-      .execute(db);
+    const attemptsResult = await db`
+      SELECT quiz_attempts.*, quizzes.title AS quiz_title, quizzes.category
+      FROM quiz_attempts
+      JOIN quizzes ON quizzes.id = quiz_attempts.quiz_id
+      WHERE quiz_attempts.user_id = ${req.params.id}
+      ORDER BY quiz_attempts.completed_at DESC
+    `;
 
     const attempts = attemptsResult.map(a => ({
       ...a,
@@ -82,11 +82,12 @@ router.get('/students/:id', authenticateToken, requireRole('teacher'), async (re
       time_taken: parseInt(a.time_taken || 0, 10)
     }));
 
-    const achievements = await qb('user_achievements')
-      .select('achievements.*', 'user_achievements.earned_at')
-      .join('achievements', 'achievements.id', '=', 'user_achievements.achievement_id')
-      .where('user_achievements.user_id', '=', req.params.id)
-      .execute(db);
+    const achievements = await db`
+      SELECT achievements.*, user_achievements.earned_at
+      FROM user_achievements
+      JOIN achievements ON achievements.id = user_achievements.achievement_id
+      WHERE user_achievements.user_id = ${req.params.id}
+    `;
 
     res.json({ ...student, attempts, achievements });
   } catch (err) {
@@ -101,18 +102,16 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
     const db = getDB();
 
     if (req.user.role === 'teacher') {
-      const totalStudentsResult = await qb('users')
-        .select('COUNT(*) as count')
-        .where('role', '=', 'student')
-        .execute(db);
+      const totalStudentsResult = await db`
+        SELECT COUNT(*) as count FROM users WHERE role = ${'student'}
+      `;
 
-      const totalQuizzesResult = await qb('quizzes')
-        .select('COUNT(*) as count')
-        .where('created_by', '=', req.user.id)
-        .execute(db);
+      const totalQuizzesResult = await db`
+        SELECT COUNT(*) as count FROM quizzes WHERE created_by = ${req.user.id}
+      `;
 
       const totalAttemptsResult = await db`
-        SELECT COUNT(*) as count FROM quiz_attempts qa 
+        SELECT COUNT(*) as count FROM quiz_attempts qa
         JOIN quizzes q ON q.id = qa.quiz_id WHERE q.created_by = ${req.user.id}
       `;
       const avgScoreResult = await db`
@@ -120,20 +119,20 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
         FROM quiz_attempts qa JOIN quizzes q ON q.id = qa.quiz_id WHERE q.created_by = ${req.user.id}
       `;
 
-      const recentAttemptsResult = await qb('quiz_attempts')
-        .select(
-          'quiz_attempts.*', 
-          'users.name AS student_name', 
-          'users.avatar_config', 
-          'quizzes.title AS quiz_title', 
-          'quizzes.unit'
-        )
-        .join('users', 'users.id', '=', 'quiz_attempts.user_id')
-        .join('quizzes', 'quizzes.id', '=', 'quiz_attempts.quiz_id')
-        .where('quizzes.created_by', '=', req.user.id)
-        .orderBy('quiz_attempts.completed_at', 'DESC')
-        .limit(10)
-        .execute(db);
+      const recentAttemptsResult = await db`
+        SELECT
+          quiz_attempts.*,
+          users.name AS student_name,
+          users.avatar_config,
+          quizzes.title AS quiz_title,
+          quizzes.unit
+        FROM quiz_attempts
+        JOIN users ON users.id = quiz_attempts.user_id
+        JOIN quizzes ON quizzes.id = quiz_attempts.quiz_id
+        WHERE quizzes.created_by = ${req.user.id}
+        ORDER BY quiz_attempts.completed_at DESC
+        LIMIT 10
+      `;
 
       const recentAttempts = recentAttemptsResult.map(a => ({
         ...a,
@@ -157,25 +156,28 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
 
       res.json(stats);
     } else {
-      const users = await qb('users').select('*').where('id', '=', req.user.id).execute(db);
+      const users = await db`SELECT * FROM users WHERE id = ${req.user.id}`;
       const user = users[0];
 
-      const quizzesTakenResult = await qb('quiz_attempts')
-        .select('COUNT(*) as count')
-        .where('user_id', '=', req.user.id)
-        .execute(db);
+      const quizzesTakenResult = await db`
+        SELECT COUNT(*) as count FROM quiz_attempts WHERE user_id = ${req.user.id}
+      `;
 
       const avgScoreResult = await db`SELECT COALESCE(AVG(score * 100.0 / NULLIF(total_points, 0)), 0) as avg FROM quiz_attempts WHERE user_id = ${req.user.id}`;
       const bestStreakResult = await db`SELECT COALESCE(MAX(streak_max), 0) as best FROM quiz_attempts WHERE user_id = ${req.user.id}`;
       const totalScoreResult = await db`SELECT COALESCE(SUM(score), 0) as total FROM quiz_attempts WHERE user_id = ${req.user.id}`;
+      // Average seconds per completed attempt, for the dashboard's Average Time card.
+      // NULLIF ignores attempts recorded with 0 elapsed time so they don't drag the mean down.
+      const avgTimeResult = await db`SELECT COALESCE(AVG(NULLIF(time_taken, 0)), 0) as avg FROM quiz_attempts WHERE user_id = ${req.user.id}`;
 
-      const recentAttemptsResult = await qb('quiz_attempts')
-        .select('quiz_attempts.*', 'quizzes.title AS quiz_title', 'quizzes.category', 'quizzes.unit')
-        .join('quizzes', 'quizzes.id', '=', 'quiz_attempts.quiz_id')
-        .where('quiz_attempts.user_id', '=', req.user.id)
-        .orderBy('quiz_attempts.completed_at', 'DESC')
-        .limit(5)
-        .execute(db);
+      const recentAttemptsResult = await db`
+        SELECT quiz_attempts.*, quizzes.title AS quiz_title, quizzes.category, quizzes.unit
+        FROM quiz_attempts
+        JOIN quizzes ON quizzes.id = quiz_attempts.quiz_id
+        WHERE quiz_attempts.user_id = ${req.user.id}
+        ORDER BY quiz_attempts.completed_at DESC
+        LIMIT 5
+      `;
 
       const recentAttempts = recentAttemptsResult.map(a => ({
         ...a,
@@ -188,12 +190,13 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
         unit: a.unit !== null ? parseInt(a.unit || 0, 10) : null
       }));
 
-      const achievements = await qb('user_achievements')
-        .select('achievements.*', 'user_achievements.earned_at')
-        .join('achievements', 'achievements.id', '=', 'user_achievements.achievement_id')
-        .where('user_achievements.user_id', '=', req.user.id)
-        .orderBy('user_achievements.earned_at', 'DESC')
-        .execute(db);
+      const achievements = await db`
+        SELECT achievements.*, user_achievements.earned_at
+        FROM user_achievements
+        JOIN achievements ON achievements.id = user_achievements.achievement_id
+        WHERE user_achievements.user_id = ${req.user.id}
+        ORDER BY user_achievements.earned_at DESC
+      `;
 
       const stats = {
         xp: parseInt(user.xp || 0, 10),
@@ -204,6 +207,12 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
         avgScore: parseFloat(avgScoreResult[0].avg || 0),
         bestStreak: parseInt(bestStreakResult[0].best || 0, 10),
         totalScore: parseInt(totalScoreResult[0].total || 0, 10),
+        // Average seconds per attempt (Average Time card)
+        avgTime: parseFloat(avgTimeResult[0].avg || 0),
+        // Duolingo-style consecutive-days-played streak. Distinct from `streak`/`bestStreak`
+        // above, which are consecutive-correct-ANSWER streaks.
+        dailyStreak: parseInt(user.current_streak || 0, 10),
+        longestStreak: parseInt(user.longest_streak || 0, 10),
         recentAttempts,
         achievements
       };

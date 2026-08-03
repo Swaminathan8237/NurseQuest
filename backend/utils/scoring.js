@@ -1,7 +1,27 @@
 /**
  * SkillQuest Scoring Engine
- * Kahoot-inspired scoring with time bonus and streak multipliers
+ *
+ * FIXED-MARKS scoring: a correct answer earns the question's full assigned marks, a wrong
+ * answer earns zero. Elapsed time is still recorded and still feeds the speed/efficiency
+ * analytics, but it never changes the mark awarded — and neither does the answer streak.
  */
+
+/** Marks a question is worth when the author has not set a value. */
+const DEFAULT_QUESTION_MARKS = 1;
+
+/**
+ * Marks percentage a student must reach to pass a level and unlock the next one.
+ *
+ * The basis is MARKS (score / total_points), not accuracy (correct_count / total_questions),
+ * so that a question the author weighted more heavily actually counts for more when deciding
+ * whether the student passed. The two coincide whenever every question in a quiz carries equal
+ * marks, and diverge only for weighted quizzes.
+ *
+ * Mirrored in frontend/src/constants.js — the two must be changed together. The server also
+ * returns this value on the submit response (`passPercent`) so the number a student is shown
+ * always comes from here rather than from the client's copy.
+ */
+const PASS_PERCENT = 60;
 
 const LEVELS = [
   { level: 1, name: 'Rookie', minXP: 0, icon: '🌱' },
@@ -14,15 +34,23 @@ const LEVELS = [
 ];
 
 /**
- * Calculate score for a single question answer
+ * Score a single answer: full marks if correct, zero if not.
+ *
+ * Marks are FIXED per question — time and streak no longer change what an answer is worth.
+ * Time is still measured and still drives the cognitive/speed analytics; it just does not
+ * inflate or erode the mark. The timeBonus/streakBonus keys are retained (always 0) so
+ * every existing caller, response payload and UI breakdown keeps working unchanged.
+ *
  * @param {boolean} isCorrect - Whether the answer was correct
- * @param {number} timeRemaining - Seconds remaining when answered
- * @param {number} totalTime - Total seconds allowed for the question
- * @param {number} currentStreak - Current consecutive correct answer streak
- * @param {number} basePoints - Base points for the question (default 1000)
+ * @param {number} timeRemaining - Unused for scoring; kept for signature compatibility
+ * @param {number} totalTime - Unused for scoring; kept for signature compatibility
+ * @param {number} currentStreak - Streak is still tracked, but awards no extra marks
+ * @param {number} basePoints - Marks for this question (default 1)
  * @returns {object} Score breakdown
  */
-function calculateScore(isCorrect, timeRemaining, totalTime, currentStreak, basePoints = 1000) {
+function calculateScore(isCorrect, timeRemaining, totalTime, currentStreak, basePoints = DEFAULT_QUESTION_MARKS) {
+  const marks = Math.max(0, Number(basePoints) || 0);
+
   if (!isCorrect) {
     return {
       baseScore: 0,
@@ -34,30 +62,22 @@ function calculateScore(isCorrect, timeRemaining, totalTime, currentStreak, base
     };
   }
 
-  const baseScore = basePoints;
-  const timeFraction = Math.max(0, timeRemaining) / Math.max(1, totalTime);
-  const timeBonus = Math.round(timeFraction * 500);
-  
-  const streakMultiplier = Math.min(currentStreak, 5);
-  const streakBonus = streakMultiplier * 100;
-  
-  const totalScore = baseScore + timeBonus + streakBonus;
-
   return {
-    baseScore,
-    timeBonus,
-    streakBonus,
-    totalScore,
+    baseScore: marks,
+    timeBonus: 0,
+    streakBonus: 0,
+    totalScore: marks,
     newStreak: currentStreak + 1,
-    multiplier: 1 + (streakMultiplier * 0.1)
+    multiplier: 1
   };
 }
 
 /**
- * Live game scoring that follows a Kahoot-style time curve.
- * points = round(maxPoints * (1 - 0.5 * elapsed/total)) for correct answers.
+ * Live game scoring. Identical rule to the single-player path: full marks or nothing.
+ * The Kahoot-style time curve has been removed so solo and live award the same marks for
+ * the same answer. `timeFactor` is retained (1 when correct) for payload compatibility.
  */
-function calculateLiveScoreKahootStyle(isCorrect, elapsedMs, totalMs, maxPoints = 1000) {
+function calculateLiveScoreKahootStyle(isCorrect, elapsedMs, totalMs, maxPoints = DEFAULT_QUESTION_MARKS) {
   const safeTotalMs = Math.max(1000, Number(totalMs) || 0);
   const safeElapsedMs = Math.max(0, Math.min(Number(elapsedMs) || 0, safeTotalMs));
   const safeMaxPoints = Math.max(0, Number(maxPoints) || 0);
@@ -72,16 +92,12 @@ function calculateLiveScoreKahootStyle(isCorrect, elapsedMs, totalMs, maxPoints 
     };
   }
 
-  const responseRatio = safeElapsedMs / safeTotalMs;
-  const timeFactor = 1 - (0.5 * responseRatio);
-  const totalScore = Math.max(0, Math.round(safeMaxPoints * timeFactor));
-
   return {
     maxPoints: safeMaxPoints,
     elapsedMs: safeElapsedMs,
     totalMs: safeTotalMs,
-    timeFactor,
-    totalScore
+    timeFactor: 1,
+    totalScore: safeMaxPoints
   };
 }
 
@@ -115,22 +131,41 @@ function getLevelInfo(xp) {
 }
 
 /**
- * Calculate XP earned from a quiz attempt
+ * XP awarded per correct answer. Under fixed marks a raw score is ~1 per question, so XP
+ * can no longer be derived from it (round(4 * 0.1) = 0 would freeze every student at
+ * level 1). XP is now earned per correct answer instead, which keeps the LEVELS
+ * thresholds below meaningful and unchanged.
+ */
+const XP_PER_CORRECT = 100;
+
+/**
+ * Calculate XP earned from a quiz attempt.
+ *
+ * Accuracy-based, because marks are now fixed: a 10-question perfect attempt earns
+ * 1000 + 500 = 1500 XP, the same order of magnitude as the old score-derived formula
+ * (~2250) so existing level thresholds still pace sensibly.
+ *
+ * Signature is unchanged so callers do not need to change. `score`/`totalPossible` are
+ * now marks earned / marks available; their ratio is used for the mastery bonus so a
+ * question worth 2 marks counts more than one worth 1.
  */
 function calculateXPEarned(score, totalPossible, correctCount, totalQuestions) {
-  const accuracy = correctCount / Math.max(1, totalQuestions);
-  const scoreRatio = score / Math.max(1, totalPossible);
-  
-  let xp = Math.round(score * 0.1); // Base XP from score
-  
-  // Accuracy bonus
-  if (accuracy >= 1.0) xp += 500;      // Perfect score bonus
+  const safeCorrect = Math.max(0, Number(correctCount) || 0);
+  const accuracy = safeCorrect / Math.max(1, Number(totalQuestions) || 0);
+  const marksRatio = Math.max(0, Number(score) || 0) / Math.max(1, Number(totalPossible) || 0);
+
+  // Base XP scales with work done, so a 20-question quiz outweighs a 5-question one.
+  let xp = Math.round(safeCorrect * XP_PER_CORRECT);
+
+  // Accuracy bonus (unchanged thresholds)
+  if (accuracy >= 1.0) xp += 500;       // Perfect attempt
   else if (accuracy >= 0.8) xp += 200;  // Great performance
   else if (accuracy >= 0.6) xp += 100;  // Good performance
-  
-  // Speed bonus
-  if (scoreRatio >= 0.9) xp += 150;
-  
+
+  // Mastery bonus: replaces the old "speed bonus", which no longer exists as a concept
+  // now that answering fast earns nothing extra. Weighted by marks, not question count.
+  if (marksRatio >= 0.9) xp += 150;
+
   return xp;
 }
 
@@ -152,5 +187,7 @@ module.exports = {
   getLevelInfo,
   calculateXPEarned,
   generateJoinCode,
-  LEVELS
+  LEVELS,
+  DEFAULT_QUESTION_MARKS,
+  PASS_PERCENT,
 };

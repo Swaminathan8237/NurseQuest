@@ -64,7 +64,7 @@ model Question {
   options        String?
   correct_answer String
   explanation    String?
-  points         Int?     @default(1000)
+  points         Int?     @default(1)
   order_index    Int?     @default(0)
   slider_min     Float?
   slider_max     Float?

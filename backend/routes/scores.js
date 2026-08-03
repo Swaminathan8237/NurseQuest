@@ -2,9 +2,58 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { getDB } = require('../db/init');
 const { authenticateToken } = require('../middleware/auth');
-const { calculateScore, calculateXPEarned, getLevelInfo } = require('../utils/scoring');
+const { calculateScore, calculateXPEarned, getLevelInfo, DEFAULT_QUESTION_MARKS, PASS_PERCENT } = require('../utils/scoring');
 
 const router = express.Router();
+
+// Grade a single answer against a question's stored key.
+// Extracted so /submit and /check share identical correctness logic and can't drift.
+function gradeAnswer(question, userAnswer) {
+  // Check correctness based on question type
+  if (question.type === 'jumbled_sequence') {
+    try {
+      const correctSeq = JSON.parse(question.correct_answer);
+      const userSeq = userAnswer;
+      return Array.isArray(userSeq) && Array.isArray(correctSeq) &&
+        userSeq.length === correctSeq.length &&
+        userSeq.every((item, idx) => item === correctSeq[idx]);
+    } catch { return false; }
+  } else if (question.type === 'slider') {
+    return parseFloat(userAnswer) === parseFloat(question.correct_answer);
+  } else if (question.type === 'matching') {
+    try {
+      const userPairs = typeof userAnswer === 'string' ? JSON.parse(userAnswer) : userAnswer;
+      const correctPairs = typeof question.correct_answer === 'string' ? JSON.parse(question.correct_answer) : question.correct_answer;
+      if (userPairs && correctPairs && typeof userPairs === 'object' && typeof correctPairs === 'object') {
+        const correctKeys = Object.keys(correctPairs);
+        return correctKeys.length === Object.keys(userPairs).length &&
+          correctKeys.every(key => userPairs[key] !== undefined &&
+            String(userPairs[key]).trim().toUpperCase() === String(correctPairs[key]).trim().toUpperCase());
+      }
+      return false;
+    } catch { return false; }
+  } else if (question.type === 'captcha') {
+    try {
+      const userBox = typeof userAnswer === 'string' ? JSON.parse(userAnswer) : userAnswer;
+      const correctBox = typeof question.correct_answer === 'string' ? JSON.parse(question.correct_answer) : question.correct_answer;
+      if (userBox && correctBox && typeof userBox === 'object' && typeof correctBox === 'object') {
+        const ix1 = Math.max(userBox.x, correctBox.x);
+        const iy1 = Math.max(userBox.y, correctBox.y);
+        const ix2 = Math.min(userBox.x + userBox.w, correctBox.x + correctBox.w);
+        const iy2 = Math.min(userBox.y + userBox.h, correctBox.y + correctBox.h);
+        const intersection = Math.max(0, ix2 - ix1) * Math.max(0, iy2 - iy1);
+        const unionArea = (userBox.w * userBox.h) + (correctBox.w * correctBox.h) - intersection;
+        const iou = unionArea > 0 ? intersection / unionArea : 0;
+        return iou >= 0.3;
+      }
+      return false;
+    } catch { return false; }
+  } else if (userAnswer === null || userAnswer === undefined) {
+    return false;
+  } else {
+    return userAnswer.toString().toUpperCase().trim() === question.correct_answer?.toString().toUpperCase().trim();
+  }
+}
 
 // Submit quiz attempt
 router.post('/submit', authenticateToken, async (req, res) => {
@@ -28,56 +77,11 @@ router.post('/submit', authenticateToken, async (req, res) => {
     const attemptId = uuidv4();
     const answerInserts = []; // Collect answer inserts to run after attempt is created
 
-    answers.forEach((answer, i) => {
+    answers.forEach((answer) => {
       const question = questions.find(q => q.id === answer.questionId);
       if (!question) return;
 
-      let isCorrect = false;
-
-      // Check correctness based on question type
-      if (question.type === 'jumbled_sequence') {
-        try {
-          const correctSeq = JSON.parse(question.correct_answer);
-          const userSeq = answer.answer;
-          isCorrect = Array.isArray(userSeq) && Array.isArray(correctSeq) &&
-            userSeq.length === correctSeq.length &&
-            userSeq.every((item, idx) => item === correctSeq[idx]);
-        } catch { isCorrect = false; }
-      } else if (question.type === 'slider') {
-        isCorrect = parseFloat(answer.answer) === parseFloat(question.correct_answer);
-      } else if (question.type === 'matching') {
-        try {
-          const userPairs = typeof answer.answer === 'string' ? JSON.parse(answer.answer) : answer.answer;
-          const correctPairs = typeof question.correct_answer === 'string' ? JSON.parse(question.correct_answer) : question.correct_answer;
-          if (userPairs && correctPairs && typeof userPairs === 'object' && typeof correctPairs === 'object') {
-            const correctKeys = Object.keys(correctPairs);
-            isCorrect = correctKeys.length === Object.keys(userPairs).length &&
-              correctKeys.every(key => userPairs[key] !== undefined &&
-                String(userPairs[key]).trim().toUpperCase() === String(correctPairs[key]).trim().toUpperCase());
-          } else {
-            isCorrect = false;
-          }
-        } catch { isCorrect = false; }
-      } else if (question.type === 'captcha') {
-        try {
-          const userBox = typeof answer.answer === 'string' ? JSON.parse(answer.answer) : answer.answer;
-          const correctBox = typeof question.correct_answer === 'string' ? JSON.parse(question.correct_answer) : question.correct_answer;
-          if (userBox && correctBox && typeof userBox === 'object' && typeof correctBox === 'object') {
-            const ix1 = Math.max(userBox.x, correctBox.x);
-            const iy1 = Math.max(userBox.y, correctBox.y);
-            const ix2 = Math.min(userBox.x + userBox.w, correctBox.x + correctBox.w);
-            const iy2 = Math.min(userBox.y + userBox.h, correctBox.y + correctBox.h);
-            const intersection = Math.max(0, ix2 - ix1) * Math.max(0, iy2 - iy1);
-            const unionArea = (userBox.w * userBox.h) + (correctBox.w * correctBox.h) - intersection;
-            const iou = unionArea > 0 ? intersection / unionArea : 0;
-            isCorrect = iou >= 0.3;
-          }
-        } catch { isCorrect = false; }
-      } else if (answer.answer === null || answer.answer === undefined) {
-        isCorrect = false;
-      } else {
-        isCorrect = answer.answer.toString().toUpperCase().trim() === question.correct_answer?.toString().toUpperCase().trim();
-      }
+      const isCorrect = gradeAnswer(question, answer.answer);
 
       if (isCorrect) {
         correctCount++;
@@ -112,7 +116,16 @@ router.post('/submit', authenticateToken, async (req, res) => {
       });
     });
 
-    const totalPossible = questions.length * 2000; // Max possible score
+    // Marks available = the sum of each question's own marks. Previously this was
+    // `questions.length * 2000`, a ceiling no attempt could ever reach (max was ~1600 per
+    // question), so every score/total_points percentage in the app read low — a perfect
+    // attempt showed ~80%. Marks percentage and accuracy now agree exactly whenever every
+    // question carries equal marks, and diverge only for weighted quizzes — which is the
+    // point of author-set marks, and why passing is decided on the marks basis below.
+    const totalPossible = questions.reduce(
+      (sum, q) => sum + Math.max(0, parseInt(q.points, 10) || DEFAULT_QUESTION_MARKS),
+      0
+    );
 
     // Save attempt FIRST (parent row for foreign key)
     await sql`
@@ -144,18 +157,54 @@ router.post('/submit', authenticateToken, async (req, res) => {
     const newXP = (user.xp || 0) + xpEarned;
     const levelInfo = getLevelInfo(newXP);
 
+    // XP/level, the correct-answer streak, and the daily play streak, in one statement.
+    // Daily streak uses CURRENT_DATE so the day boundary is decided by the database rather
+    // than the client clock or the Node process timezone:
+    //   no previous play      -> 1
+    //   already played today  -> unchanged
+    //   played yesterday      -> +1  (continued)
+    //   gap of 2+ days        -> 1   (reset)
     await sql`
-      UPDATE users 
-      SET xp = ${newXP}, 
-          level = ${levelInfo.level}, 
-          streak = CASE WHEN streak < ${maxStreak} THEN ${maxStreak} ELSE streak END 
+      UPDATE users
+      SET xp = ${newXP},
+          level = ${levelInfo.level},
+          streak = CASE WHEN streak < ${maxStreak} THEN ${maxStreak} ELSE streak END,
+          current_streak = CASE
+            WHEN last_played_date = CURRENT_DATE     THEN COALESCE(current_streak, 0)
+            WHEN last_played_date = CURRENT_DATE - 1 THEN COALESCE(current_streak, 0) + 1
+            ELSE 1
+          END,
+          longest_streak = GREATEST(
+            COALESCE(longest_streak, 0),
+            CASE
+              WHEN last_played_date = CURRENT_DATE     THEN COALESCE(current_streak, 0)
+              WHEN last_played_date = CURRENT_DATE - 1 THEN COALESCE(current_streak, 0) + 1
+              ELSE 1
+            END
+          ),
+          last_played_date = CURRENT_DATE
       WHERE id = ${req.user.id}
     `;
 
     // Check for achievements
+    // Fastest single answer in this attempt, for the 'speed' achievement.
+    // null (not Infinity) when nothing was answered, so it can never falsely qualify.
+    const answerTimes = answerInserts.map(a => a.timeTaken).filter(t => t > 0);
+    const fastestAnswerSec = answerTimes.length ? Math.min(...answerTimes) : null;
+
     const newAchievements = await checkAchievements(sql, req.user.id, {
-      correctCount, totalQuestions: questions.length, maxStreak, totalScore, newXP
+      correctCount, totalQuestions: questions.length, maxStreak, totalScore, newXP,
+      fastestAnswerSec
     });
+
+    // Two percentages, deliberately both reported:
+    //   scorePercent — MARKS earned / marks available. Decides passing, and is what the
+    //                  results screen shows as the headline figure.
+    //   percentage   — ACCURACY, correct answers / questions. Kept unchanged so every
+    //                  existing consumer of this field keeps its current meaning.
+    // They are equal unless the quiz mixes mark weights. `passed` is computed here rather
+    // than in the browser because grading is authoritative on the server.
+    const scorePercent = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0;
 
     res.json({
       attemptId,
@@ -169,10 +218,45 @@ router.post('/submit', authenticateToken, async (req, res) => {
       levelInfo,
       questionResults,
       newAchievements,
-      percentage: Math.round((correctCount / questions.length) * 100)
+      percentage: Math.round((correctCount / questions.length) * 100),
+      scorePercent,
+      passPercent: PASS_PERCENT,
+      passed: totalPossible > 0 && (totalScore / totalPossible) * 100 >= PASS_PERCENT
     });
   } catch (err) {
     console.error('Submit score error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Check a single answer and reveal its key (per-question feedback).
+// Grades server-side and returns the correct answer + explanation ONLY after the
+// student commits an answer, so the answer key never ships in the initial quiz payload.
+// No DB writes — /submit remains the authoritative recorder of the attempt.
+router.post('/check', authenticateToken, async (req, res) => {
+  try {
+    const { quizId, questionId, answer, timeRemaining } = req.body;
+    const sql = getDB();
+
+    const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${quizId}`;
+    const quiz = quizzes[0];
+    if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+
+    const questions = await sql`SELECT * FROM questions WHERE id = ${questionId} AND quiz_id = ${quizId}`;
+    const question = questions[0];
+    if (!question) return res.status(404).json({ error: 'Question not found' });
+
+    const isCorrect = gradeAnswer(question, answer);
+    const scoreResult = calculateScore(isCorrect, timeRemaining || 0, quiz.time_per_question, 0, question.points);
+
+    res.json({
+      isCorrect,
+      correctAnswer: question.correct_answer,
+      explanation: question.explanation,
+      pointsEarned: scoreResult.totalScore
+    });
+  } catch (err) {
+    console.error('Check answer error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -396,7 +480,9 @@ async function checkAchievements(sql, userId, data) {
   const attemptCount = parseInt(attemptCountResult[0].count || 0, 10);
 
   for (const achievement of allAchievements) {
-    if (userAchievementIds.includes(achievement.id)) return;
+    // `continue`, not `return` — returning here aborted the whole loop at the first
+    // already-earned badge, so students could never earn a second one.
+    if (userAchievementIds.includes(achievement.id)) continue;
 
     let earned = false;
     switch (achievement.requirement_type) {
@@ -411,6 +497,19 @@ async function checkAchievements(sql, userId, data) {
         break;
       case 'xp':
         earned = data.newXP >= achievement.requirement_value;
+        break;
+      case 'speed':
+        // Fastest single answer in this attempt, at or under the requirement.
+        earned = data.fastestAnswerSec !== null
+          && data.fastestAnswerSec !== undefined
+          && data.fastestAnswerSec <= achievement.requirement_value;
+        break;
+      case 'login_streak':
+      case 'rank':
+        // Seeded but not yet awardable: login_streak needs daily-login tracking and
+        // rank needs a leaderboard snapshot, neither of which exists yet. Left
+        // explicitly unearned rather than silently falling through.
+        earned = false;
         break;
     }
 

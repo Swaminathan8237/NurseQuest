@@ -407,11 +407,11 @@ add_styled_paragraph("Scoring & XP Engine", font_size=16, bold=True, space_after
 add_styled_paragraph("Self-Paced Quiz Scoring:", font_size=12, bold=True, space_after=6)
 
 scoring_items = [
-    "Base Score: 1000 points (for a correct answer)",
-    "Time Bonus: round(timeRemaining / totalTime × 500) → 0 to 500 pts",
-    "Streak Bonus: min(streak, 5) × 100 → 0 to 500 pts",
-    "Total per question: 1000 to 2000 points max",
-    "Incorrect answer: 0 points, streak resets to 0",
+    "Base Score: question's assigned marks (default 1) for a correct answer",
+    "Time Bonus: none — answering faster earns no extra marks",
+    "Streak Bonus: none — streaks do not affect marks",
+    "Total per question: exactly the question's marks or 0",
+    "Incorrect answer: 0 points",
 ]
 
 for item in scoring_items:
@@ -422,8 +422,8 @@ for item in scoring_items:
 add_styled_paragraph("Live Game Scoring (Kahoot-Style):", font_size=12, bold=True, space_before=18, space_after=6)
 
 live_items = [
-    "points = round(maxPoints × (1 − 0.5 × elapsed / totalTime))",
-    "Fastest correct answer gets ~1000 pts, slowest gets ~500 pts",
+    "points = question's marks for the first correct answer (fixed marks)",
+    "Answering faster earns no extra points — time no longer decays the score",
     "Incorrect answer always scores 0",
 ]
 
@@ -436,11 +436,11 @@ for item in live_items:
 add_styled_paragraph("XP Calculation:", font_size=12, bold=True, space_before=18, space_after=6)
 
 xp_items = [
-    "Base XP = score × 0.1",
+    "Base XP = correctAnswers × 100 (marks no longer scale XP)",
     "100% Accuracy → +500 XP bonus",
     "≥ 80% Accuracy → +200 XP bonus",
     "≥ 60% Accuracy → +100 XP bonus",
-    "Speed Ratio ≥ 0.9 → +150 XP bonus",
+    "Marks Ratio ≥ 0.9 → +150 XP mastery bonus",
 ]
 
 for item in xp_items:

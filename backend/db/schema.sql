@@ -18,6 +18,15 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Daily play streak (consecutive CALENDAR DAYS with >=1 quiz played).
+-- Distinct from users.streak, which is a consecutive-correct-ANSWER streak written from
+-- quiz_attempts.streak_max. Added as ALTERs rather than columns in the CREATE above because
+-- the users table already exists in deployed databases, where CREATE TABLE IF NOT EXISTS is
+-- a no-op and new columns in the body would never be applied. These are idempotent.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS current_streak   INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS longest_streak   INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_played_date DATE;
+
 -- Quizzes table
 CREATE TABLE IF NOT EXISTS quizzes (
   id TEXT PRIMARY KEY,
@@ -45,7 +54,7 @@ CREATE TABLE IF NOT EXISTS questions (
   options TEXT, -- JSON array for MCQ options (stored as string for code compatibility)
   correct_answer TEXT NOT NULL,
   explanation TEXT,
-  points INTEGER DEFAULT 1000,
+  points INTEGER DEFAULT 1,     -- Fixed marks: full marks if correct, 0 if not
   order_index INTEGER DEFAULT 0,
   slider_min REAL,           -- Slider: minimum value
   slider_max REAL,           -- Slider: maximum value
@@ -54,6 +63,12 @@ CREATE TABLE IF NOT EXISTS questions (
   matching_pairs TEXT,       -- Matching: JSON array of {left, right} pairs
   FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
 );
+
+-- Fixed-marks scoring: default marks per question moved from 1000 to 1. The CREATE above
+-- only applies to fresh installs (CREATE TABLE IF NOT EXISTS is a no-op on an existing
+-- table), so the deployed default is changed explicitly here. Idempotent.
+-- NOTE: this changes the DEFAULT for NEW questions only; it does not rewrite existing rows.
+ALTER TABLE questions ALTER COLUMN points SET DEFAULT 1;
 
 -- Quiz attempts (individual)
 CREATE TABLE IF NOT EXISTS quiz_attempts (

@@ -80,7 +80,7 @@ export default function Navbar() {
           </NavLink>
           <div className="hidden lg:flex gap-1 items-center">
             <NavLink to={dashPath} className={navLinkClass}>Dashboard</NavLink>
-            {isStudent && <NavLink to="/units" className={navLinkClass}>Units</NavLink>}
+            {isStudent && <NavLink to="/units" className={navLinkClass}>Levels</NavLink>}
             <NavLink to="/leaderboard" className={navLinkClass}>Leaderboard</NavLink>
             {!isStudent && <NavLink to="/quiz-builder" className={navLinkClass}>Create Quiz</NavLink>}
             <NavLink to="/live" className={navLinkClass}>Live Game</NavLink>
@@ -160,7 +160,7 @@ export default function Navbar() {
               {isStudent && (
                 <NavLink to="/units" className={mobileNavLinkClass} onClick={() => setMobileMenuOpen(false)}>
                   <span className="material-symbols-outlined text-xl">school</span>
-                  Units
+                  Levels
                 </NavLink>
               )}
               <NavLink to="/leaderboard" className={mobileNavLinkClass} onClick={() => setMobileMenuOpen(false)}>

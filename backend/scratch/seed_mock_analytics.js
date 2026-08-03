@@ -65,14 +65,22 @@ const UNITS = [
   },
 ];
 
+// Marks per question under the fixed-marks model: a correct answer earns the
+// question's full marks, a wrong one earns 0. Answering faster earns nothing
+// extra, so per-question points are derived from the correctness mask rather
+// than listed per attempt (they previously varied, implying a time bonus that
+// no longer exists).
+const MARKS_PER_QUESTION = 1;
+
 // Three attempts per unit, showing improvement over time.
-// Each mask has 5 booleans (one per question). points for a correct answer vary
-// to produce non-trivial accuracy values; incorrect answers earn 0.
+// Each mask has 5 booleans (one per question). Response times still vary, which
+// is what drives the speed / time-utilisation metrics — they just no longer
+// affect the marks.
 const ATTEMPT_PLANS = [
-  // date offset (days ago), correctness mask, per-question points when correct, per-question seconds
-  { daysAgo: 18, mask: [true, false, true, false, false], correctPts: [820, 0, 640, 0, 0], secs: [14, 22, 11, 25, 19] },
-  { daysAgo: 9,  mask: [true, true, false, true, false],  correctPts: [900, 780, 0, 700, 0], secs: [10, 13, 21, 12, 18] },
-  { daysAgo: 2,  mask: [true, true, true, true, false],   correctPts: [980, 910, 850, 760, 0], secs: [7, 9, 8, 11, 20] },
+  // date offset (days ago), correctness mask, per-question seconds
+  { daysAgo: 18, mask: [true, false, true, false, false], secs: [14, 22, 11, 25, 19] },
+  { daysAgo: 9,  mask: [true, true, false, true, false],  secs: [10, 13, 21, 12, 18] },
+  { daysAgo: 2,  mask: [true, true, true, true, false],   secs: [7, 9, 8, 11, 20] },
 ];
 
 async function seed() {
@@ -114,15 +122,15 @@ async function seed() {
         qIds.push(qId);
         await sql`
           INSERT INTO questions (id, quiz_id, type, question_text, options, correct_answer, points, order_index)
-          VALUES (${qId}, ${u.quizId}, ${q.type}, ${q.text}, '[]', ${q.answer}, 1000, ${i})
+          VALUES (${qId}, ${u.quizId}, ${q.type}, ${q.text}, '[]', ${q.answer}, ${MARKS_PER_QUESTION}, ${i})
         `;
       }
 
       for (const plan of ATTEMPT_PLANS) {
         const attemptId = `${u.quizId}-a${plan.daysAgo}`;
         const correctCount = plan.mask.filter(Boolean).length;
-        const score = plan.correctPts.reduce((s, p) => s + p, 0);
-        const totalPoints = u.questions.length * 1000;
+        const score = correctCount * MARKS_PER_QUESTION;
+        const totalPoints = u.questions.length * MARKS_PER_QUESTION;
         const streakMax = longestStreak(plan.mask);
         const timeTaken = plan.secs.reduce((s, t) => s + t, 0);
         const completedAt = new Date(Date.now() - plan.daysAgo * 24 * 60 * 60 * 1000);
@@ -137,7 +145,7 @@ async function seed() {
 
         for (let i = 0; i < u.questions.length; i++) {
           const ok = plan.mask[i];
-          const pts = plan.correctPts[i];
+          const pts = ok ? MARKS_PER_QUESTION : 0;
           await sql`
             INSERT INTO question_answers
               (id, attempt_id, question_id, user_answer, is_correct, points_earned, time_taken)

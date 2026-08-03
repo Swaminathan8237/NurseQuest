@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { getDB } = require('../db/init');
 
-const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 async function authenticateToken(req, res, next) {
   // Read token from HttpOnly cookie first, fall back to Authorization header
@@ -15,24 +15,23 @@ async function authenticateToken(req, res, next) {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  console.log('🔑 authenticateToken: Received token:', token.substring(0, 20) + '...');
+  // Fail closed: without a signing secret we cannot verify signatures, so refuse
+  // to authenticate rather than trusting an unverified token.
+  if (!JWT_SECRET) {
+    console.error('Auth misconfiguration: JWT_SECRET is not set; refusing to authenticate.');
+    return res.status(500).json({ error: 'Server auth is misconfigured' });
+  }
+
   let decoded;
   try {
-    if (!SUPABASE_JWT_SECRET) {
-      // Fallback for development if secret isn't provided yet
-      decoded = jwt.decode(token);
-      console.log('🔑 authenticateToken: Decoded payload:', decoded);
-      if (!decoded || !decoded.sub) {
-        console.error('🔑 authenticateToken: Missing sub in decoded token:', decoded);
-        return res.status(403).json({ error: 'Invalid token structure' });
-      }
-    } else {
-      decoded = jwt.verify(token, SUPABASE_JWT_SECRET);
-      console.log('🔑 authenticateToken: Verified payload:', decoded);
-    }
+    decoded = jwt.verify(token, JWT_SECRET);
   } catch (err) {
     console.error('Token verification error:', err.message);
     return res.status(403).json({ error: 'Invalid or expired token: ' + err.message });
+  }
+
+  if (!decoded || !(decoded.sub || decoded.id)) {
+    return res.status(403).json({ error: 'Invalid token structure' });
   }
 
   try {

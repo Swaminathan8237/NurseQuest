@@ -230,7 +230,7 @@ const Q_TYPES = [
   { value: 'video', label: 'Video Based', icon: 'play_circle' },
   { value: 'audio', label: 'Audio Based', icon: 'volume_up' },
   { value: 'jumbled_letters', label: 'Jumbled Letters', icon: 'sort_by_alpha' },
-  { value: 'jumbled_sequence', label: 'Sequence Order', icon: 'format_list_numbered' },
+  { value: 'jumbled_sequence', label: 'Procedure / Sequence Order', icon: 'format_list_numbered' },
   { value: 'slider', label: 'Slider', icon: 'linear_scale' },
   { value: 'matching', label: 'Match Pairs', icon: 'compare_arrows' },
   { value: 'captcha', label: 'Image Captcha', icon: 'center_focus_strong' },
@@ -271,7 +271,7 @@ export default function QuizBuilder() {
 
   useEffect(() => {
     if (editId) {
-      quizAPI.getById(editId).then(data => {
+      quizAPI.getByIdForEdit(editId).then(data => {
         setQuiz({
           title: data.title,
           description: data.description || '',
@@ -289,7 +289,7 @@ export default function QuizBuilder() {
             options: q.options && q.options.length > 0 ? q.options : ['', '', '', ''],
             correctAnswer: q.correct_answer || '',
             explanation: q.explanation || '',
-            points: q.points || 1000,
+            points: q.points || 1,
             sliderMin: q.slider_min !== null ? q.slider_min : 0,
             sliderMax: q.slider_max !== null ? q.slider_max : 100,
             sliderStep: q.slider_step !== null ? q.slider_step : 1,
@@ -306,7 +306,7 @@ export default function QuizBuilder() {
 
 
   function createEmptyQuestion() {
-    return { type: 'mcq', questionText: '', mediaUrl: '', options: ['', '', '', ''], correctAnswer: '', explanation: '', points: 1000, sliderMin: 0, sliderMax: 100, sliderStep: 1, sliderUnit: '', matchingPairs: ['', '', '', ''] };
+    return { type: 'mcq', questionText: '', mediaUrl: '', options: ['', '', '', ''], correctAnswer: '', explanation: '', points: 1, sliderMin: 0, sliderMax: 100, sliderStep: 1, sliderUnit: '', matchingPairs: ['', '', '', ''] };
   }
 
   const updateQuestion = (i, field, value) => {
@@ -642,7 +642,8 @@ export default function QuizBuilder() {
                 {/* Sequence Order */}
                 {q.type === 'jumbled_sequence' && (
                   <div>
-                    <label className="block text-sm font-label font-semibold text-slate-400 mb-3 uppercase tracking-wider">Steps (In Correct Order)</label>
+                    <label className="block text-sm font-label font-semibold text-slate-400 mb-1 uppercase tracking-wider">Steps (In Correct Order)</label>
+                    <p className="text-xs text-slate-500 mb-3">Students see these as shuffled cards to drag into numbered containers — the order you enter here is the answer key.</p>
                     <div className="space-y-3">
                       {(q.options || ['']).map((step, si) => (
                         <div key={si} className="flex items-center gap-3 bg-surface-container-high rounded-lg p-3 pl-4 border border-outline-variant/20">
@@ -672,8 +673,12 @@ export default function QuizBuilder() {
                       <button 
                         className="w-full py-3 border border-dashed border-outline-variant/50 rounded-lg text-slate-400 font-semibold hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center justify-center gap-2" 
                         onClick={() => {
+                          // correctAnswer must be rewritten alongside options: grading requires
+                          // both to be the same length, so a step added but never typed into
+                          // would otherwise make the question permanently ungradeable.
                           const opts = [...(q.options || []), ''];
                           updateQuestion(activeQ, 'options', opts);
+                          updateQuestion(activeQ, 'correctAnswer', JSON.stringify(opts));
                         }}
                       >
                         <span className="material-symbols-outlined text-sm">add</span> Add Step
@@ -871,12 +876,24 @@ export default function QuizBuilder() {
 
                   <div>
                     <label className="block text-sm font-label font-semibold text-slate-400 mb-2 uppercase tracking-wider">Clinical Explanation (Optional)</label>
-                    <textarea 
-                      className="input h-24 resize-none text-sm" 
-                      value={q.explanation} 
-                      onChange={e => updateQuestion(activeQ, 'explanation', e.target.value)} 
+                    <textarea
+                      className="input h-24 resize-none text-sm"
+                      value={q.explanation}
+                      onChange={e => updateQuestion(activeQ, 'explanation', e.target.value)}
                       placeholder="Explain the clinical rationale for the correct answer..."
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-label font-semibold text-slate-400 mb-2 uppercase tracking-wider">Marks</label>
+                    <input
+                      type="number" min="0" step="1"
+                      className="input text-sm"
+                      value={q.points}
+                      onChange={e => updateQuestion(activeQ, 'points', parseInt(e.target.value, 10) || 0)}
+                      placeholder="1"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Marks awarded for a correct answer. Wrong answers score 0. Answering faster earns no extra marks. Default 1.</p>
                   </div>
                 </div>
 

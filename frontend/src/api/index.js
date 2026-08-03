@@ -48,6 +48,9 @@ export const quizAPI = {
   },
   getMyQuizzes: () => request('/quizzes/my-quizzes'),
   getById: (id) => request(`/quizzes/${id}`),
+  // Teacher/admin editing path — returns the full quiz WITH the answer key.
+  // Ownership-gated server-side; students must never call this.
+  getByIdForEdit: (id) => request(`/quizzes/${id}/edit`),
   create: (data) => request('/quizzes', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => request(`/quizzes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id) => request(`/quizzes/${id}`, { method: 'DELETE' }),
@@ -120,6 +123,10 @@ export const quizAPI = {
 // Scores
 export const scoreAPI = {
   submit: (quizId, answers) => request('/scores/submit', { method: 'POST', body: JSON.stringify({ quizId, answers }) }),
+  // Grade a single question server-side and reveal its key AFTER the student commits.
+  // This is how the answer/explanation reach the client — never in the initial quiz payload.
+  check: (quizId, questionId, answer, timeRemaining) =>
+    request('/scores/check', { method: 'POST', body: JSON.stringify({ quizId, questionId, answer, timeRemaining }) }),
   getLeaderboard: (params) => {
     const query = new URLSearchParams(params).toString();
     return request(`/scores/leaderboard${query ? '?' + query : ''}`);
@@ -150,6 +157,12 @@ export const adminAPI = {
   getStudentUnits: (id) => request(`/admin/students/${id}/units`),
   getStudentUnitAttempts: (id, unit) => request(`/admin/students/${id}/units/${unit}/attempts`),
   getAttemptQuestions: (attemptId) => request(`/admin/attempts/${attemptId}/questions`),
+  // Full performance report: accuracy, first-attempt mastery, cognitive/time metrics,
+  // retention, Knowledge Score + classification, and badges. `expectedMinutes` optionally
+  // overrides the per-unit time budget used by the Speed Score.
+  getStudentReport: (id, expectedMinutes) => request(`/admin/students/${id}/report${expectedMinutes ? `?expectedMinutes=${expectedMinutes}` : ''}`),
+  // Unit quiz management
+  getUnitQuizzes: () => request('/admin/unit-quizzes'),
 };
 
 export default { authAPI, quizAPI, scoreAPI, userAPI, adminAPI };

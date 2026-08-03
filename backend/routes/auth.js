@@ -6,11 +6,13 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const { sanitizeLogInput, escapeHtml } = require('../utils/logger');
 
 const router = express.Router();
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
@@ -28,7 +30,7 @@ router.post('/login', async (req, res) => {
     
     if (users.length === 0) {
       // If they don't exist locally, check if they exist in Supabase Auth (fallback)
-      console.log(`🔑 Auth: User not found in local DB, checking Supabase Auth for ${email}...`);
+      console.log(`🔑 Auth: User not found in local DB, checking Supabase Auth for ${sanitizeLogInput(email)}...`);
       if (!SUPABASE_URL || !SUPABASE_KEY) {
         return res.status(400).json({ error: 'Invalid email or password' });
       }
@@ -69,7 +71,11 @@ router.post('/login', async (req, res) => {
         role: 'authenticated',
         exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24)
       };
-      const secret = process.env.SUPABASE_JWT_SECRET || 'fallback-secret-for-demo';
+      const secret = JWT_SECRET;
+      if (!secret) {
+        console.error('Auth misconfiguration: JWT_SECRET is not set; cannot sign token.');
+        return res.status(500).json({ error: 'Server auth is misconfigured' });
+      }
       const token = jwt.sign(payload, secret);
       
       const cookieOptions = {
@@ -133,7 +139,11 @@ router.post('/login', async (req, res) => {
       role: 'authenticated',
       exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 hours
     };
-    const secret = process.env.SUPABASE_JWT_SECRET || 'fallback-secret-for-demo';
+    const secret = JWT_SECRET;
+    if (!secret) {
+      console.error('Auth misconfiguration: JWT_SECRET is not set; cannot sign token.');
+      return res.status(500).json({ error: 'Server auth is misconfigured' });
+    }
     const token = jwt.sign(payload, secret);
 
     const cookieOptions = {
@@ -213,7 +223,7 @@ router.post('/register', async (req, res) => {
     const verifyUrl = `http://localhost:3001/api/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(lowerEmail)}`;
     
     // Log the verification URL in the console for easy developer testing/bypass
-    console.log(`\n✉️  [SKILLQUEST VERIFICATION] Email verification URL generated for ${lowerEmail}:`);
+    console.log(`\n✉️  [SKILLQUEST VERIFICATION] Email verification URL generated for ${sanitizeLogInput(lowerEmail)}:`);
     console.log(`👉 ${verifyUrl}\n`);
 
     // 5. Use the Nodemailer transporter to send a styled HTML email to the student containing a clear, puffy action button to "Verify My Account" using the verification URL
@@ -232,6 +242,14 @@ router.post('/register', async (req, res) => {
       }
     });
 
+    // This markup renders in the recipient's mail client, so every interpolated value must be
+    // HTML-escaped (CWE-116). `name` comes straight from the registration request body, so an
+    // unescaped value could inject arbitrary markup into the email. verifyUrl is built from a
+    // crypto token and an encodeURIComponent'd address, but is escaped too so the template has
+    // no unescaped holes — `&` correctly becomes `&amp;` inside the href.
+    const safeName = escapeHtml(name);
+    const safeVerifyUrl = escapeHtml(verifyUrl);
+
     const mailOptions = {
       from: process.env.SMTP_FROM || `"SkillQuest Support" <no-reply@skillquest.io>`,
       to: lowerEmail,
@@ -243,18 +261,18 @@ router.post('/register', async (req, res) => {
             <p style="color: #A8A3C0; margin: 5px 0 0 0; font-size: 14px;">Learn · Practice · Excel</p>
           </div>
           <div style="background-color: #1A1830; padding: 40px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1);">
-            <h2 style="color: #E8E4F5; margin-top: 0; font-size: 20px; font-weight: 700;">Welcome to SkillQuest, ${name}!</h2>
+            <h2 style="color: #E8E4F5; margin-top: 0; font-size: 20px; font-weight: 700;">Welcome to SkillQuest, ${safeName}!</h2>
             <p style="color: #4E4E5A; line-height: 1.6; font-size: 15px;">
               Thank you for registering. To verify your email and activate your account, please click the puffy verification button below:
             </p>
             <div style="text-align: center; margin: 35px 0;">
-              <a href="${verifyUrl}" style="background-color: #ff3b93; color: #ffffff; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 15px rgba(255, 59, 147, 0.4); text-transform: uppercase; letter-spacing: 0.5px;">
+              <a href="${safeVerifyUrl}" style="background-color: #ff3b93; color: #ffffff; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 15px rgba(255, 59, 147, 0.4); text-transform: uppercase; letter-spacing: 0.5px;">
                 Verify My Account
               </a>
             </div>
             <p style="color: #8E8EA0; font-size: 12px; line-height: 1.5; margin-bottom: 0;">
               If the button above does not work, copy and paste this URL into your browser: <br/>
-              <a href="${verifyUrl}" style="color: #b76dff; text-decoration: none; word-break: break-all;">${verifyUrl}</a>
+              <a href="${safeVerifyUrl}" style="color: #b76dff; text-decoration: none; word-break: break-all;">${safeVerifyUrl}</a>
             </p>
           </div>
           <div style="text-align: center; margin-top: 25px; color: #B2B2C2; font-size: 12px;">
@@ -324,7 +342,7 @@ router.get('/verify-email', async (req, res) => {
       WHERE id = ${user.id}
     `;
 
-    console.log(`✅ Email verified successfully for: ${lowerEmail}`);
+    console.log(`✅ Email verified successfully for: ${sanitizeLogInput(lowerEmail)}`);
 
     // 4. Redirect to FRONTEND_URL/login?verified=true (will trigger the AppRoutes redirect to /auth?verified=true)
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -352,10 +370,39 @@ router.post('/logout', async (req, res) => {
 });
 
 // POST /api/auth/set-cookie
+// Bridges the Supabase OAuth flow to our HttpOnly session cookie: the client hands us the
+// access_token Supabase issued and we persist it as `skillquest_token`.
+//
+// The token MUST be verified before it is trusted as a session credential (CWE-384 session
+// fixation) — without verification any caller could plant an arbitrary cookie value and
+// fixate or forge a session. We apply the same signature/structure checks that
+// middleware/auth.js applies when it later reads this cookie, so this endpoint only ever
+// issues a cookie the middleware would subsequently accept. Legitimate tokens (Supabase
+// access_tokens and locally-issued login tokens, both signed with JWT_SECRET) keep working
+// unchanged; forged or expired tokens are rejected here instead of being stored.
 router.post('/set-cookie', async (req, res) => {
   const { token } = req.body;
   if (!token) {
     return res.status(400).json({ error: 'Token is required' });
+  }
+
+  // Fail closed: without a signing secret we cannot verify the token, so refuse rather than
+  // store unverified input (mirrors middleware/auth.js).
+  if (!JWT_SECRET) {
+    console.error('Auth misconfiguration: JWT_SECRET is not set; refusing to set session cookie.');
+    return res.status(500).json({ error: 'Server auth is misconfigured' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    console.error('Rejected set-cookie: token verification failed:', sanitizeLogInput(err.message));
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  if (!decoded || !(decoded.sub || decoded.id)) {
+    return res.status(401).json({ error: 'Invalid token structure' });
   }
 
   try {

@@ -174,7 +174,7 @@ async function seed() {
     ];
 
     for (const q of questions) {
-      await sql`INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index) VALUES (${uuidv4()}, ${q.quiz_id}, ${q.type}, ${q.question_text}, ${q.media_url || null}, ${q.options}, ${q.correct_answer}, ${q.explanation}, 1000, ${q.order_index})`;
+      await sql`INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index) VALUES (${uuidv4()}, ${q.quiz_id}, ${q.type}, ${q.question_text}, ${q.media_url || null}, ${q.options}, ${q.correct_answer}, ${q.explanation}, ${q.points || 1}, ${q.order_index})`;
     }
 
     // Create quiz attempts for leaderboard data

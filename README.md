@@ -587,18 +587,34 @@ NurseQuest uses **SQLite** (via better-sqlite3) with **10 tables**:
 
 ## 🏆 Scoring System
 
-NurseQuest uses a multi-factor scoring algorithm:
+NurseQuest uses **fixed marks** per question:
 
 ```
-Score = Base Points × Correctness × Time Bonus × Streak Multiplier
+Score = Correct ? Question's Assigned Marks : 0
 ```
 
 | Factor | Details |
 |--------|---------|
-| **Base Points** | 1000 points per question (configurable) |
-| **Time Bonus** | Faster answers earn more — linear decay from 100% to 50% |
-| **Streak Multiplier** | Consecutive correct answers boost score (1× → 1.5× → 2×) |
-| **XP Mapping** | Score converts to XP and accumulates toward level progression |
+| **Marks** | Set per question by the author, default **1 mark** |
+| **Time** | Recorded and reported, but **never changes the mark** — answering faster earns nothing extra |
+| **Streak** | Tracked for badges and analytics, but **does not multiply the mark** |
+| **XP Mapping** | XP comes from correct-answer count and accuracy (not from marks), and accumulates toward level progression |
+
+A quiz's percentage is therefore `earned marks ÷ sum of all question marks`, which equals plain
+accuracy whenever every question carries equal marks.
+
+### Passing a Level
+
+| Rule | Details |
+|------|---------|
+| **Pass mark** | **60%**, defined once as `PASS_PERCENT` in `backend/utils/scoring.js` and mirrored in `frontend/src/constants.js` |
+| **Basis** | The **marks** percentage (`score ÷ total_points`), so a question the author weighted more heavily counts for more |
+| **Effect** | Reaching the pass mark on Level *N* marks it complete and unlocks Level *N+1* |
+| **Enforcement** | Server-side on `GET /api/quizzes/:id` — the frontend lock is a mirror, not the gate |
+
+Below the pass mark, the results screen tells the student the score they reached, the score they
+need, and prompts a retry. Naming convention across the codebase: a field ending in
+`ScorePercent` is marks-based; one ending in `Accuracy` is answer-count-based.
 
 ### Nursing Ranks
 

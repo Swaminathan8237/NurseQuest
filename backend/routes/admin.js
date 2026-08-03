@@ -2,6 +2,8 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { getDB } = require('../db/init');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const analytics = require('../utils/analytics');
+const { PASS_PERCENT } = require('../utils/scoring');
 
 const router = express.Router();
 
@@ -273,6 +275,42 @@ router.post('/requests/:id/action', authenticateToken, requireAdmin, async (req,
 
 
 /* ==========================================================================
+   3. UNIT QUIZ MANAGEMENT (Admin Only)
+   ========================================================================== */
+
+// Admin: Get all unit-linked quizzes (any author) for the Units management view
+router.get('/unit-quizzes', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const sql = getDB();
+    const rows = await sql`
+      SELECT q.id, q.title, q.description, q.category, q.difficulty, q.unit,
+        q.is_published, q.time_per_question, q.created_by, q.created_at,
+        u.name AS author_name,
+        (SELECT COUNT(*) FROM questions     WHERE quiz_id = q.id) AS question_count,
+        (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = q.id) AS attempt_count
+      FROM quizzes q
+      JOIN users u ON q.created_by = u.id
+      WHERE q.unit IS NOT NULL
+      ORDER BY q.unit ASC, q.created_at DESC
+    `;
+
+    const quizzes = rows.map(q => ({
+      ...q,
+      unit: parseInt(q.unit, 10),
+      is_published: parseInt(q.is_published || 0, 10),
+      question_count: parseInt(q.question_count || 0, 10),
+      attempt_count: parseInt(q.attempt_count || 0, 10)
+    }));
+
+    res.json(quizzes);
+  } catch (err) {
+    console.error('Admin get unit quizzes error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+/* ==========================================================================
    4. DEVELOPMENTS & ANALYTICS (Admin Only)
    ========================================================================== */
 
@@ -533,6 +571,389 @@ router.get('/attempts/:attemptId/questions', authenticateToken, requireAdmin, as
     res.json(questions);
   } catch (err) {
     console.error('Admin get attempt questions error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ==========================================================================
+   5. STUDENT PERFORMANCE REPORT (Admin Only)
+   ==========================================================================
+   Full metric report: accuracy, first-attempt mastery, cognitive/time metrics,
+   retention, composite Knowledge Score + classification, and badges.
+
+   All figures are computed from recorded single-player attempts. Live-game answers
+   are NOT persisted (socket.js only writes live_sessions), so they are excluded —
+   the response advertises this via meta.liveGamesExcluded.
+
+   ?expectedMinutes=<n> optionally overrides the per-unit expected time used by the
+   Speed Score. Omitted => quizzes.time_per_question x question count.
+*/
+
+router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sql = getDB();
+
+    // Optional admin override, bounded to a sane range (1 min .. 24 h).
+    let expectedMinutes = null;
+    if (req.query.expectedMinutes !== undefined && req.query.expectedMinutes !== '') {
+      const parsed = parseInt(req.query.expectedMinutes, 10);
+      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1440) {
+        return res.status(400).json({ error: 'expectedMinutes must be an integer between 1 and 1440.' });
+      }
+      expectedMinutes = parsed;
+    }
+
+    const students = await sql`
+      SELECT id, name, email, role, avatar_config, xp, level, streak
+      FROM users WHERE id = ${id}
+    `;
+    if (students.length === 0) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+    const s = students[0];
+    const student = {
+      id: s.id,
+      name: s.name,
+      email: s.email,
+      role: s.role,
+      avatar_config: s.avatar_config,
+      xp: parseInt(s.xp || 0, 10),
+      level: parseInt(s.level || 1, 10),
+      streak: parseInt(s.streak || 0, 10)
+    };
+
+    // 1. Per-unit answer rollup: correctness + per-question response times.
+    const answerRows = await sql`
+      SELECT q.unit,
+        COUNT(*)                       AS answered,
+        SUM(qans.is_correct)           AS correct,
+        AVG(NULLIF(qans.time_taken, 0)) AS avg_time,
+        MIN(NULLIF(qans.time_taken, 0)) AS fastest,
+        MAX(qans.time_taken)           AS slowest
+      FROM question_answers qans
+      JOIN quiz_attempts qa ON qa.id = qans.attempt_id
+      JOIN quizzes q        ON q.id  = qa.quiz_id
+      WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+      GROUP BY q.unit
+    `;
+
+    // 2. Per-unit attempt rollup: elapsed time, points, best score, attempt count.
+    const attemptRows = await sql`
+      SELECT q.unit,
+        COUNT(*)                                           AS attempts,
+        SUM(qa.time_taken)                                 AS total_time,
+        SUM(qa.score)                                      AS total_points,
+        MAX(qa.streak_max)                                 AS best_streak,
+        MAX(qa.score * 100.0 / NULLIF(qa.total_points, 0)) AS best_score_percent,
+        MAX(qa.correct_count * 100.0 / NULLIF(qa.total_questions, 0)) AS best_accuracy
+      FROM quiz_attempts qa
+      JOIN quizzes q ON q.id = qa.quiz_id
+      WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+      GROUP BY q.unit
+    `;
+
+    // 3. Expected time per unit. Scaled by attempt count per quiz, because query 2's
+    //    total_time sums EVERY attempt — comparing that against a single-pass budget
+    //    would punish a student for retrying. The inner joins also restrict this to
+    //    quizzes the student actually attempted, so both sides cover the same work.
+    const expectedRows = await sql`
+      SELECT q.unit,
+        SUM(q.time_per_question * qc.question_count * ac.attempt_count) AS expected_time,
+        SUM(q.time_per_question * qc.question_count)                    AS expected_time_single,
+        SUM(ac.attempt_count)                                           AS attempt_count
+      FROM quizzes q
+      JOIN (
+        SELECT quiz_id, COUNT(*) AS question_count
+        FROM questions GROUP BY quiz_id
+      ) qc ON qc.quiz_id = q.id
+      JOIN (
+        SELECT quiz_id, COUNT(*) AS attempt_count
+        FROM quiz_attempts WHERE user_id = ${id} GROUP BY quiz_id
+      ) ac ON ac.quiz_id = q.id
+      WHERE q.unit IS NOT NULL
+      GROUP BY q.unit
+    `;
+
+    // 4. First-attempt correctness: the student's EARLIEST answer to each question.
+    const firstAttemptRows = await sql`
+      WITH ranked AS (
+        SELECT qans.question_id, qans.is_correct, q.unit,
+          ROW_NUMBER() OVER (PARTITION BY qans.question_id ORDER BY qa.completed_at ASC) AS rn
+        FROM question_answers qans
+        JOIN quiz_attempts qa ON qa.id = qans.attempt_id
+        JOIN quizzes q        ON q.id  = qa.quiz_id
+        WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+      )
+      SELECT unit, COUNT(*) AS total, SUM(is_correct) AS correct
+      FROM ranked WHERE rn = 1
+      GROUP BY unit
+    `;
+
+    // 5. Retention: accuracy of the earliest vs latest attempt per unit.
+    const retentionRows = await sql`
+      WITH ranked AS (
+        SELECT q.unit,
+          qa.correct_count * 100.0 / NULLIF(qa.total_questions, 0) AS acc,
+          ROW_NUMBER() OVER (PARTITION BY q.unit ORDER BY qa.completed_at ASC)  AS rn_first,
+          ROW_NUMBER() OVER (PARTITION BY q.unit ORDER BY qa.completed_at DESC) AS rn_last,
+          COUNT(*)    OVER (PARTITION BY q.unit)                                AS unit_attempts
+        FROM quiz_attempts qa
+        JOIN quizzes q ON q.id = qa.quiz_id
+        WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+      )
+      SELECT unit,
+        MAX(unit_attempts)                            AS unit_attempts,
+        MAX(CASE WHEN rn_first = 1 THEN acc END)      AS initial_acc,
+        MAX(CASE WHEN rn_last  = 1 THEN acc END)      AS latest_acc
+      FROM ranked
+      GROUP BY unit
+    `;
+
+    // 6. Units available platform-wide (denominator for Completion).
+    const availableRows = await sql`
+      SELECT COUNT(DISTINCT unit) AS units_available
+      FROM quizzes WHERE unit IS NOT NULL AND is_published = 1
+    `;
+    const unitsAvailable = parseInt(availableRows[0]?.units_available || 0, 10);
+
+    // ---- Assemble per-unit metrics ----
+    const byUnit = new Map();
+    const ensure = (unitRaw) => {
+      const unit = parseInt(unitRaw, 10);
+      if (!byUnit.has(unit)) byUnit.set(unit, { unit });
+      return byUnit.get(unit);
+    };
+
+    answerRows.forEach(r => {
+      const u = ensure(r.unit);
+      u.totalQuestions = parseInt(r.answered || 0, 10);
+      u.correct = parseInt(r.correct || 0, 10);
+      u.incorrect = u.totalQuestions - u.correct;
+      u.avgResponseTime = Math.round(parseFloat(r.avg_time || 0) * 100) / 100;
+      u.fastestResponse = parseInt(r.fastest || 0, 10);
+      u.slowestResponse = parseInt(r.slowest || 0, 10);
+    });
+
+    attemptRows.forEach(r => {
+      const u = ensure(r.unit);
+      u.attempts = parseInt(r.attempts || 0, 10);
+      u.completionTime = parseInt(r.total_time || 0, 10);
+      u.totalPoints = parseInt(r.total_points || 0, 10);
+      u.bestStreak = parseInt(r.best_streak || 0, 10);
+      u.bestScorePercent = Math.round(parseFloat(r.best_score_percent || 0));
+      u.bestAccuracy = Math.round(parseFloat(r.best_accuracy || 0));
+    });
+
+    expectedRows.forEach(r => {
+      const u = ensure(r.unit);
+      u.expectedTimeDefault = parseInt(r.expected_time || 0, 10);
+      // Single-pass budget and attempt count, so the admin override can scale the
+      // same way the default does (see expectedTime below).
+      u.expectedTimeSingle = parseInt(r.expected_time_single || 0, 10);
+      u.expectedAttemptCount = parseInt(r.attempt_count || 0, 10);
+    });
+
+    const firstAttemptByUnit = new Map();
+    firstAttemptRows.forEach(r => {
+      firstAttemptByUnit.set(parseInt(r.unit, 10), {
+        total: parseInt(r.total || 0, 10),
+        correct: parseInt(r.correct || 0, 10)
+      });
+    });
+
+    const retentionByUnit = new Map();
+    retentionRows.forEach(r => {
+      retentionByUnit.set(parseInt(r.unit, 10), {
+        attempts: parseInt(r.unit_attempts || 0, 10),
+        initial: parseFloat(r.initial_acc || 0),
+        latest: parseFloat(r.latest_acc || 0)
+      });
+    });
+
+    const units = Array.from(byUnit.values())
+      .sort((a, b) => a.unit - b.unit)
+      .map(u => {
+        u.totalQuestions = u.totalQuestions || 0;
+        u.correct = u.correct || 0;
+        u.incorrect = u.incorrect || 0;
+        u.attempts = u.attempts || 0;
+        u.completionTime = u.completionTime || 0;
+        u.totalPoints = u.totalPoints || 0;
+        u.bestScorePercent = u.bestScorePercent || 0;
+        u.bestAccuracy = u.bestAccuracy || 0;
+        u.avgResponseTime = u.avgResponseTime || 0;
+        u.fastestResponse = u.fastestResponse || 0;
+        u.slowestResponse = u.slowestResponse || 0;
+
+        // Expected time is a per-quiz budget, so it scales with how many attempts the
+        // student made, mirroring total_time in query 2. Admin override applies per
+        // attempt; otherwise use the authored budget per quiz.
+        u.expectedTime = expectedMinutes !== null
+          ? (expectedMinutes * 60) * (u.expectedAttemptCount || 0)
+          : (u.expectedTimeDefault || 0);
+        delete u.expectedTimeDefault;
+        delete u.expectedTimeSingle;
+        delete u.expectedAttemptCount;
+
+        const fa = firstAttemptByUnit.get(u.unit);
+        u.firstAttemptAccuracy = fa ? analytics.accuracy(fa.correct, fa.total) : 0;
+        u.firstAttemptMastered = !!(fa && fa.total > 0 && fa.correct === fa.total);
+
+        const ret = retentionByUnit.get(u.unit);
+        u.retention = (ret && ret.attempts >= 2)
+          ? analytics.retention(ret.latest, ret.initial)
+          : null;
+
+        u.accuracy = analytics.accuracy(u.correct, u.totalQuestions);
+        u.speedScore = analytics.speedScore(u.expectedTime, u.completionTime);
+        u.timeUtilization = analytics.timeUtilization(u.completionTime, u.expectedTime);
+        u.efficiency = analytics.efficiency(u.accuracy, u.avgResponseTime);
+        // Completed = best MARKS percentage >= the pass mark, the same rule the student-facing
+        // Levels page and the server-side unlock gate in quizzes.js now use, so admin and
+        // student never disagree about which levels are done. Marks (not accuracy) is the
+        // basis so that a question the author weighted more heavily counts for more; the two
+        // coincide whenever a quiz's questions all carry equal marks.
+        u.completed = u.bestScorePercent >= PASS_PERCENT;
+
+        const ks = analytics.knowledgeScore({
+          accuracy: u.accuracy,
+          firstAttemptAccuracy: u.firstAttemptAccuracy,
+          speed: u.speedScore,
+          retention: u.retention
+        });
+        u.knowledgeScore = ks.score;
+        u.retentionApplied = ks.retentionApplied;
+        u.knowledgeLevel = analytics.classify(ks.score);
+
+        return u;
+      });
+
+    // ---- Overall: summed counts, NOT averaged unit percentages, so a 40-question
+    //      unit outweighs a 4-question one. ----
+    const sum = (key) => units.reduce((acc, u) => acc + (u[key] || 0), 0);
+
+    const totalQuestions = sum('totalQuestions');
+    const totalCorrect = sum('correct');
+    const totalTime = sum('completionTime');
+    const totalExpected = sum('expectedTime');
+    const unitsCompleted = units.filter(u => u.completed).length;
+
+    let firstTotal = 0, firstCorrect = 0;
+    firstAttemptByUnit.forEach(v => { firstTotal += v.total; firstCorrect += v.correct; });
+
+    // Response-time extremes across every answered question.
+    const timed = units.filter(u => u.totalQuestions > 0);
+    const weightedRespSum = timed.reduce((acc, u) => acc + u.avgResponseTime * u.totalQuestions, 0);
+    const avgResponseTime = totalQuestions > 0
+      ? Math.round((weightedRespSum / totalQuestions) * 100) / 100
+      : 0;
+    const fastestCandidates = timed.map(u => u.fastestResponse).filter(v => v > 0);
+    const fastestResponse = fastestCandidates.length ? Math.min(...fastestCandidates) : 0;
+    const slowestResponse = timed.length ? Math.max(...timed.map(u => u.slowestResponse)) : 0;
+
+    // Overall retention: mean of the units where it is measurable.
+    const measurable = units.map(u => u.retention).filter(v => v !== null && v !== undefined);
+    const overallRetention = measurable.length
+      ? Math.round((measurable.reduce((a, b) => a + b, 0) / measurable.length) * 100) / 100
+      : null;
+
+    const overallAccuracy = analytics.accuracy(totalCorrect, totalQuestions);
+    const overallFirstAttempt = analytics.accuracy(firstCorrect, firstTotal);
+    const overallSpeed = analytics.speedScore(totalExpected, totalTime);
+    const completion = unitsAvailable > 0
+      ? Math.round((unitsCompleted / unitsAvailable) * 10000) / 100
+      : 0;
+
+    const overallKs = analytics.knowledgeScore({
+      accuracy: overallAccuracy,
+      firstAttemptAccuracy: overallFirstAttempt,
+      speed: overallSpeed,
+      retention: overallRetention
+    });
+
+    const overall = {
+      totalPoints: sum('totalPoints'),
+      totalAttempts: sum('attempts'),
+      totalQuestions,
+      correct: totalCorrect,
+      incorrect: totalQuestions - totalCorrect,
+      accuracy: overallAccuracy,
+      firstAttemptAccuracy: overallFirstAttempt,
+      avgResponseTime,
+      fastestResponse,
+      slowestResponse,
+      totalTime,
+      expectedTime: totalExpected,
+      timeUtilization: analytics.timeUtilization(totalTime, totalExpected),
+      speedScore: overallSpeed,
+      efficiency: analytics.efficiency(overallAccuracy, avgResponseTime),
+      unitsCompleted,
+      unitsAvailable,
+      completion,
+      retention: overallRetention,
+      knowledgeScore: overallKs.score,
+      retentionApplied: overallKs.retentionApplied,
+      knowledgeLevel: analytics.classify(overallKs.score),
+      leaderboardScore: analytics.leaderboardScore({
+        accuracy: overallAccuracy,
+        speed: overallSpeed,
+        completion
+      })
+    };
+
+    // ---- Badges: derived on read, so they stay correct as attempts change and add
+    //      no write path to the database. ----
+    // Consistency counts units the student has PASSED, on the same marks basis and pass mark
+    // as the Levels page. Note this is the best single attempt per unit (bestScorePercent),
+    // not correctness pooled across every attempt (u.accuracy), so retries count in the
+    // student's favour here — consistent with "did they clear this level".
+    const consistentUnits = units.filter(u => u.bestScorePercent >= PASS_PERCENT).length;
+    const masteredUnits = units.filter(u => u.firstAttemptMastered).length;
+    const perfectUnits = units.filter(u => u.bestAccuracy >= 100).length;
+
+    const badges = [
+      {
+        id: 'accuracy', name: 'Accuracy', icon: 'target',
+        earned: overallAccuracy > 90,
+        detail: `${overallAccuracy}% overall accuracy (needs >90%)`
+      },
+      {
+        id: 'speed', name: 'Speed', icon: 'bolt',
+        earned: overallSpeed >= 90,
+        detail: `Speed score ${overallSpeed} (needs >=90)`
+      },
+      {
+        id: 'consistency', name: 'Consistency', icon: 'trending_up',
+        earned: consistentUnits >= 3,
+        detail: `${consistentUnits} level(s) passed at >=${PASS_PERCENT}% (needs 3)`
+      },
+      {
+        id: 'perfect', name: 'Perfect Score', icon: 'star',
+        earned: perfectUnits > 0,
+        detail: perfectUnits > 0 ? 'Scored 100% on an attempt' : 'No 100% attempt yet'
+      },
+      {
+        id: 'mastery', name: 'Mastery', icon: 'workspace_premium',
+        earned: masteredUnits > 0,
+        detail: masteredUnits > 0
+          ? `${masteredUnits} unit(s) fully correct on first attempt`
+          : 'No unit fully correct on first attempt'
+      }
+    ];
+
+    res.json({
+      student,
+      overall,
+      units,
+      badges,
+      meta: {
+        expectedMinutes,
+        liveGamesExcluded: true
+      }
+    });
+  } catch (err) {
+    console.error('Admin get student report error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

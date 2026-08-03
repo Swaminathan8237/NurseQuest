@@ -4,6 +4,7 @@ import { quizAPI } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import SectionSideCanvas from '../components/SectionSideCanvas';
+import { PASS_PERCENT } from '../constants';
 
 const UNIT_ICONS = {
   1: 'health_and_safety',
@@ -75,14 +76,14 @@ export default function Units() {
         <Navbar />
         <div className="flex flex-col items-center justify-center h-[70vh] gap-4">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm font-bold text-slate-600 font-headline">Loading Clinical Units...</p>
+          <p className="text-sm font-bold text-slate-600 font-headline">Loading Clinical Levels...</p>
         </div>
       </div>
     );
   }
 
   const totalUnits = quizzes.length;
-  const completedUnits = quizzes.filter(q => q.bestScorePercent >= 75).length;
+  const completedUnits = quizzes.filter(q => q.bestScorePercent >= PASS_PERCENT).length;
 
   const progressPercent = totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0;
 
@@ -104,10 +105,10 @@ export default function Units() {
               <span className="text-primary font-bold">Learning Path</span>
             </nav>
             <h1 className="font-headline text-4xl text-slate-900 font-extrabold tracking-tight">
-              Unit-Based <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-tertiary">Learning Path</span>
+              Level-Based <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-tertiary">Learning Path</span>
             </h1>
             <p className="font-body text-slate-600 text-base font-medium">
-              Master each unit step-by-step. Score 75%+ to unlock the next clinical challenge!
+              Master each level step-by-step. Score {PASS_PERCENT}%+ to unlock the next clinical challenge!
             </p>
           </div>
 
@@ -115,7 +116,7 @@ export default function Units() {
           <div className="bg-slate-50 border border-slate-200 shadow-inner rounded-2xl p-6 min-w-[280px] w-full md:w-auto">
             <div className="flex justify-between items-center mb-3 font-headline">
               <span className="text-xs font-black uppercase tracking-wider text-slate-500">Overall Progress</span>
-              <span className="text-sm font-black text-slate-900">{completedUnits} / {totalUnits} Units</span>
+              <span className="text-sm font-black text-slate-900">{completedUnits} / {totalUnits} Levels</span>
             </div>
             <div className="w-full h-4 bg-slate-200 rounded-full overflow-hidden mb-2">
               <div 
@@ -134,13 +135,13 @@ export default function Units() {
         {/* Units Timeline / Grid */}
         <section ref={sectionRef} className="space-y-6">
           <h2 className="text-2xl font-headline font-black text-slate-900 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-3xl">view_timeline</span> Learning Units
+            <span className="material-symbols-outlined text-primary text-3xl">view_timeline</span> Learning Levels
           </h2>
 
           {quizzes.length === 0 ? (
             <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center text-slate-500 shadow-sm">
               <span className="material-symbols-outlined text-5xl mb-3 opacity-40">inventory_2</span>
-              <p className="text-lg font-semibold">No unit quizzes imported yet. Please contact your instructor.</p>
+              <p className="text-lg font-semibold">No level quizzes imported yet. Please contact your instructor.</p>
             </div>
           ) : (
             <div className="flex flex-col lg:flex-row gap-8 items-start relative">
@@ -172,7 +173,7 @@ export default function Units() {
                   // Calculate scorePercent using bestScorePercent (which is out of 100)
                   const scorePercent = quiz.bestScorePercent !== undefined ? Math.round(quiz.bestScorePercent) : null;
                   
-                  // Lock/Unlock Logic: Teacher bypasses, the first available unit is always unlocked, Unit N is unlocked if N-1 bestScorePercent >= 75
+                  // Lock/Unlock Logic: Teacher bypasses, the first available unit is always unlocked, Unit N is unlocked if N-1 bestScorePercent >= PASS_PERCENT
                   let isUnlocked = false;
                   if (user?.role === 'teacher') {
                     isUnlocked = true;
@@ -180,7 +181,7 @@ export default function Units() {
                     isUnlocked = true;
                   } else {
                     const prevQuiz = quizzes[i - 1];
-                    if (prevQuiz && prevQuiz.bestScorePercent >= 75) {
+                    if (prevQuiz && prevQuiz.bestScorePercent >= PASS_PERCENT) {
                       isUnlocked = true;
                     }
                   }
@@ -188,7 +189,7 @@ export default function Units() {
                   let status = 'NOT_STARTED'; // 'LOCKED', 'NOT_STARTED', 'IN_PROGRESS', 'PASSED'
                   if (!isUnlocked) {
                     status = 'LOCKED';
-                  } else if (scorePercent >= 75) {
+                  } else if (scorePercent >= PASS_PERCENT) {
                     status = 'PASSED';
                   } else if (lastAttempt) {
                     status = 'IN_PROGRESS';
@@ -203,7 +204,7 @@ export default function Units() {
                     if (user?.role === 'teacher') {
                       nextUnlocked = true;
                     } else {
-                      if (quiz.bestScorePercent >= 75) {
+                      if (quiz.bestScorePercent >= PASS_PERCENT) {
                         nextUnlocked = true;
                       }
                     }
@@ -258,7 +259,7 @@ export default function Units() {
                               <div>
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="text-xs font-headline font-black uppercase tracking-wider text-slate-500">
-                                    Unit {String(quiz.unit).padStart(2, '0')}
+                                    Level {String(quiz.unit).padStart(2, '0')}
                                   </span>
                                   <span className="text-slate-300">•</span>
                                   <span className="text-xs font-body font-semibold text-slate-500">
@@ -286,16 +287,16 @@ export default function Units() {
                                   onClick={() => navigate(`/quiz/${quiz.id}`)}
                                   className="w-full sm:w-auto bg-gradient-to-r from-[#7C3AED] to-[#00E5FF] hover:from-[#6D28D9] hover:to-[#00B4D8] text-white font-headline font-black px-6 py-2.5 rounded-xl shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-wider"
                                 >
-                                  <span>{status === 'PASSED' ? 'Retry Unit' : status === 'IN_PROGRESS' ? 'Continue' : 'Start Unit'}</span>
+                                  <span>{status === 'PASSED' ? 'Retry Level' : status === 'IN_PROGRESS' ? 'Continue' : 'Start Level'}</span>
                                   <span className="material-symbols-outlined text-base">play_arrow</span>
                                 </button>
                               )}
 
                               {scorePercent !== null && (
                                 <div className={`text-xs font-bold font-headline px-3 py-1 rounded-lg ${
-                                  scorePercent >= 75 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  scorePercent >= PASS_PERCENT ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
                                 }`}>
-                                  Best Score: {scorePercent}% {scorePercent >= 75 ? '✓' : ''}
+                                  Best Score: {scorePercent}% {scorePercent >= PASS_PERCENT ? '✓' : ''}
                                 </div>
                               )}
                             </div>
@@ -310,7 +311,7 @@ export default function Units() {
               <div className="flex gap-6 md:gap-8 items-stretch">
                 <div className="flex flex-col items-center">
                   <div className={`w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center flex-shrink-0 ${
-                    quizzes[quizzes.length - 1]?.bestScorePercent >= 75
+                    quizzes[quizzes.length - 1]?.bestScorePercent >= PASS_PERCENT
                       ? 'text-amber-500 border-2 border-amber-400'
                       : 'text-slate-400 border-2 border-slate-300'
                   }`}>
@@ -319,7 +320,7 @@ export default function Units() {
                 </div>
                   <div className="flex-1 animate-slideUp" style={{ animationDelay: `${quizzes.length * 0.05}s` }}>
                     <div className={`bg-white border border-slate-200 shadow-md rounded-2xl p-5 max-w-md ${
-                      quizzes[quizzes.length - 1]?.bestScorePercent >= 75
+                      quizzes[quizzes.length - 1]?.bestScorePercent >= PASS_PERCENT
                         ? 'opacity-100'
                         : 'opacity-60'
                     }`}>

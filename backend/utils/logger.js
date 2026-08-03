@@ -1,6 +1,6 @@
 /**
- * Utility functions for safe logging and input neutralization.
- * Prevents CWE-117 Log Injection / Log Forging vulnerabilities.
+ * Utility functions for safe logging and output neutralization.
+ * Prevents CWE-117 Log Injection / Log Forging and CWE-116 Improper Output Encoding.
  */
 
 /**
@@ -31,6 +31,33 @@ function sanitizeLogInput(input, maxLength = 200) {
   return str;
 }
 
+/**
+ * Escapes HTML metacharacters so untrusted text can be safely interpolated into markup
+ * (CWE-116). Use for any user-supplied value placed inside an HTML template literal —
+ * notably outbound emails, which render in the recipient's mail client.
+ *
+ * Escapes the five characters that can break out of element or attribute context. Not a
+ * substitute for context-aware encoding inside <script>, <style>, or a URL attribute.
+ *
+ * @param {any} input - Value to escape; non-strings are coerced, null/undefined become ''
+ * @returns {string} HTML-safe string
+ */
+function escapeHtml(input) {
+  if (input === null || input === undefined) return '';
+  const str = typeof input === 'string' ? input : String(input);
+  return str.replace(/[&<>'"]/g, ch => {
+    switch (ch) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case "'": return '&#39;';
+      case '"': return '&quot;';
+      default: return ch;
+    }
+  });
+}
+
 module.exports = {
-  sanitizeLogInput
+  sanitizeLogInput,
+  escapeHtml
 };

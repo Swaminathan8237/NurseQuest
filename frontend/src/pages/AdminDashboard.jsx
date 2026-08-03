@@ -1,10 +1,44 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { adminAPI } from '../api';
+import { adminAPI, quizAPI } from '../api';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import StreakFire from '../components/StreakFire';
+import {
+  Chart as ChartJS, CategoryScale, LinearScale, BarElement,
+  PointElement, LineElement, Tooltip, Legend
+} from 'chart.js';
+import { Bar, Line } from 'react-chartjs-2';
+
+// Register only the chart.js pieces these two charts need, to keep the bundle lean.
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend);
+
+// Persist the admin's expected-time override locally rather than in the database.
+const EXPECTED_MINUTES_KEY = 'skillquest.admin.expectedMinutes';
+
+// Shared chart styling for the dark admin surface.
+const CHART_OPTS = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
+    y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.06)' } }
+  }
+};
+
+// Format seconds as "1m 05s" / "45s"
+const formatDuration = (sec) => {
+  const s = Math.round(Number(sec) || 0);
+  if (s <= 0) return '—';
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+};
+
+// Render a metric or an em-dash when it has no meaningful value.
+const orDash = (value, suffix = '') =>
+  value === null || value === undefined || Number.isNaN(value) ? '—' : `${value}${suffix}`;
 
 // Unit icon + accent maps (mirrors Units.jsx)
 const UNIT_ICONS = {
@@ -35,6 +69,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [unitQuizzes, setUnitQuizzes] = useState([]);
 
   // Loading & Action states
   const [loading, setLoading] = useState(true);
@@ -59,6 +94,17 @@ export default function AdminDashboard() {
   const [attemptQuestions, setAttemptQuestions] = useState([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
 
+  // Performance report (accuracy, knowledge score, badges, charts)
+  const [report, setReport] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [expectedMinutes, setExpectedMinutes] = useState(() => {
+    // Ignore anything a previous session left behind that isn't a valid minute count,
+    // otherwise the report request would 400 on every load.
+    const stored = localStorage.getItem(EXPECTED_MINUTES_KEY);
+    const n = parseInt(stored, 10);
+    return Number.isInteger(n) && n >= 1 && n <= 1440 ? String(n) : '';
+  });
+
   // Load a student's unit-by-unit summary and switch to the analytics tab
   const openStudentAnalytics = async (student) => {
     setActiveTab('analytics');
@@ -70,17 +116,49 @@ export default function AdminDashboard() {
     setUnitAttempts([]);
     setSelectedAttempt(null);
     setAttemptQuestions([]);
+    setReport(null);
     setUnitsLoading(true);
-    try {
-      const data = await adminAPI.getStudentUnits(student.id);
+    setReportLoading(true);
+
+    // allSettled so a failing report can't blank the unit list, and vice versa.
+    const [unitsRes, reportRes] = await Promise.allSettled([
+      adminAPI.getStudentUnits(student.id),
+      adminAPI.getStudentReport(student.id, expectedMinutes || undefined)
+    ]);
+
+    if (unitsRes.status === 'fulfilled') {
+      const data = unitsRes.value;
       setSelectedStudent(data.student || student);
       setStudentUnits(data.units || []);
       setOverallAvg(data.overallAvg || 0);
       setTotalAttempts(data.totalAttempts || 0);
+    } else {
+      console.error('Failed to load student units:', unitsRes.reason);
+    }
+    setUnitsLoading(false);
+
+    if (reportRes.status === 'fulfilled') {
+      setReport(reportRes.value);
+    } else {
+      console.error('Failed to load student report:', reportRes.reason);
+    }
+    setReportLoading(false);
+  };
+
+  // Recompute the report with a different expected-time budget
+  const applyExpectedMinutes = async () => {
+    if (!selectedStudent) return;
+    if (expectedMinutes) localStorage.setItem(EXPECTED_MINUTES_KEY, expectedMinutes);
+    else localStorage.removeItem(EXPECTED_MINUTES_KEY);
+    setReportLoading(true);
+    try {
+      const data = await adminAPI.getStudentReport(selectedStudent.id, expectedMinutes || undefined);
+      setReport(data);
     } catch (err) {
-      console.error('Failed to load student units:', err);
+      console.error('Failed to recalculate report:', err);
+      alert(err.message || 'Failed to recalculate report');
     } finally {
-      setUnitsLoading(false);
+      setReportLoading(false);
     }
   };
 
@@ -128,16 +206,18 @@ export default function AdminDashboard() {
     setUnitAttempts([]);
     setSelectedAttempt(null);
     setAttemptQuestions([]);
+    setReport(null);
   };
 
   // Fetch dashboard data
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [s, u, r] = await Promise.allSettled([
+      const [s, u, r, uq] = await Promise.allSettled([
         adminAPI.getStats(),
         adminAPI.getUsers(),
-        adminAPI.getAllQuizRequests()
+        adminAPI.getAllQuizRequests(),
+        adminAPI.getUnitQuizzes()
       ]);
       if (s.status === 'fulfilled') setStats(s.value);
       else console.error('Failed to load stats:', s.reason);
@@ -145,6 +225,8 @@ export default function AdminDashboard() {
       else console.error('Failed to load users:', u.reason);
       if (r.status === 'fulfilled') setRequests(r.value);
       else console.error('Failed to load requests:', r.reason);
+      if (uq.status === 'fulfilled') setUnitQuizzes(uq.value);
+      else console.error('Failed to load unit quizzes:', uq.reason);
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
@@ -180,6 +262,31 @@ export default function AdminDashboard() {
       setStats(s);
     } catch (err) {
       alert(err.message || 'Failed to delete user');
+    }
+  };
+
+  // Actions: Unit Quiz Management (mirrors teacher quiz actions; admin bypasses ownership)
+  const handleToggleQuizPublish = async (quiz) => {
+    try {
+      await quizAPI.update(quiz.id, { ...quiz, isPublished: !quiz.is_published });
+      setUnitQuizzes(prev => prev.map(q =>
+        q.id === quiz.id ? { ...q, is_published: quiz.is_published ? 0 : 1 } : q
+      ));
+    } catch (err) {
+      alert(err.message || 'Failed to update publish status');
+    }
+  };
+
+  const handleDeleteQuiz = async (quiz) => {
+    if (!window.confirm(`⚠️ Delete "${quiz.title}"? This permanently removes the quiz, its questions, and all attempts. This cannot be undone. Proceed?`)) return;
+    try {
+      await quizAPI.delete(quiz.id);
+      setUnitQuizzes(prev => prev.filter(q => q.id !== quiz.id));
+      // Refresh stats
+      const s = await adminAPI.getStats();
+      setStats(s);
+    } catch (err) {
+      alert(err.message || 'Failed to delete quiz');
     }
   };
 
@@ -280,6 +387,7 @@ export default function AdminDashboard() {
             { id: 'users', label: 'Students & Teachers', icon: 'group' },
             { id: 'analytics', label: 'Student Analytics', icon: 'monitoring' },
             { id: 'requests', label: `Quiz Requests (${pendingCount})`, icon: 'task' },
+            { id: 'units', label: 'Units', icon: 'menu_book' },
             { id: 'developments', label: 'Developments & DB', icon: 'developer_mode' }
           ].map(tab => (
             <button
@@ -663,6 +771,183 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* ── Performance report ─────────────────────────────────────────── */}
+                {reportLoading ? (
+                  <div className="flex justify-center py-16">
+                    <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                  </div>
+                ) : report?.overall?.knowledgeLevel ? (
+                  <div className="space-y-6">
+                    {/* Knowledge Score card */}
+                    <div className="bg-surface-container-high/40 rounded-2xl p-6 border border-white/5 flex flex-col md:flex-row items-center gap-8">
+                      <div className="relative w-32 h-32 flex-shrink-0">
+                        <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+                          <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="12" />
+                          <circle
+                            cx="60" cy="60" r="52" fill="none"
+                            stroke={report.overall.knowledgeLevel.color} strokeWidth="12" strokeLinecap="round"
+                            strokeDasharray={2 * Math.PI * 52}
+                            strokeDashoffset={2 * Math.PI * 52 * (1 - report.overall.knowledgeScore / 100)}
+                            style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-3xl font-bold" style={{ color: report.overall.knowledgeLevel.color }}>
+                            {report.overall.knowledgeScore}
+                          </span>
+                          <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">/ 100</span>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 text-center md:text-left w-full">
+                        <p className="text-sm font-bold uppercase tracking-widest" style={{ color: report.overall.knowledgeLevel.color }}>
+                          {report.overall.knowledgeLevel.label}
+                        </p>
+                        <p className="text-lg font-headline font-bold text-on-surface mt-1">Knowledge Score</p>
+                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                          0.5·Accuracy + 0.2·First-try + 0.15·Speed + 0.15·Retention
+                          {!report.overall.retentionApplied && ' — retention excluded (fewer than 2 attempts)'}
+                        </p>
+
+                        {/* Stacked contribution bar */}
+                        <div className="flex w-full h-3 rounded-full overflow-hidden mt-4 bg-white/5">
+                          <div className="h-full" style={{ width: `${report.overall.accuracy * 0.5}%`, background: '#10B981' }} />
+                          <div className="h-full" style={{ width: `${report.overall.firstAttemptAccuracy * 0.2}%`, background: '#22C55E' }} />
+                          <div className="h-full" style={{ width: `${report.overall.speedScore * 0.15}%`, background: '#F59E0B' }} />
+                          <div className="h-full" style={{ width: `${(report.overall.retention ?? 0) * 0.15}%`, background: '#7C3AED' }} />
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[10px] font-mono text-[var(--text-muted)]">
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#10B981] inline-block"></span>Acc {report.overall.accuracy}%</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#22C55E] inline-block"></span>1st {report.overall.firstAttemptAccuracy}%</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#F59E0B] inline-block"></span>Speed {report.overall.speedScore}</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#7C3AED] inline-block"></span>Ret {report.overall.retention ?? 'N/A'}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex-shrink-0 text-center px-4 py-3 rounded-xl bg-white/5 border border-white/5">
+                        <p className="text-2xl font-bold text-on-surface">{report.overall.leaderboardScore}</p>
+                        <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Leaderboard Score</p>
+                        <p className="text-[9px] text-[var(--text-muted)] mt-1">0.5 Acc + 0.3 Spd + 0.2 Comp</p>
+                      </div>
+                    </div>
+
+                    {/* Stat tiles */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {[
+                        { label: 'Accuracy', value: `${report.overall.accuracy}%`, icon: 'check_circle', color: '#10B981' },
+                        { label: '1st-Try Accuracy', value: `${report.overall.firstAttemptAccuracy}%`, icon: 'flag', color: '#22C55E' },
+                        { label: 'Avg Response', value: `${report.overall.avgResponseTime}s`, icon: 'timer', color: '#F59E0B' },
+                        { label: 'Efficiency', value: orDash(report.overall.efficiency), icon: 'speed', color: '#38BDF8' },
+                        { label: 'Completion', value: `${report.overall.completion}%`, icon: 'fact_check', color: '#7C3AED' },
+                        { label: 'Points', value: (report.overall.totalPoints || 0).toLocaleString(), icon: 'trophy', color: '#F472B6' }
+                      ].map(t => (
+                        <div key={t.label} className="bg-surface-container-high/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center text-center">
+                          <span className="material-symbols-outlined mb-1" style={{ color: t.color }}>{t.icon}</span>
+                          <p className="text-xl font-bold text-on-surface">{t.value}</p>
+                          <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t.label}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Badges */}
+                    <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5">
+                      <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">Badges</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                        {(report.badges || []).map(b => (
+                          <div
+                            key={b.id}
+                            title={b.detail}
+                            className={`rounded-2xl p-4 border flex flex-col items-center text-center transition-all ${
+                              b.earned
+                                ? 'bg-primary/10 border-primary/30'
+                                : 'bg-white/[0.02] border-white/5 opacity-50 grayscale'
+                            }`}
+                          >
+                            <span className={`material-symbols-outlined text-3xl mb-2 ${b.earned ? 'text-primary' : 'text-[var(--text-muted)]'}`}>
+                              {b.icon}
+                            </span>
+                            <p className="text-xs font-bold text-on-surface">{b.name}</p>
+                            <p className="text-[9px] text-[var(--text-muted)] mt-1">{b.earned ? 'Earned' : 'Locked'}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Charts */}
+                    {(report.units?.length || 0) > 0 && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5">
+                          <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">Accuracy by Unit</p>
+                          <div className="h-56">
+                            <Bar
+                              data={{
+                                labels: report.units.map(u => `U${u.unit}`),
+                                datasets: [{
+                                  label: 'Accuracy %',
+                                  data: report.units.map(u => u.accuracy),
+                                  backgroundColor: report.units.map(u => u.knowledgeLevel?.color || '#7C3AED'),
+                                  borderRadius: 6
+                                }]
+                              }}
+                              options={CHART_OPTS}
+                            />
+                          </div>
+                        </div>
+                        <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5">
+                          <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">Avg Response Time by Unit (s)</p>
+                          <div className="h-56">
+                            <Line
+                              data={{
+                                labels: report.units.map(u => `U${u.unit}`),
+                                datasets: [{
+                                  label: 'Avg Response (s)',
+                                  data: report.units.map(u => u.avgResponseTime),
+                                  borderColor: '#38BDF8',
+                                  backgroundColor: 'rgba(56,189,248,0.15)',
+                                  tension: 0.35,
+                                  pointBackgroundColor: '#38BDF8'
+                                }]
+                              }}
+                              options={CHART_OPTS}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Expected-time override + disclaimer */}
+                    <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5 flex flex-col sm:flex-row items-center gap-4">
+                      <div className="flex-1 flex flex-col sm:flex-row items-center gap-3">
+                        <label htmlFor="expected-minutes" className="text-sm font-bold text-[var(--text-muted)] whitespace-nowrap">
+                          Expected time per unit
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            id="expected-minutes"
+                            type="number" min="1" max="1440"
+                            placeholder="auto"
+                            value={expectedMinutes}
+                            onChange={e => setExpectedMinutes(e.target.value)}
+                            className="w-24 px-3 py-2 bg-surface-container-high border border-white/10 rounded-lg text-sm font-mono text-on-surface focus:border-primary focus:outline-none"
+                          />
+                          <span className="text-xs text-[var(--text-muted)]">min</span>
+                          <button
+                            onClick={applyExpectedMinutes}
+                            className="ml-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/80 transition-colors"
+                          >
+                            Recalculate
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-[var(--text-muted)]">blank = use quiz time_per_question</p>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)] text-center sm:text-right flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm">info</span>
+                        Live-game sessions are not included.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+
                 {/* Units */}
                 {unitsLoading ? (
                   <div className="flex justify-center py-16">
@@ -706,9 +991,29 @@ export default function AdminDashboard() {
                               </div>
                             </div>
                             <div className="hidden sm:flex items-center gap-6 text-center flex-shrink-0">
+                              {(() => {
+                                const m = report?.units?.find(r => r.unit === u.unit);
+                                if (!m) return null;
+                                return (
+                                  <>
+                                    <div>
+                                      <p className="text-lg font-bold" style={{ color: m.knowledgeLevel?.color }}>{m.accuracy}%</p>
+                                      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Accuracy</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-lg font-bold text-on-surface">{m.firstAttemptAccuracy}%</p>
+                                      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">1st Try</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-lg font-bold text-on-surface">{m.avgResponseTime}s</p>
+                                      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Avg Time</p>
+                                    </div>
+                                  </>
+                                );
+                              })()}
                               <div>
                                 <p className="text-lg font-bold" style={{ color }}>{u.avg_score}%</p>
-                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Avg</p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Avg Score</p>
                               </div>
                               <div>
                                 <p className="text-lg font-bold text-on-surface">{u.best_score}%</p>
@@ -725,6 +1030,35 @@ export default function AdminDashboard() {
                           {/* Attempts + question breakdown */}
                           {isOpen && (
                             <div className="border-t border-white/5 p-5 space-y-4 bg-black/10">
+                              {/* Per-unit metric strip */}
+                              {(() => {
+                                const m = report?.units?.find(r => r.unit === u.unit);
+                                if (!m) return null;
+                                const cells = [
+                                  { label: 'Questions', value: m.totalQuestions },
+                                  { label: 'Correct', value: m.correct },
+                                  { label: 'Incorrect', value: m.incorrect },
+                                  { label: 'Accuracy', value: `${m.accuracy}%` },
+                                  { label: '1st-Try', value: `${m.firstAttemptAccuracy}%` },
+                                  { label: 'Fastest', value: m.fastestResponse ? `${m.fastestResponse}s` : '—' },
+                                  { label: 'Slowest', value: m.slowestResponse ? `${m.slowestResponse}s` : '—' },
+                                  { label: 'Unit Time', value: formatDuration(m.completionTime) },
+                                  { label: 'Time Util', value: m.timeUtilization ? `${m.timeUtilization}x` : '—' },
+                                  { label: 'Efficiency', value: orDash(m.efficiency) },
+                                  { label: 'Retention', value: m.retention === null ? 'N/A' : `${m.retention}%` },
+                                  { label: 'Knowledge', value: m.knowledgeScore, color: m.knowledgeLevel?.color }
+                                ];
+                                return (
+                                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3 pb-2">
+                                    {cells.map(c => (
+                                      <div key={c.label} className="bg-white/[0.03] rounded-xl px-3 py-2 text-center border border-white/5">
+                                        <p className="text-sm font-bold font-mono" style={c.color ? { color: c.color } : undefined}>{c.value}</p>
+                                        <p className="text-[9px] uppercase tracking-wider text-[var(--text-muted)]">{c.label}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                               {attemptsLoading ? (
                                 <div className="flex justify-center py-8">
                                   <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
@@ -908,6 +1242,106 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Units Tab — manage unit-linked quizzes (edit / publish / live / delete) */}
+        {activeTab === 'units' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h3 className="text-xl font-bold font-headline">Unit Quiz Management</h3>
+              <span className="text-sm text-[var(--text-muted)] font-semibold">
+                {unitQuizzes.length} unit {unitQuizzes.length === 1 ? 'quiz' : 'quizzes'}
+              </span>
+            </div>
+
+            {unitQuizzes.length === 0 ? (
+              <div className="bg-surface-container-high/30 border border-white/5 rounded-2xl p-10 text-center text-[var(--text-muted)] font-semibold">
+                No unit-linked quizzes yet. Quizzes appear here once assigned to a unit (1–15).
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {unitQuizzes.map(quiz => {
+                  const color = UNIT_COLORS[quiz.unit] || '#94a3b8';
+                  const icon = UNIT_ICONS[quiz.unit] || 'menu_book';
+                  const published = !!quiz.is_published;
+                  return (
+                    <div
+                      key={quiz.id}
+                      className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 flex flex-col gap-4 hover:border-white/10 transition-all"
+                    >
+                      {/* Header: unit badge + status pill */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: `${color}22`, color }}
+                          >
+                            <span className="material-symbols-outlined">{icon}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-on-surface truncate" title={quiz.title}>{quiz.title}</p>
+                            <p className="text-xs text-[var(--text-muted)] truncate">
+                              Unit {quiz.unit} · {quiz.author_name}
+                            </p>
+                          </div>
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${published
+                            ? 'bg-[var(--success-light)] text-success'
+                            : 'bg-[var(--warning-light)] text-warning'
+                          }`}>
+                          {published ? 'Published' : 'Draft'}
+                        </span>
+                      </div>
+
+                      {/* Meta counts */}
+                      <div className="flex items-center gap-4 text-xs text-[var(--text-secondary)] font-semibold">
+                        <span className="flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm">quiz</span>
+                          {quiz.question_count} Qs
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm">groups</span>
+                          {quiz.attempt_count} attempts
+                        </span>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="grid grid-cols-2 gap-2 mt-auto pt-1">
+                        <button
+                          className="px-3 py-2 bg-secondary/10 hover:bg-secondary/20 border border-secondary/30 text-secondary text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
+                          onClick={() => navigate(`/quiz-builder/${quiz.id}`)}
+                        >
+                          <span className="material-symbols-outlined text-sm">edit</span>
+                          Edit
+                        </button>
+                        <button
+                          className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-on-surface text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
+                          onClick={() => handleToggleQuizPublish(quiz)}
+                        >
+                          <span className="material-symbols-outlined text-sm">{published ? 'visibility_off' : 'publish'}</span>
+                          {published ? 'Unpublish' : 'Publish'}
+                        </button>
+                        <button
+                          className="px-3 py-2 bg-[var(--success-light)] hover:bg-success/20 border border-success/30 text-success text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
+                          onClick={() => navigate('/live', { state: { quizId: quiz.id } })}
+                        >
+                          <span className="material-symbols-outlined text-sm">sports_esports</span>
+                          Live
+                        </button>
+                        <button
+                          className="px-3 py-2 bg-[var(--danger-light)] hover:bg-danger/20 border border-danger/30 text-danger text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
+                          onClick={() => handleDeleteQuiz(quiz)}
+                        >
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

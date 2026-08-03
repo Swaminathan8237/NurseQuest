@@ -323,10 +323,16 @@ router.get('/verify-email', async (req, res) => {
     const user = users[0];
 
     // 2. Check if token matches and token_expires_at is in the future
-    if (user.verification_token !== token) {
+    if (!user.verification_token) {
       return res.status(400).json({ error: 'Verification failed: Invalid verification token.' });
     }
 
+    const actual = crypto.createHash('sha256').update(token).digest();
+    const expected = crypto.createHash('sha256').update(user.verification_token).digest();
+
+    if (!crypto.timingSafeEqual(actual, expected)) {
+      return res.status(400).json({ error: 'Verification failed: Invalid verification token.' });
+    }
     const now = new Date();
     const expiresAt = new Date(user.token_expires_at);
     if (expiresAt < now) {

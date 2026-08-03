@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar, { SKIN_TONES, HAIR_COLORS, FACES, EYES, MOUTHS, HAIRS, DICEBEAR_STYLES } from '../components/Avatar';
 import Navbar from '../components/Navbar';

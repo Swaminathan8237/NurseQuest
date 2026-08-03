@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router';
 import { quizAPI } from '../api';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';

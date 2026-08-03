@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { scoreAPI } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import useScrollReveal from '../hooks/useScrollReveal';
 import logo from '../assets/skillquest-logo.png';
 import mascotImg from '../assets/skillquest-mascot.png';

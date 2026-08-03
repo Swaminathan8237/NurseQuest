@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useCallback, memo, useRef } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { io } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
 import { quizAPI } from '../api';

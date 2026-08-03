@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router';
 import { quizAPI, scoreAPI } from '../api';
 import confetti from 'canvas-confetti';
 import Avatar from '../components/Avatar';

@@ -14,6 +14,10 @@ import { Bar, Line } from 'react-chartjs-2';
 // Register only the chart.js pieces these two charts need, to keep the bundle lean.
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend);
 
+// Lightweight i18n seam: wrap user-facing copy so it can be routed through a real
+// translator later without touching call sites. Identity for now (no visible change).
+const t = (val) => val;
+
 // Persist the admin's expected-time override locally rather than in the database.
 const EXPECTED_MINUTES_KEY = 'skillquest.admin.expectedMinutes';
 
@@ -156,7 +160,7 @@ export default function AdminDashboard() {
       setReport(data);
     } catch (err) {
       console.error('Failed to recalculate report:', err);
-      alert(err.message || 'Failed to recalculate report');
+      alert(err.message || t('Failed to recalculate report'));
     } finally {
       setReportLoading(false);
     }
@@ -240,7 +244,7 @@ export default function AdminDashboard() {
 
   // Actions: User Management
   const handleUpdateRole = async (userId, newRole) => {
-    if (!window.confirm(`Are you sure you want to change this user's role to ${newRole}?`)) return;
+    if (!window.confirm(t(`Are you sure you want to change this user's role to ${newRole}?`))) return;
     try {
       await adminAPI.updateUserRole(userId, newRole);
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
@@ -248,12 +252,12 @@ export default function AdminDashboard() {
       const s = await adminAPI.getStats();
       setStats(s);
     } catch (err) {
-      alert(err.message || 'Failed to update user role');
+      alert(err.message || t('Failed to update user role'));
     }
   };
 
   const handleDeleteUser = async (userId, userName) => {
-    if (!window.confirm(`⚠️ WARNING: Deleting ${userName} will permanently delete their account and ALL associated quizzes, quiz attempts, and scores. This cannot be undone. Proceed?`)) return;
+    if (!window.confirm(t(`⚠️ WARNING: Deleting ${userName} will permanently delete their account and ALL associated quizzes, quiz attempts, and scores. This cannot be undone. Proceed?`))) return;
     try {
       await adminAPI.deleteUser(userId);
       setUsers(prev => prev.filter(u => u.id !== userId));
@@ -261,7 +265,7 @@ export default function AdminDashboard() {
       const s = await adminAPI.getStats();
       setStats(s);
     } catch (err) {
-      alert(err.message || 'Failed to delete user');
+      alert(err.message || t('Failed to delete user'));
     }
   };
 
@@ -273,12 +277,12 @@ export default function AdminDashboard() {
         q.id === quiz.id ? { ...q, is_published: quiz.is_published ? 0 : 1 } : q
       ));
     } catch (err) {
-      alert(err.message || 'Failed to update publish status');
+      alert(err.message || t('Failed to update publish status'));
     }
   };
 
   const handleDeleteQuiz = async (quiz) => {
-    if (!window.confirm(`⚠️ Delete "${quiz.title}"? This permanently removes the quiz, its questions, and all attempts. This cannot be undone. Proceed?`)) return;
+    if (!window.confirm(t(`⚠️ Delete "${quiz.title}"? This permanently removes the quiz, its questions, and all attempts. This cannot be undone. Proceed?`))) return;
     try {
       await quizAPI.delete(quiz.id);
       setUnitQuizzes(prev => prev.filter(q => q.id !== quiz.id));
@@ -286,7 +290,7 @@ export default function AdminDashboard() {
       const s = await adminAPI.getStats();
       setStats(s);
     } catch (err) {
-      alert(err.message || 'Failed to delete quiz');
+      alert(err.message || t('Failed to delete quiz'));
     }
   };
 
@@ -305,19 +309,19 @@ export default function AdminDashboard() {
       const s = await adminAPI.getStats();
       setStats(s);
     } catch (err) {
-      alert(err.message || 'Failed to process request');
+      alert(err.message || t('Failed to process request'));
     }
   };
 
   // Actions: Developments reset
   const handleResetStatistics = async () => {
-    if (!window.confirm('⚠️ CRITICAL WARNING: You are about to wipe out ALL student quiz attempts, history scores, and answers. User accounts and quizzes themselves will remain intact. This is irreversible. Proceed?')) return;
+    if (!window.confirm(t('⚠️ CRITICAL WARNING: You are about to wipe out ALL student quiz attempts, history scores, and answers. User accounts and quizzes themselves will remain intact. This is irreversible. Proceed?'))) return;
     try {
       const res = await adminAPI.resetStatistics();
-      alert(res.message || 'All statistics and progress reset successfully.');
+      alert(res.message || t('All statistics and progress reset successfully.'));
       fetchData();
     } catch (err) {
-      alert(err.message || 'Failed to reset statistics');
+      alert(err.message || t('Failed to reset statistics'));
     }
   };
 
@@ -354,9 +358,9 @@ export default function AdminDashboard() {
             </div>
             <div>
               <h1 className="text-3xl md:text-4xl font-headline font-black tracking-tighter">
-                Admin <span className="text-transparent bg-clip-text bg-gradient-to-r from-secondary to-primary">Control Center</span>
+                {t('Admin')} <span className="text-transparent bg-clip-text bg-gradient-to-r from-secondary to-primary">{t('Control Center')}</span>
               </h1>
-              <p className="text-on-surface-variant font-medium mt-1">Platform management, unit assignments, and developer diagnostics</p>
+              <p className="text-on-surface-variant font-medium mt-1">{t('Platform management, unit assignments, and developer diagnostics')}</p>
             </div>
           </div>
 
@@ -366,16 +370,16 @@ export default function AdminDashboard() {
                 className="px-6 py-3.5 bg-secondary text-white rounded-xl font-headline font-bold uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2 active:scale-95 shadow-[0_4px_20px_rgba(183,109,255,0.3)]"
                 onClick={() => setActiveTab('requests')}
               >
-                <span className="material-symbols-outlined text-lg">task</span>
-                {pendingCount} Pending
+                <span className="material-symbols-outlined text-lg">{t('task')}</span>
+                {pendingCount} {t('Pending')}
               </button>
             )}
             <button
               className="px-6 py-3.5 bg-surface-variant/40 border border-outline-variant/30 text-on-surface-variant rounded-xl font-headline font-bold uppercase tracking-widest hover:bg-surface-variant transition-all flex items-center gap-2 active:scale-95"
               onClick={fetchData}
             >
-              <span className="material-symbols-outlined text-lg">refresh</span>
-              Sync
+              <span className="material-symbols-outlined text-lg">{t('refresh')}</span>
+              {t('Sync')}
             </button>
           </div>
         </div>
@@ -383,12 +387,12 @@ export default function AdminDashboard() {
         {/* Tab Navigation */}
         <div className="flex border-b border-white/5 gap-2 overflow-x-auto pb-1">
           {[
-            { id: 'overview', label: 'Overview & Stats', icon: 'grid_view' },
-            { id: 'users', label: 'Students & Teachers', icon: 'group' },
-            { id: 'analytics', label: 'Student Analytics', icon: 'monitoring' },
-            { id: 'requests', label: `Quiz Requests (${pendingCount})`, icon: 'task' },
-            { id: 'units', label: 'Units', icon: 'menu_book' },
-            { id: 'developments', label: 'Developments & DB', icon: 'developer_mode' }
+            { id: 'overview', label: t('Overview & Stats'), icon: 'grid_view' },
+            { id: 'users', label: t('Students & Teachers'), icon: 'group' },
+            { id: 'analytics', label: t('Student Analytics'), icon: 'monitoring' },
+            { id: 'requests', label: `${t('Quiz Requests')} (${pendingCount})`, icon: 'task' },
+            { id: 'units', label: t('Units'), icon: 'menu_book' },
+            { id: 'developments', label: t('Developments & DB'), icon: 'developer_mode' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -412,67 +416,67 @@ export default function AdminDashboard() {
               <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 relative overflow-hidden">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-semibold text-[var(--text-muted)]">Total Accounts</p>
+                    <p className="text-sm font-semibold text-[var(--text-muted)]">{t('Total Accounts')}</p>
                     <p className="text-3xl font-bold font-headline mt-2">
                       {stats.users.student + stats.users.teacher + stats.users.admin}
                     </p>
                   </div>
                   <div className="p-3 bg-primary/10 rounded-lg text-primary">
-                    <span className="material-symbols-outlined">group</span>
+                    <span className="material-symbols-outlined">{t('group')}</span>
                   </div>
                 </div>
                 <div className="mt-4 flex gap-4 text-xs font-semibold text-[var(--text-secondary)]">
-                  <span>🎓 {stats.users.student} Students</span>
-                  <span>👩‍🏫 {stats.users.teacher} Teachers</span>
+                  <span>🎓 {stats.users.student} {t('Students')}</span>
+                  <span>👩‍🏫 {stats.users.teacher} {t('Teachers')}</span>
                 </div>
               </div>
 
               <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 relative overflow-hidden">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-semibold text-[var(--text-muted)]">Pending Requests</p>
+                    <p className="text-sm font-semibold text-[var(--text-muted)]">{t('Pending Requests')}</p>
                     <p className="text-3xl font-bold font-headline mt-2 text-warning">{stats.requests.pending}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-[var(--warning-light)] text-warning">
-                    <span className="material-symbols-outlined">pending_actions</span>
+                    <span className="material-symbols-outlined">{t('pending_actions')}</span>
                   </div>
                 </div>
                 <div className="mt-4 flex gap-4 text-xs font-semibold text-[var(--text-secondary)]">
-                  <span>✅ {stats.requests.approved} Approved</span>
-                  <span>⛔ {stats.requests.rejected} Rejected</span>
+                  <span>✅ {stats.requests.approved} {t('Approved')}</span>
+                  <span>⛔ {stats.requests.rejected} {t('Rejected')}</span>
                 </div>
               </div>
 
               <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 relative overflow-hidden">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-semibold text-[var(--text-muted)]">Total Quizzes</p>
+                    <p className="text-sm font-semibold text-[var(--text-muted)]">{t('Total Quizzes')}</p>
                     <p className="text-3xl font-bold font-headline mt-2">{stats.quizzes.total}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-[var(--warning-light)] text-[var(--secondary)]">
-                    <span className="material-symbols-outlined">quiz</span>
+                    <span className="material-symbols-outlined">{t('quiz')}</span>
                   </div>
                 </div>
                 <div className="mt-4 flex gap-4 text-xs font-semibold text-[var(--text-secondary)]">
-                  <span>📖 {stats.quizzes.unitLinked} Linked to Units</span>
-                  <span>🌐 {stats.quizzes.standalone} Standalone</span>
+                  <span>📖 {stats.quizzes.unitLinked} {t('Linked to Units')}</span>
+                  <span>🌐 {stats.quizzes.standalone} {t('Standalone')}</span>
                 </div>
               </div>
 
               <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 relative overflow-hidden">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-semibold text-[var(--text-muted)]">Average Score</p>
+                    <p className="text-sm font-semibold text-[var(--text-muted)]">{t('Average Score')}</p>
                     <p className="text-3xl font-bold font-headline mt-2 text-success">
                       {Math.round(stats.attempts.avgScore)}%
                     </p>
                   </div>
                   <div className="p-3 bg-[var(--success-light)] rounded-lg text-success">
-                    <span className="material-symbols-outlined">analytics</span>
+                    <span className="material-symbols-outlined">{t('analytics')}</span>
                   </div>
                 </div>
                 <div className="mt-4 text-xs font-semibold text-[var(--text-secondary)]">
-                  📝 {stats.attempts.count} attempts | ⏱️ {stats.attempts.totalTimeMinutes} mins logged
+                  📝 {stats.attempts.count} {t('attempts')} | ⏱️ {stats.attempts.totalTimeMinutes} {t('mins logged')}
                 </div>
               </div>
             </div>
@@ -480,12 +484,12 @@ export default function AdminDashboard() {
             {/* Quiz Requests Summary */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="bg-surface-container-high/30 border border-white/5 rounded-xl p-6 lg:col-span-2 space-y-6">
-                <h3 className="text-xl font-bold font-headline">Pending Posting Requests</h3>
+                <h3 className="text-xl font-bold font-headline">{t('Pending Posting Requests')}</h3>
 
                 {requests.filter(r => r.status === 'pending').length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
-                    <span className="material-symbols-outlined text-4xl mb-2 text-secondary/40">done_all</span>
-                    <p className="font-semibold text-sm">All teacher posting requests have been processed!</p>
+                    <span className="material-symbols-outlined text-4xl mb-2 text-secondary/40">{t('done_all')}</span>
+                    <p className="font-semibold text-sm">{t('All teacher posting requests have been processed!')}</p>
                   </div>
                 ) : (
                   <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
@@ -494,7 +498,7 @@ export default function AdminDashboard() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="px-2.5 py-0.5 rounded-full bg-secondary/15 text-secondary text-xs font-bold font-mono">
-                              QUIZ SUBMISSION
+                              {t('QUIZ SUBMISSION')}
                             </span>
                             <span className="text-xs text-[var(--text-muted)] font-medium">
                               {new Date(req.created_at).toLocaleDateString()}
@@ -502,7 +506,7 @@ export default function AdminDashboard() {
                           </div>
                           <h4 className="text-base font-bold font-headline mt-1.5">{req.quiz_title}</h4>
                           <p className="text-xs text-[var(--text-secondary)] mt-1">
-                            Request by: <span className="font-bold text-on-surface">{req.teacher_name}</span> | Target Unit: <span className="font-bold text-on-surface">Unit {req.unit}</span>
+                            {t('Request by')}: <span className="font-bold text-on-surface">{req.teacher_name}</span> | {t('Target Unit')}: <span className="font-bold text-on-surface">{t('Unit')} {req.unit}</span>
                           </p>
                         </div>
                         <div className="flex gap-2 w-full sm:w-auto">
@@ -510,13 +514,13 @@ export default function AdminDashboard() {
                             className="flex-1 sm:flex-none px-4 py-2 bg-[var(--success-light)] hover:bg-success/20 border border-success/30 text-success text-xs font-bold rounded-lg transition-all"
                             onClick={() => { setSelectedUnit('none'); setRequestActionModal({ request: req, action: 'approve' }); }}
                           >
-                            Approve
+                            {t('Approve')}
                           </button>
                           <button
                             className="flex-1 sm:flex-none px-4 py-2 bg-[var(--danger-light)] hover:bg-danger/20 border border-danger/30 text-danger text-xs font-bold rounded-lg transition-all"
                             onClick={() => { setSelectedUnit('none'); setRequestActionModal({ request: req, action: 'reject' }); }}
                           >
-                            Reject
+                            {t('Reject')}
                           </button>
                         </div>
                       </div>
@@ -527,26 +531,26 @@ export default function AdminDashboard() {
 
               {/* Quick Platforms Health */}
               <div className="bg-surface-container-high/30 border border-white/5 rounded-xl p-6 space-y-6">
-                <h3 className="text-xl font-bold font-headline">Quiz Posting Workflow</h3>
+                <h3 className="text-xl font-bold font-headline">{t('Quiz Posting Workflow')}</h3>
                 <div className="space-y-4 text-sm text-[var(--text-secondary)] leading-relaxed">
                   <p>
-                    Teachers are authorized to create and publish standalone quizzes independently.
+                    {t('Teachers are authorized to create and publish standalone quizzes independently.')}
                   </p>
                   <p>
-                    However, to safeguard curriculum standards, linking a quiz to a formal <strong>Unit</strong> requires administrator review.
+                    {t('However, to safeguard curriculum standards, linking a quiz to a formal')} <strong>{t('Unit')}</strong> {t('requires administrator review.')}
                   </p>
                   <div className="bg-surface-container-highest/40 p-4 border border-white/5 rounded-xl space-y-3 font-semibold text-xs text-on-surface">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-warning"></span>
-                      <span>Pending: {stats.requests.pending} requests</span>
+                      <span>{t('Pending')}: {stats.requests.pending} {t('requests')}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-success"></span>
-                      <span>Approved: {stats.requests.approved} linked</span>
+                      <span>{t('Approved')}: {stats.requests.approved} {t('linked')}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-danger"></span>
-                      <span>Rejected: {stats.requests.rejected} denied</span>
+                      <span>{t('Rejected')}: {stats.requests.rejected} {t('denied')}</span>
                     </div>
                   </div>
                 </div>
@@ -561,10 +565,10 @@ export default function AdminDashboard() {
             {/* Filters */}
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="relative w-full md:max-w-md">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[var(--text-muted)]">search</span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[var(--text-muted)]">{t('search')}</span>
                 <input
                   type="text"
-                  placeholder="Search by name or email..."
+                  placeholder={t('Search by name or email...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-secondary focus:outline-none transition-all"
@@ -581,7 +585,7 @@ export default function AdminDashboard() {
                         : 'bg-surface-container-high border-white/5 text-on-surface-variant hover:bg-surface-container-highest'
                       }`}
                   >
-                    {r}
+                    {t(r)}
                   </button>
                 ))}
               </div>
@@ -593,19 +597,19 @@ export default function AdminDashboard() {
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="border-b border-white/5 bg-surface-container-high/40 font-headline font-bold text-xs uppercase tracking-wider text-[var(--text-muted)]">
-                      <th className="p-4 md:p-5">Name / Email</th>
-                      <th className="p-4 md:p-5">Role</th>
-                      <th className="p-4 md:p-5 text-center">XP Progress</th>
-                      <th className="p-4 md:p-5 text-center">Attempts</th>
-                      <th className="p-4 md:p-5 text-center">Quizzes Created</th>
-                      <th className="p-4 md:p-5 text-right">Actions</th>
+                      <th className="p-4 md:p-5">{t('Name / Email')}</th>
+                      <th className="p-4 md:p-5">{t('Role')}</th>
+                      <th className="p-4 md:p-5 text-center">{t('XP Progress')}</th>
+                      <th className="p-4 md:p-5 text-center">{t('Attempts')}</th>
+                      <th className="p-4 md:p-5 text-center">{t('Quizzes Created')}</th>
+                      <th className="p-4 md:p-5 text-right">{t('Actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-sm font-medium">
                     {filteredUsers.length === 0 ? (
                       <tr>
                         <td colSpan="6" className="p-10 text-center text-[var(--text-muted)] font-semibold">
-                          No users found matching filters.
+                          {t('No users found matching filters.')}
                         </td>
                       </tr>
                     ) : (
@@ -628,19 +632,19 @@ export default function AdminDashboard() {
                               onChange={(e) => handleUpdateRole(u.id, e.target.value)}
                               className="px-3 py-1.5 bg-surface-container-high border border-white/10 rounded-lg text-xs font-bold focus:outline-none focus:border-secondary transition-all"
                             >
-                              <option value="student">Student</option>
-                              <option value="teacher">Teacher</option>
-                              <option value="admin">Administrator</option>
+                              <option value="student">{t('Student')}</option>
+                              <option value="teacher">{t('Teacher')}</option>
+                              <option value="admin">{t('Administrator')}</option>
                             </select>
                           </td>
                           <td className="p-4 md:p-5 text-center font-mono text-xs text-[var(--text-secondary)]">
-                            {u.role === 'student' ? `${u.xp} XP (Lvl ${u.level})` : 'N/A'}
+                            {u.role === 'student' ? `${u.xp} XP (${t('Lvl')} ${u.level})` : t('N/A')}
                           </td>
                           <td className="p-4 md:p-5 text-center font-bold font-mono">
-                            {u.role === 'student' ? u.quizzes_taken : 'N/A'}
+                            {u.role === 'student' ? u.quizzes_taken : t('N/A')}
                           </td>
                           <td className="p-4 md:p-5 text-center font-bold font-mono">
-                            {u.role === 'teacher' ? u.quizzes_created : 'N/A'}
+                            {u.role === 'teacher' ? u.quizzes_created : t('N/A')}
                           </td>
                           <td className="p-4 md:p-5 text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -648,18 +652,18 @@ export default function AdminDashboard() {
                                 <button
                                   className="p-2 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary hover:scale-105 active:scale-95 transition-all"
                                   onClick={() => openStudentAnalytics(u)}
-                                  title="View Analytics"
+                                  title={t('View Analytics')}
                                 >
-                                  <span className="material-symbols-outlined text-lg">monitoring</span>
+                                  <span className="material-symbols-outlined text-lg">{t('monitoring')}</span>
                                 </button>
                               )}
                               <button
                                 className="p-2 rounded-lg bg-[var(--danger-light)] hover:bg-danger/20 border border-danger/30 text-danger hover:scale-105 active:scale-95 transition-all"
                                 onClick={() => handleDeleteUser(u.id, u.name)}
-                                title="Delete User"
+                                title={t('Delete User')}
                                 disabled={u.id === user?.id}
                               >
-                                <span className="material-symbols-outlined text-lg">delete</span>
+                                <span className="material-symbols-outlined text-lg">{t('delete')}</span>
                               </button>
                             </div>
                           </td>
@@ -680,10 +684,10 @@ export default function AdminDashboard() {
               /* ---- Student picker ---- */
               <>
                 <div className="relative w-full md:max-w-md">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[var(--text-muted)]">search</span>
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[var(--text-muted)]">{t('search')}</span>
                   <input
                     type="text"
-                    placeholder="Search students by name or email..."
+                    placeholder={t('Search students by name or email...')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-11 pr-4 py-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-primary focus:outline-none transition-all"
@@ -710,17 +714,17 @@ export default function AdminDashboard() {
                           <p className="font-bold text-on-surface truncate">{s.name}</p>
                           <p className="text-xs text-[var(--text-muted)] truncate">{s.email}</p>
                           <div className="flex items-center gap-3 mt-1 text-xs font-mono text-[var(--text-muted)]">
-                            <span>Lvl {s.level || 1}</span>
+                            <span>{t('Lvl')} {s.level || 1}</span>
                             <span>{(s.xp || 0).toLocaleString()} XP</span>
                           </div>
                         </div>
-                        <span className="material-symbols-outlined text-[var(--text-muted)] group-hover:text-primary transition-colors">chevron_right</span>
+                        <span className="material-symbols-outlined text-[var(--text-muted)] group-hover:text-primary transition-colors">{t('chevron_right')}</span>
                       </button>
                     ))}
                   {users.filter(u => u.role === 'student').length === 0 && (
                     <div className="col-span-full text-center py-12 text-[var(--text-muted)]">
-                      <span className="material-symbols-outlined text-4xl mb-2 block">school</span>
-                      No students found.
+                      <span className="material-symbols-outlined text-4xl mb-2 block">{t('school')}</span>
+                      {t('No students found.')}
                     </div>
                   )}
                 </div>
@@ -732,8 +736,8 @@ export default function AdminDashboard() {
                   onClick={backToStudentList}
                   className="inline-flex items-center gap-2 text-sm font-bold text-[var(--text-muted)] hover:text-primary transition-colors"
                 >
-                  <span className="material-symbols-outlined text-lg">arrow_back</span>
-                  All students
+                  <span className="material-symbols-outlined text-lg">{t('arrow_back')}</span>
+                  {t('All students')}
                 </button>
 
                 {/* Student header */}
@@ -745,12 +749,12 @@ export default function AdminDashboard() {
                     <h2 className="text-2xl font-headline font-bold text-on-surface">{selectedStudent.name}</h2>
                     <p className="text-sm text-[var(--text-muted)]">{selectedStudent.email}</p>
                     <div className="flex items-center justify-center sm:justify-start gap-4 mt-3 flex-wrap">
-                      <span className="px-3 py-1 rounded-lg bg-white/5 text-xs font-mono font-bold">Level {selectedStudent.level || 1}</span>
+                      <span className="px-3 py-1 rounded-lg bg-white/5 text-xs font-mono font-bold">{t('Level')} {selectedStudent.level || 1}</span>
                       <span className="px-3 py-1 rounded-lg bg-white/5 text-xs font-mono font-bold">{(selectedStudent.xp || 0).toLocaleString()} XP</span>
                       {selectedStudent.streak > 0 && (
                         <span className="inline-flex items-center gap-1"><StreakFire streak={selectedStudent.streak} /></span>
                       )}
-                      <span className="px-3 py-1 rounded-lg bg-white/5 text-xs font-mono font-bold">{totalAttempts} attempts</span>
+                      <span className="px-3 py-1 rounded-lg bg-white/5 text-xs font-mono font-bold">{totalAttempts} {t('attempts')}</span>
                     </div>
                   </div>
                   {/* Overall accuracy donut */}
@@ -766,7 +770,7 @@ export default function AdminDashboard() {
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-2xl font-bold text-on-surface">{overallAvg}%</span>
-                      <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Avg Score</span>
+                      <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Avg Score')}</span>
                     </div>
                   </div>
                 </div>
@@ -803,10 +807,10 @@ export default function AdminDashboard() {
                         <p className="text-sm font-bold uppercase tracking-widest" style={{ color: report.overall.knowledgeLevel.color }}>
                           {report.overall.knowledgeLevel.label}
                         </p>
-                        <p className="text-lg font-headline font-bold text-on-surface mt-1">Knowledge Score</p>
+                        <p className="text-lg font-headline font-bold text-on-surface mt-1">{t('Knowledge Score')}</p>
                         <p className="text-xs text-[var(--text-muted)] mt-1">
-                          0.5·Accuracy + 0.2·First-try + 0.15·Speed + 0.15·Retention
-                          {!report.overall.retentionApplied && ' — retention excluded (fewer than 2 attempts)'}
+                          {t('0.5·Accuracy + 0.2·First-try + 0.15·Speed + 0.15·Retention')}
+                          {!report.overall.retentionApplied && ` ${t('— retention excluded (fewer than 2 attempts)')}`}
                         </p>
 
                         {/* Stacked contribution bar */}
@@ -817,41 +821,41 @@ export default function AdminDashboard() {
                           <div className="h-full" style={{ width: `${(report.overall.retention ?? 0) * 0.15}%`, background: '#7C3AED' }} />
                         </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[10px] font-mono text-[var(--text-muted)]">
-                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#10B981] inline-block"></span>Acc {report.overall.accuracy}%</span>
-                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#22C55E] inline-block"></span>1st {report.overall.firstAttemptAccuracy}%</span>
-                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#F59E0B] inline-block"></span>Speed {report.overall.speedScore}</span>
-                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#7C3AED] inline-block"></span>Ret {report.overall.retention ?? 'N/A'}</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#10B981] inline-block"></span>{t('Acc')} {report.overall.accuracy}%</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#22C55E] inline-block"></span>{t('1st')} {report.overall.firstAttemptAccuracy}%</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#F59E0B] inline-block"></span>{t('Speed')} {report.overall.speedScore}</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#7C3AED] inline-block"></span>{t('Ret')} {report.overall.retention ?? t('N/A')}</span>
                         </div>
                       </div>
 
                       <div className="flex-shrink-0 text-center px-4 py-3 rounded-xl bg-white/5 border border-white/5">
                         <p className="text-2xl font-bold text-on-surface">{report.overall.leaderboardScore}</p>
-                        <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Leaderboard Score</p>
-                        <p className="text-[9px] text-[var(--text-muted)] mt-1">0.5 Acc + 0.3 Spd + 0.2 Comp</p>
+                        <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Leaderboard Score')}</p>
+                        <p className="text-[9px] text-[var(--text-muted)] mt-1">{t('0.5 Acc + 0.3 Spd + 0.2 Comp')}</p>
                       </div>
                     </div>
 
                     {/* Stat tiles */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                       {[
-                        { label: 'Accuracy', value: `${report.overall.accuracy}%`, icon: 'check_circle', color: '#10B981' },
-                        { label: '1st-Try Accuracy', value: `${report.overall.firstAttemptAccuracy}%`, icon: 'flag', color: '#22C55E' },
-                        { label: 'Avg Response', value: `${report.overall.avgResponseTime}s`, icon: 'timer', color: '#F59E0B' },
-                        { label: 'Efficiency', value: orDash(report.overall.efficiency), icon: 'speed', color: '#38BDF8' },
-                        { label: 'Completion', value: `${report.overall.completion}%`, icon: 'fact_check', color: '#7C3AED' },
-                        { label: 'Points', value: (report.overall.totalPoints || 0).toLocaleString(), icon: 'trophy', color: '#F472B6' }
-                      ].map(t => (
-                        <div key={t.label} className="bg-surface-container-high/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center text-center">
-                          <span className="material-symbols-outlined mb-1" style={{ color: t.color }}>{t.icon}</span>
-                          <p className="text-xl font-bold text-on-surface">{t.value}</p>
-                          <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t.label}</p>
+                        { label: t('Accuracy'), value: `${report.overall.accuracy}%`, icon: 'check_circle', color: '#10B981' },
+                        { label: t('1st-Try Accuracy'), value: `${report.overall.firstAttemptAccuracy}%`, icon: 'flag', color: '#22C55E' },
+                        { label: t('Avg Response'), value: `${report.overall.avgResponseTime}s`, icon: 'timer', color: '#F59E0B' },
+                        { label: t('Efficiency'), value: orDash(report.overall.efficiency), icon: 'speed', color: '#38BDF8' },
+                        { label: t('Completion'), value: `${report.overall.completion}%`, icon: 'fact_check', color: '#7C3AED' },
+                        { label: t('Points'), value: (report.overall.totalPoints || 0).toLocaleString(), icon: 'trophy', color: '#F472B6' }
+                      ].map(tile => (
+                        <div key={tile.label} className="bg-surface-container-high/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center text-center">
+                          <span className="material-symbols-outlined mb-1" style={{ color: tile.color }}>{tile.icon}</span>
+                          <p className="text-xl font-bold text-on-surface">{tile.value}</p>
+                          <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{tile.label}</p>
                         </div>
                       ))}
                     </div>
 
                     {/* Badges */}
                     <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5">
-                      <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">Badges</p>
+                      <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">{t('Badges')}</p>
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                         {(report.badges || []).map(b => (
                           <div
@@ -867,7 +871,7 @@ export default function AdminDashboard() {
                               {b.icon}
                             </span>
                             <p className="text-xs font-bold text-on-surface">{b.name}</p>
-                            <p className="text-[9px] text-[var(--text-muted)] mt-1">{b.earned ? 'Earned' : 'Locked'}</p>
+                            <p className="text-[9px] text-[var(--text-muted)] mt-1">{b.earned ? t('Earned') : t('Locked')}</p>
                           </div>
                         ))}
                       </div>
@@ -877,13 +881,13 @@ export default function AdminDashboard() {
                     {(report.units?.length || 0) > 0 && (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5">
-                          <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">Accuracy by Unit</p>
+                          <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">{t('Accuracy by Unit')}</p>
                           <div className="h-56">
                             <Bar
                               data={{
                                 labels: report.units.map(u => `U${u.unit}`),
                                 datasets: [{
-                                  label: 'Accuracy %',
+                                  label: t('Accuracy %'),
                                   data: report.units.map(u => u.accuracy),
                                   backgroundColor: report.units.map(u => u.knowledgeLevel?.color || '#7C3AED'),
                                   borderRadius: 6
@@ -894,13 +898,13 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5">
-                          <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">Avg Response Time by Unit (s)</p>
+                          <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">{t('Avg Response Time by Unit (s)')}</p>
                           <div className="h-56">
                             <Line
                               data={{
                                 labels: report.units.map(u => `U${u.unit}`),
                                 datasets: [{
-                                  label: 'Avg Response (s)',
+                                  label: t('Avg Response (s)'),
                                   data: report.units.map(u => u.avgResponseTime),
                                   borderColor: '#38BDF8',
                                   backgroundColor: 'rgba(56,189,248,0.15)',
@@ -919,30 +923,30 @@ export default function AdminDashboard() {
                     <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5 flex flex-col sm:flex-row items-center gap-4">
                       <div className="flex-1 flex flex-col sm:flex-row items-center gap-3">
                         <label htmlFor="expected-minutes" className="text-sm font-bold text-[var(--text-muted)] whitespace-nowrap">
-                          Expected time per unit
+                          {t('Expected time per unit')}
                         </label>
                         <div className="flex items-center gap-2">
                           <input
                             id="expected-minutes"
                             type="number" min="1" max="1440"
-                            placeholder="auto"
+                            placeholder={t('auto')}
                             value={expectedMinutes}
                             onChange={e => setExpectedMinutes(e.target.value)}
                             className="w-24 px-3 py-2 bg-surface-container-high border border-white/10 rounded-lg text-sm font-mono text-on-surface focus:border-primary focus:outline-none"
                           />
-                          <span className="text-xs text-[var(--text-muted)]">min</span>
+                          <span className="text-xs text-[var(--text-muted)]">{t('min')}</span>
                           <button
                             onClick={applyExpectedMinutes}
                             className="ml-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/80 transition-colors"
                           >
-                            Recalculate
+                            {t('Recalculate')}
                           </button>
                         </div>
-                        <p className="text-[11px] text-[var(--text-muted)]">blank = use quiz time_per_question</p>
+                        <p className="text-[11px] text-[var(--text-muted)]">{t('blank = use quiz time_per_question')}</p>
                       </div>
                       <p className="text-[11px] text-[var(--text-muted)] text-center sm:text-right flex items-center gap-1">
-                        <span className="material-symbols-outlined text-sm">info</span>
-                        Live-game sessions are not included.
+                        <span className="material-symbols-outlined text-sm">{t('info')}</span>
+                        {t('Live-game sessions are not included.')}
                       </p>
                     </div>
                   </div>
@@ -955,8 +959,8 @@ export default function AdminDashboard() {
                   </div>
                 ) : studentUnits.length === 0 ? (
                   <div className="text-center py-16 text-[var(--text-muted)]">
-                    <span className="material-symbols-outlined text-4xl mb-2 block">quiz</span>
-                    This student hasn't attempted any units yet.
+                    <span className="material-symbols-outlined text-4xl mb-2 block">{t('quiz')}</span>
+                    {t("This student hasn't attempted any units yet.")}
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -979,7 +983,7 @@ export default function AdminDashboard() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-3 flex-wrap">
-                                <p className="font-bold text-on-surface">Unit {u.unit}</p>
+                                <p className="font-bold text-on-surface">{t('Unit')} {u.unit}</p>
                                 {u.best_streak > 0 && <StreakFire streak={u.best_streak} />}
                               </div>
                               {/* Avg score bar */}
@@ -998,33 +1002,33 @@ export default function AdminDashboard() {
                                   <>
                                     <div>
                                       <p className="text-lg font-bold" style={{ color: m.knowledgeLevel?.color }}>{m.accuracy}%</p>
-                                      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Accuracy</p>
+                                      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Accuracy')}</p>
                                     </div>
                                     <div>
                                       <p className="text-lg font-bold text-on-surface">{m.firstAttemptAccuracy}%</p>
-                                      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">1st Try</p>
+                                      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('1st Try')}</p>
                                     </div>
                                     <div>
                                       <p className="text-lg font-bold text-on-surface">{m.avgResponseTime}s</p>
-                                      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Avg Time</p>
+                                      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Avg Time')}</p>
                                     </div>
                                   </>
                                 );
                               })()}
                               <div>
                                 <p className="text-lg font-bold" style={{ color }}>{u.avg_score}%</p>
-                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Avg Score</p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Avg Score')}</p>
                               </div>
                               <div>
                                 <p className="text-lg font-bold text-on-surface">{u.best_score}%</p>
-                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Best</p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Best')}</p>
                               </div>
                               <div>
                                 <p className="text-lg font-bold text-on-surface">{u.attempts}</p>
-                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Tries</p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Tries')}</p>
                               </div>
                             </div>
-                            <span className={`material-symbols-outlined text-[var(--text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`}>expand_more</span>
+                            <span className={`material-symbols-outlined text-[var(--text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`}>{t('expand_more')}</span>
                           </button>
 
                           {/* Attempts + question breakdown */}
@@ -1035,18 +1039,18 @@ export default function AdminDashboard() {
                                 const m = report?.units?.find(r => r.unit === u.unit);
                                 if (!m) return null;
                                 const cells = [
-                                  { label: 'Questions', value: m.totalQuestions },
-                                  { label: 'Correct', value: m.correct },
-                                  { label: 'Incorrect', value: m.incorrect },
-                                  { label: 'Accuracy', value: `${m.accuracy}%` },
-                                  { label: '1st-Try', value: `${m.firstAttemptAccuracy}%` },
-                                  { label: 'Fastest', value: m.fastestResponse ? `${m.fastestResponse}s` : '—' },
-                                  { label: 'Slowest', value: m.slowestResponse ? `${m.slowestResponse}s` : '—' },
-                                  { label: 'Unit Time', value: formatDuration(m.completionTime) },
-                                  { label: 'Time Util', value: m.timeUtilization ? `${m.timeUtilization}x` : '—' },
-                                  { label: 'Efficiency', value: orDash(m.efficiency) },
-                                  { label: 'Retention', value: m.retention === null ? 'N/A' : `${m.retention}%` },
-                                  { label: 'Knowledge', value: m.knowledgeScore, color: m.knowledgeLevel?.color }
+                                  { label: t('Questions'), value: m.totalQuestions },
+                                  { label: t('Correct'), value: m.correct },
+                                  { label: t('Incorrect'), value: m.incorrect },
+                                  { label: t('Accuracy'), value: `${m.accuracy}%` },
+                                  { label: t('1st-Try'), value: `${m.firstAttemptAccuracy}%` },
+                                  { label: t('Fastest'), value: m.fastestResponse ? `${m.fastestResponse}s` : '—' },
+                                  { label: t('Slowest'), value: m.slowestResponse ? `${m.slowestResponse}s` : '—' },
+                                  { label: t('Unit Time'), value: formatDuration(m.completionTime) },
+                                  { label: t('Time Util'), value: m.timeUtilization ? `${m.timeUtilization}x` : '—' },
+                                  { label: t('Efficiency'), value: orDash(m.efficiency) },
+                                  { label: t('Retention'), value: m.retention === null ? t('N/A') : `${m.retention}%` },
+                                  { label: t('Knowledge'), value: m.knowledgeScore, color: m.knowledgeLevel?.color }
                                 ];
                                 return (
                                   <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3 pb-2">
@@ -1064,7 +1068,7 @@ export default function AdminDashboard() {
                                   <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
                                 </div>
                               ) : unitAttempts.length === 0 ? (
-                                <p className="text-center text-[var(--text-muted)] py-4 text-sm">No attempts recorded.</p>
+                                <p className="text-center text-[var(--text-muted)] py-4 text-sm">{t('No attempts recorded.')}</p>
                               ) : (
                                 <>
                                   {/* Attempt picker */}
@@ -1102,11 +1106,11 @@ export default function AdminDashboard() {
                                             <thead>
                                               <tr className="border-b border-white/5 bg-white/[0.03] text-xs uppercase tracking-wider text-[var(--text-muted)]">
                                                 <th className="p-3 w-10">#</th>
-                                                <th className="p-3">Question</th>
-                                                <th className="p-3 text-center">Result</th>
-                                                <th className="p-3 text-center">Marks</th>
-                                                <th className="p-3 text-center">Accuracy</th>
-                                                <th className="p-3 text-center">Time</th>
+                                                <th className="p-3">{t('Question')}</th>
+                                                <th className="p-3 text-center">{t('Result')}</th>
+                                                <th className="p-3 text-center">{t('Marks')}</th>
+                                                <th className="p-3 text-center">{t('Accuracy')}</th>
+                                                <th className="p-3 text-center">{t('Time')}</th>
                                               </tr>
                                             </thead>
                                             <tbody>
@@ -1120,11 +1124,11 @@ export default function AdminDashboard() {
                                                   <td className="p-3 text-center">
                                                     {q.is_correct ? (
                                                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-success/15 text-success">
-                                                        <span className="material-symbols-outlined text-sm">check</span>Correct
+                                                        <span className="material-symbols-outlined text-sm">{t('check')}</span>{t('Correct')}
                                                       </span>
                                                     ) : (
                                                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-danger/15 text-danger">
-                                                        <span className="material-symbols-outlined text-sm">close</span>Wrong
+                                                        <span className="material-symbols-outlined text-sm">{t('close')}</span>{t('Wrong')}
                                                       </span>
                                                     )}
                                                   </td>
@@ -1138,7 +1142,7 @@ export default function AdminDashboard() {
                                                 </tr>
                                               ))}
                                               {attemptQuestions.length === 0 && (
-                                                <tr><td colSpan={6} className="p-6 text-center text-[var(--text-muted)]">No question data.</td></tr>
+                                                <tr><td colSpan={6} className="p-6 text-center text-[var(--text-muted)]">{t('No question data.')}</td></tr>
                                               )}
                                             </tbody>
                                           </table>
@@ -1163,33 +1167,33 @@ export default function AdminDashboard() {
         {/* Requests Tab */}
         {activeTab === 'requests' && (
           <div className="space-y-6 animate-fadeIn">
-            <h3 className="text-xl font-bold font-headline">Quiz Posting Request Logs</h3>
+            <h3 className="text-xl font-bold font-headline">{t('Quiz Posting Request Logs')}</h3>
 
             <div className="bg-surface-container-high/30 border border-white/5 rounded-2xl overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="border-b border-white/5 bg-surface-container-high/40 font-headline font-bold text-xs uppercase tracking-wider text-[var(--text-muted)]">
-                      <th className="p-4 md:p-5">Quiz Title</th>
-                      <th className="p-4 md:p-5">Requested Unit</th>
-                      <th className="p-4 md:p-5">Teacher</th>
-                      <th className="p-4 md:p-5">Date Submitted</th>
-                      <th className="p-4 md:p-5 text-center">Status</th>
-                      <th className="p-4 md:p-5 text-right">Action</th>
+                      <th className="p-4 md:p-5">{t('Quiz Title')}</th>
+                      <th className="p-4 md:p-5">{t('Requested Unit')}</th>
+                      <th className="p-4 md:p-5">{t('Teacher')}</th>
+                      <th className="p-4 md:p-5">{t('Date Submitted')}</th>
+                      <th className="p-4 md:p-5 text-center">{t('Status')}</th>
+                      <th className="p-4 md:p-5 text-right">{t('Action')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-sm font-medium">
                     {requests.length === 0 ? (
                       <tr>
                         <td colSpan="6" className="p-10 text-center text-[var(--text-muted)] font-semibold">
-                          No requests submitted yet.
+                          {t('No requests submitted yet.')}
                         </td>
                       </tr>
                     ) : (
                       requests.map(req => (
                         <tr key={req.id} className="hover:bg-white/[0.01] transition-all">
                           <td className="p-4 md:p-5 font-bold text-on-surface">{req.quiz_title}</td>
-                          <td className="p-4 md:p-5 text-[var(--text-secondary)]">Unit {req.unit}</td>
+                          <td className="p-4 md:p-5 text-[var(--text-secondary)]">{t('Unit')} {req.unit}</td>
                           <td className="p-4 md:p-5">
                             <p className="font-semibold">{req.teacher_name}</p>
                             <p className="text-xs text-[var(--text-muted)]">{req.teacher_email}</p>
@@ -1217,7 +1221,7 @@ export default function AdminDashboard() {
                                     setRequestActionModal({ request: req, action: 'approve' });
                                   }}
                                 >
-                                  Approve
+                                  {t('Approve')}
                                 </button>
                                 <button
                                   className="px-3 py-1.5 bg-[var(--danger-light)] hover:bg-danger/20 border border-danger/30 text-danger text-xs font-bold rounded-lg transition-all"
@@ -1226,12 +1230,12 @@ export default function AdminDashboard() {
                                     setRequestActionModal({ request: req, action: 'reject' });
                                   }}
                                 >
-                                  Reject
+                                  {t('Reject')}
                                 </button>
                               </div>
                             ) : (
                               <p className="text-xs text-[var(--text-muted)] italic max-w-[150px] truncate" title={req.admin_notes || ''}>
-                                {req.admin_notes ? `"${req.admin_notes}"` : 'No notes'}
+                                {req.admin_notes ? `"${req.admin_notes}"` : t('No notes')}
                               </p>
                             )}
                           </td>
@@ -1249,15 +1253,15 @@ export default function AdminDashboard() {
         {activeTab === 'units' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex items-center justify-between flex-wrap gap-3">
-              <h3 className="text-xl font-bold font-headline">Unit Quiz Management</h3>
+              <h3 className="text-xl font-bold font-headline">{t('Unit Quiz Management')}</h3>
               <span className="text-sm text-[var(--text-muted)] font-semibold">
-                {unitQuizzes.length} unit {unitQuizzes.length === 1 ? 'quiz' : 'quizzes'}
+                {unitQuizzes.length} {t('unit')} {unitQuizzes.length === 1 ? t('quiz') : t('quizzes')}
               </span>
             </div>
 
             {unitQuizzes.length === 0 ? (
               <div className="bg-surface-container-high/30 border border-white/5 rounded-2xl p-10 text-center text-[var(--text-muted)] font-semibold">
-                No unit-linked quizzes yet. Quizzes appear here once assigned to a unit (1–15).
+                {t('No unit-linked quizzes yet. Quizzes appear here once assigned to a unit (1–15).')}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1282,7 +1286,7 @@ export default function AdminDashboard() {
                           <div className="min-w-0">
                             <p className="font-bold text-on-surface truncate" title={quiz.title}>{quiz.title}</p>
                             <p className="text-xs text-[var(--text-muted)] truncate">
-                              Unit {quiz.unit} · {quiz.author_name}
+                              {t('Unit')} {quiz.unit} · {quiz.author_name}
                             </p>
                           </div>
                         </div>
@@ -1290,19 +1294,19 @@ export default function AdminDashboard() {
                             ? 'bg-[var(--success-light)] text-success'
                             : 'bg-[var(--warning-light)] text-warning'
                           }`}>
-                          {published ? 'Published' : 'Draft'}
+                          {published ? t('Published') : t('Draft')}
                         </span>
                       </div>
 
                       {/* Meta counts */}
                       <div className="flex items-center gap-4 text-xs text-[var(--text-secondary)] font-semibold">
                         <span className="flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-sm">quiz</span>
-                          {quiz.question_count} Qs
+                          <span className="material-symbols-outlined text-sm">{t('quiz')}</span>
+                          {quiz.question_count} {t('Qs')}
                         </span>
                         <span className="flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-sm">groups</span>
-                          {quiz.attempt_count} attempts
+                          <span className="material-symbols-outlined text-sm">{t('groups')}</span>
+                          {quiz.attempt_count} {t('attempts')}
                         </span>
                       </div>
 
@@ -1312,29 +1316,29 @@ export default function AdminDashboard() {
                           className="px-3 py-2 bg-secondary/10 hover:bg-secondary/20 border border-secondary/30 text-secondary text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
                           onClick={() => navigate(`/quiz-builder/${quiz.id}`)}
                         >
-                          <span className="material-symbols-outlined text-sm">edit</span>
-                          Edit
+                          <span className="material-symbols-outlined text-sm">{t('edit')}</span>
+                          {t('Edit')}
                         </button>
                         <button
                           className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-on-surface text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
                           onClick={() => handleToggleQuizPublish(quiz)}
                         >
                           <span className="material-symbols-outlined text-sm">{published ? 'visibility_off' : 'publish'}</span>
-                          {published ? 'Unpublish' : 'Publish'}
+                          {published ? t('Unpublish') : t('Publish')}
                         </button>
                         <button
                           className="px-3 py-2 bg-[var(--success-light)] hover:bg-success/20 border border-success/30 text-success text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
                           onClick={() => navigate('/live', { state: { quizId: quiz.id } })}
                         >
-                          <span className="material-symbols-outlined text-sm">sports_esports</span>
-                          Live
+                          <span className="material-symbols-outlined text-sm">{t('sports_esports')}</span>
+                          {t('Live')}
                         </button>
                         <button
                           className="px-3 py-2 bg-[var(--danger-light)] hover:bg-danger/20 border border-danger/30 text-danger text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
                           onClick={() => handleDeleteQuiz(quiz)}
                         >
-                          <span className="material-symbols-outlined text-sm">delete</span>
-                          Delete
+                          <span className="material-symbols-outlined text-sm">{t('delete')}</span>
+                          {t('Delete')}
                         </button>
                       </div>
                     </div>
@@ -1352,8 +1356,8 @@ export default function AdminDashboard() {
               {/* Database Metadata Explorer */}
               <div className="bg-surface-container-high/30 border border-white/5 rounded-2xl p-6 space-y-6">
                 <div>
-                  <h3 className="text-xl font-bold font-headline">PostgreSQL Database Schema</h3>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">Real-time table rows count verified directly from database instances</p>
+                  <h3 className="text-xl font-bold font-headline">{t('PostgreSQL Database Schema')}</h3>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">{t('Real-time table rows count verified directly from database instances')}</p>
                 </div>
 
                 <div className="space-y-3">
@@ -1361,7 +1365,7 @@ export default function AdminDashboard() {
                     <div key={tbl.name} className="flex justify-between items-center p-3 rounded-xl bg-surface-container-high/60 border border-white/5 font-mono text-sm">
                       <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">{tbl.name}</span>
                       <span className="px-3 py-1 bg-surface-container-highest text-on-surface rounded-lg font-bold">
-                        {tbl.rows !== -1 ? `${tbl.rows} rows` : 'Error checking'}
+                        {tbl.rows !== -1 ? `${tbl.rows} ${t('rows')}` : t('Error checking')}
                       </span>
                     </div>
                   ))}
@@ -1371,18 +1375,18 @@ export default function AdminDashboard() {
               {/* Developer Operations */}
               <div className="bg-surface-container-high/30 border border-white/5 rounded-2xl p-6 space-y-6">
                 <div>
-                  <h3 className="text-xl font-bold font-headline text-danger">Administrator Systems Tools</h3>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">Direct system hooks and administrative cleanup scripts</p>
+                  <h3 className="text-xl font-bold font-headline text-danger">{t('Administrator Systems Tools')}</h3>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">{t('Direct system hooks and administrative cleanup scripts')}</p>
                 </div>
 
                 <div className="space-y-4">
                   <div className="border border-danger/25 bg-[var(--danger-light)] p-5 rounded-xl space-y-4">
                     <div className="flex gap-3">
-                      <span className="material-symbols-outlined text-danger text-2xl">warning</span>
+                      <span className="material-symbols-outlined text-danger text-2xl">{t('warning')}</span>
                       <div>
-                        <h4 className="text-sm font-bold text-on-surface">Reset Attempts & Scores Statistics</h4>
+                        <h4 className="text-sm font-bold text-on-surface">{t('Reset Attempts & Scores Statistics')}</h4>
                         <p className="text-xs text-[var(--text-secondary)] mt-1">
-                          This operation clears all quiz attempts and answer logs, resetting user XP and student dashboards to clean slates. Accounts and quizzes are kept intact.
+                          {t('This operation clears all quiz attempts and answer logs, resetting user XP and student dashboards to clean slates. Accounts and quizzes are kept intact.')}
                         </p>
                       </div>
                     </div>
@@ -1390,24 +1394,24 @@ export default function AdminDashboard() {
                       className="w-full py-3 bg-danger text-white hover:bg-danger/80 rounded-xl font-headline font-bold text-xs uppercase tracking-widest active:scale-95 transition-all shadow-[0_4px_15px_rgba(255,49,49,0.3)]"
                       onClick={handleResetStatistics}
                     >
-                      Reset statistics logs
+                      {t('Reset statistics logs')}
                     </button>
                   </div>
 
                   <div className="border border-white/5 bg-surface-container-highest/20 p-5 rounded-xl space-y-3">
-                    <h4 className="text-sm font-bold text-on-surface">Admin System Status</h4>
+                    <h4 className="text-sm font-bold text-on-surface">{t('Admin System Status')}</h4>
                     <div className="space-y-2 text-xs font-semibold text-[var(--text-secondary)]">
                       <div className="flex justify-between">
-                        <span>API Base URL</span>
+                        <span>{t('API Base URL')}</span>
                         <span className="font-mono text-on-surface">/api</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Active Session ID</span>
+                        <span>{t('Active Session ID')}</span>
                         <span className="font-mono text-on-surface truncate max-w-[200px]">{user?.id}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Environment Mode</span>
-                        <span className="font-mono text-success bg-[var(--success-light)] px-2 py-0.5 rounded">Production (Live)</span>
+                        <span>{t('Environment Mode')}</span>
+                        <span className="font-mono text-success bg-[var(--success-light)] px-2 py-0.5 rounded">{t('Production (Live)')}</span>
                       </div>
                     </div>
                   </div>
@@ -1425,44 +1429,44 @@ export default function AdminDashboard() {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setRequestActionModal(null)}></div>
           <div className="bg-surface-container-low border border-white/10 p-6 rounded-2xl w-full max-w-md relative z-10 space-y-6 shadow-2xl animate-fadeInScale">
             <h3 className="text-xl font-bold font-headline capitalize">
-              {requestActionModal.action} Request
+              {t(requestActionModal.action)} {t('Request')}
             </h3>
 
             <div className="space-y-1.5 text-sm text-[var(--text-secondary)]">
-              <p>Quiz: <strong>{requestActionModal.request.quiz_title}</strong></p>
-              <p>Target Unit: <strong>Unit {requestActionModal.request.unit}</strong></p>
-              <p>Teacher: <strong>{requestActionModal.request.teacher_name}</strong></p>
+              <p>{t('Quiz')}: <strong>{requestActionModal.request.quiz_title}</strong></p>
+              <p>{t('Target Unit')}: <strong>{t('Unit')} {requestActionModal.request.unit}</strong></p>
+              <p>{t('Teacher')}: <strong>{requestActionModal.request.teacher_name}</strong></p>
             </div>
 
             {requestActionModal.action === 'approve' && (
               <div className="space-y-2">
                 <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                  Assign to Student Learning Path Unit (Optional)
+                  {t('Assign to Student Learning Path Unit (Optional)')}
                 </label>
                 <select
                   value={selectedUnit}
                   onChange={(e) => setSelectedUnit(e.target.value)}
                   className="w-full p-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-secondary focus:outline-none cursor-pointer text-on-surface"
                 >
-                  <option value="none">None (Standalone / Practice Only)</option>
+                  <option value="none">{t('None (Standalone / Practice Only)')}</option>
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(u => (
-                    <option key={u} value={u}>Unit {u}</option>
+                    <option key={u} value={u}>{t('Unit')} {u}</option>
                   ))}
                 </select>
                 <p className="text-[10px] text-[var(--text-muted)] mt-1">
-                  Assigning a unit (1-15) places the quiz sequentially on the Student Unit dashboard.
+                  {t('Assigning a unit (1-15) places the quiz sequentially on the Student Unit dashboard.')}
                 </p>
               </div>
             )}
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                Admin Notes / Feedback (Optional)
+                {t('Admin Notes / Feedback (Optional)')}
               </label>
               <textarea
                 value={adminNotes}
                 onChange={(e) => setAdminNotes(e.target.value)}
-                placeholder="Provide notes or feedback to the teacher here..."
+                placeholder={t('Provide notes or feedback to the teacher here...')}
                 rows="3"
                 className="w-full p-3 bg-surface-container-high border border-white/5 rounded-xl text-sm focus:border-secondary focus:outline-none resize-none transition-all"
               />
@@ -1473,7 +1477,7 @@ export default function AdminDashboard() {
                 className="flex-1 py-3 bg-surface-variant/40 hover:bg-surface-variant text-on-surface font-headline font-bold text-xs uppercase rounded-xl transition-all"
                 onClick={() => { setRequestActionModal(null); setAdminNotes(''); }}
               >
-                Cancel
+                {t('Cancel')}
               </button>
               <button
                 className={`flex-1 py-3 font-headline font-bold text-xs uppercase rounded-xl text-white transition-all ${requestActionModal.action === 'approve'
@@ -1482,7 +1486,7 @@ export default function AdminDashboard() {
                   }`}
                 onClick={handleProcessRequest}
               >
-                Confirm {requestActionModal.action}
+                {t('Confirm')} {t(requestActionModal.action)}
               </button>
             </div>
           </div>

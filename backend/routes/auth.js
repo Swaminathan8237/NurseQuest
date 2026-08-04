@@ -27,14 +27,14 @@ router.post('/login', async (req, res) => {
 
     // Check if user exists in the local database
     const users = await sql`SELECT id, password, role, is_verified FROM users WHERE email = ${lowerEmail}`;
-    
+
     if (users.length === 0) {
       // If they don't exist locally, check if they exist in Supabase Auth (fallback)
       console.log(`🔑 Auth: User not found in local DB, checking Supabase Auth for ${sanitizeLogInput(email)}...`);
       if (!SUPABASE_URL || !SUPABASE_KEY) {
         return res.status(400).json({ error: 'Invalid email or password' });
       }
-      
+
       const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
         method: 'POST',
         headers: {
@@ -54,17 +54,17 @@ router.post('/login', async (req, res) => {
       const metadata = data.user.user_metadata || {};
       const name = metadata.name || email.split('@')[0];
       const role = metadata.role || 'student';
-      
+
       await sql`
         INSERT INTO users (id, email, name, role, avatar_config, is_verified) 
         VALUES (${userId}, ${email}, ${name}, ${role}, '{}', true)
         ON CONFLICT (email) DO UPDATE SET is_verified = true
       `;
-      
+
       // Re-query user
       const usersReload = await sql`SELECT id, password, role, is_verified FROM users WHERE email = ${lowerEmail}`;
       const userRecord = usersReload[0];
-      
+
       const payload = {
         sub: userId,
         email: lowerEmail,
@@ -77,7 +77,8 @@ router.post('/login', async (req, res) => {
         return res.status(500).json({ error: 'Server auth is misconfigured' });
       }
       const token = jwt.sign(payload, secret);
-      
+
+      const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
       const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -85,7 +86,7 @@ router.post('/login', async (req, res) => {
         maxAge: 24 * 60 * 60 * 1000
       };
       res.cookie('skillquest_token', token, cookieOptions);
-      
+
       const fullUsers = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
       const user = fullUsers[0];
       return res.json({
@@ -106,7 +107,7 @@ router.post('/login', async (req, res) => {
     // Verify password
     let passwordMatches = false;
     const isBcrypt = userRecord.password && (userRecord.password.startsWith('$2a$') || userRecord.password.startsWith('$2b$') || userRecord.password.startsWith('$2y$'));
-    
+
     if (isBcrypt) {
       passwordMatches = await bcrypt.compare(password, userRecord.password);
     } else {
@@ -146,10 +147,11 @@ router.post('/login', async (req, res) => {
     }
     const token = jwt.sign(payload, secret);
 
+    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: isHttps,
+      sameSite: isHttps ? 'strict' : 'lax',
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     };
 
@@ -219,9 +221,13 @@ router.post('/register', async (req, res) => {
       )
     `;
 
-    // 4. Construct a verification URL pointing to: http://localhost:3001/api/auth/verify-email?token={TOKEN}&email={EMAIL}
-    const verifyUrl = `http://localhost:3001/api/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(lowerEmail)}`;
-    
+    // 4. Construct the verification URL. PUBLIC_BASE_URL is the single origin knob — where users
+    // actually reach the app. It drives BOTH this email link and the post-verify redirect below so
+    // the two can never drift. Defaults to localhost:3001 (the backend also serves the built SPA),
+    // so local testing needs no config; point it at the EC2 host/domain in .env for production.
+    const publicBaseUrl = process.env.PUBLIC_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:3001';
+    const verifyUrl = `${publicBaseUrl}/api/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(lowerEmail)}`;
+
     // Log the verification URL in the console for easy developer testing/bypass
     console.log(`\n✉️  [SKILLQUEST VERIFICATION] Email verification URL generated for ${sanitizeLogInput(lowerEmail)}:`);
     console.log(`👉 ${verifyUrl}\n`);
@@ -315,7 +321,7 @@ router.get('/verify-email', async (req, res) => {
 
     // 1. Fetch user by email
     const users = await sql`SELECT id, verification_token, token_expires_at FROM users WHERE email = ${lowerEmail}`;
-    
+
     if (users.length === 0) {
       return res.status(400).json({ error: 'Verification failed: User account not found.' });
     }
@@ -344,8 +350,10 @@ router.get('/verify-email', async (req, res) => {
 
     console.log(`✅ Email verified successfully for: ${sanitizeLogInput(lowerEmail)}`);
 
-    // 4. Redirect to FRONTEND_URL/login?verified=true (will trigger the AppRoutes redirect to /auth?verified=true)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    // 4. Redirect to <PUBLIC_BASE_URL>/login?verified=true. App.jsx rewrites /login -> /auth while
+    // preserving the query string, so ?verified=true reaches AuthPage and lights the success banner.
+    // Same knob as the email link above (localhost:3001 default) so both always point at one origin.
+    const frontendUrl = process.env.PUBLIC_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:3001';
     return res.redirect(`${frontendUrl}/login?verified=true`);
   } catch (err) {
     console.error('Email verification error:', err);

@@ -34,24 +34,35 @@ const LEVELS = [
 ];
 
 /**
- * Score a single answer: full marks if correct, zero if not.
+ * Score a single answer: award marks in proportion to how much of it was right.
  *
- * Marks are FIXED per question — time and streak no longer change what an answer is worth.
- * Time is still measured and still drives the cognitive/speed analytics; it just does not
- * inflate or erode the mark. The timeBonus/streakBonus keys are retained (always 0) so
- * every existing caller, response payload and UI breakdown keeps working unchanged.
+ * `correctness` is a FRACTION in 0..1 — 1 for a fully-correct answer, 0 for fully wrong,
+ * and something in between for partially-correct types (matching / jumbled_sequence). The
+ * awarded marks are `round(basePoints × correctness)`. Marks are still FIXED per question —
+ * time and streak never change what an answer is worth. Time is still measured and still
+ * drives the cognitive/speed analytics; it just does not inflate or erode the mark. The
+ * timeBonus/streakBonus keys are retained (always 0) so every existing caller, response
+ * payload and UI breakdown keeps working unchanged.
  *
- * @param {boolean} isCorrect - Whether the answer was correct
+ * Backward compatible with boolean callers: Number(true)=1 and Number(false)=0, so passing
+ * `true`/`false` still yields full-marks / zero exactly as before.
+ *
+ * Note: awarded marks are ROUNDED because the storage columns are INTEGER. A question worth
+ * 1 mark therefore only ever awards 0 or 1 — partial marks only appear for basePoints >= 2.
+ *
+ * @param {number|boolean} correctness - Fraction correct in 0..1 (true→1, false→0)
  * @param {number} timeRemaining - Unused for scoring; kept for signature compatibility
  * @param {number} totalTime - Unused for scoring; kept for signature compatibility
  * @param {number} currentStreak - Streak is still tracked, but awards no extra marks
  * @param {number} basePoints - Marks for this question (default 1)
  * @returns {object} Score breakdown
  */
-function calculateScore(isCorrect, timeRemaining, totalTime, currentStreak, basePoints = DEFAULT_QUESTION_MARKS) {
+function calculateScore(correctness, timeRemaining, totalTime, currentStreak, basePoints = DEFAULT_QUESTION_MARKS) {
   const marks = Math.max(0, Number(basePoints) || 0);
+  const fraction = Math.max(0, Math.min(1, Number(correctness) || 0));
+  const awarded = Math.round(marks * fraction);
 
-  if (!isCorrect) {
+  if (awarded <= 0) {
     return {
       baseScore: 0,
       timeBonus: 0,
@@ -63,11 +74,12 @@ function calculateScore(isCorrect, timeRemaining, totalTime, currentStreak, base
   }
 
   return {
-    baseScore: marks,
+    baseScore: awarded,
     timeBonus: 0,
     streakBonus: 0,
-    totalScore: marks,
-    newStreak: currentStreak + 1,
+    totalScore: awarded,
+    // Only a FULLY correct answer continues the streak; a partial resets it.
+    newStreak: fraction === 1 ? currentStreak + 1 : 0,
     multiplier: 1
   };
 }

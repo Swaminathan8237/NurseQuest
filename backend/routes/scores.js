@@ -8,30 +8,50 @@ const router = express.Router();
 
 // Grade a single answer against a question's stored key.
 // Extracted so /submit and /check share identical correctness logic and can't drift.
+//
+// Returns { isCorrect, fraction } where fraction is in 0..1:
+//   - matching / jumbled_sequence award PARTIAL credit (fraction = share of the answer
+//     that is right), so a mostly-right answer is no longer worth zero.
+//   - every other type (slider, captcha, mcq/text, null) is all-or-nothing:
+//     fraction is exactly 0 or 1 and never in between. Slider is intentionally exact-match.
+// Invariant: isCorrect === (fraction === 1) for all inputs.
 function gradeAnswer(question, userAnswer) {
   // Check correctness based on question type
   if (question.type === 'jumbled_sequence') {
     try {
       const correctSeq = JSON.parse(question.correct_answer);
       const userSeq = userAnswer;
-      return Array.isArray(userSeq) && Array.isArray(correctSeq) &&
-        userSeq.length === correctSeq.length &&
-        userSeq.every((item, idx) => item === correctSeq[idx]);
-    } catch { return false; }
+      if (!Array.isArray(userSeq) || !Array.isArray(correctSeq) || correctSeq.length === 0) {
+        return { isCorrect: false, fraction: 0 };
+      }
+      // Count positions the student placed in the right spot (undefined-safe if shorter).
+      let matched = 0;
+      for (let idx = 0; idx < correctSeq.length; idx++) {
+        if (userSeq[idx] === correctSeq[idx]) matched++;
+      }
+      const fraction = matched / correctSeq.length;
+      const isCorrect = userSeq.length === correctSeq.length && matched === correctSeq.length;
+      return { isCorrect, fraction };
+    } catch { return { isCorrect: false, fraction: 0 }; }
   } else if (question.type === 'slider') {
-    return parseFloat(userAnswer) === parseFloat(question.correct_answer);
+    const b = parseFloat(userAnswer) === parseFloat(question.correct_answer);
+    return { isCorrect: b, fraction: b ? 1 : 0 };
   } else if (question.type === 'matching') {
     try {
       const userPairs = typeof userAnswer === 'string' ? JSON.parse(userAnswer) : userAnswer;
       const correctPairs = typeof question.correct_answer === 'string' ? JSON.parse(question.correct_answer) : question.correct_answer;
       if (userPairs && correctPairs && typeof userPairs === 'object' && typeof correctPairs === 'object') {
         const correctKeys = Object.keys(correctPairs);
-        return correctKeys.length === Object.keys(userPairs).length &&
-          correctKeys.every(key => userPairs[key] !== undefined &&
-            String(userPairs[key]).trim().toUpperCase() === String(correctPairs[key]).trim().toUpperCase());
+        if (correctKeys.length === 0) return { isCorrect: false, fraction: 0 };
+        // Count pairs matched correctly (same comparison as the strict check below).
+        const matched = correctKeys.filter(key => userPairs[key] !== undefined &&
+          String(userPairs[key]).trim().toUpperCase() === String(correctPairs[key]).trim().toUpperCase()).length;
+        const fraction = matched / correctKeys.length;
+        const isCorrect = matched === correctKeys.length && Object.keys(userPairs).length === correctKeys.length;
+        return { isCorrect, fraction };
       }
-      return false;
-    } catch { return false; }
+      return { isCorrect: false, fraction: 0 };
+    } catch { return { isCorrect: false, fraction: 0 }; }
   } else if (question.type === 'captcha') {
     try {
       const userBox = typeof userAnswer === 'string' ? JSON.parse(userAnswer) : userAnswer;
@@ -44,14 +64,16 @@ function gradeAnswer(question, userAnswer) {
         const intersection = Math.max(0, ix2 - ix1) * Math.max(0, iy2 - iy1);
         const unionArea = (userBox.w * userBox.h) + (correctBox.w * correctBox.h) - intersection;
         const iou = unionArea > 0 ? intersection / unionArea : 0;
-        return iou >= 0.3;
+        const b = iou >= 0.3;
+        return { isCorrect: b, fraction: b ? 1 : 0 };
       }
-      return false;
-    } catch { return false; }
+      return { isCorrect: false, fraction: 0 };
+    } catch { return { isCorrect: false, fraction: 0 }; }
   } else if (userAnswer === null || userAnswer === undefined) {
-    return false;
+    return { isCorrect: false, fraction: 0 };
   } else {
-    return userAnswer.toString().toUpperCase().trim() === question.correct_answer?.toString().toUpperCase().trim();
+    const b = userAnswer.toString().toUpperCase().trim() === question.correct_answer?.toString().toUpperCase().trim();
+    return { isCorrect: b, fraction: b ? 1 : 0 };
   }
 }
 
@@ -81,7 +103,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
       const question = questions.find(q => q.id === answer.questionId);
       if (!question) return;
 
-      const isCorrect = gradeAnswer(question, answer.answer);
+      const { isCorrect, fraction } = gradeAnswer(question, answer.answer);
 
       if (isCorrect) {
         correctCount++;
@@ -91,14 +113,16 @@ router.post('/submit', authenticateToken, async (req, res) => {
         currentStreak = 0;
       }
 
-      const scoreResult = calculateScore(isCorrect, answer.timeRemaining || 0, quiz.time_per_question, currentStreak - 1, question.points);
+      const scoreResult = calculateScore(fraction, answer.timeRemaining || 0, quiz.time_per_question, currentStreak - 1, question.points);
       totalScore += scoreResult.totalScore;
       totalTime += (answer.timeTaken || 0);
 
       questionResults.push({
         questionId: question.id,
         isCorrect,
+        fraction,
         pointsEarned: scoreResult.totalScore,
+        pointsPossible: Math.max(0, parseInt(question.points, 10) || DEFAULT_QUESTION_MARKS),
         scoreBreakdown: scoreResult,
         correctAnswer: question.correct_answer,
         explanation: question.explanation
@@ -246,11 +270,12 @@ router.post('/check', authenticateToken, async (req, res) => {
     const question = questions[0];
     if (!question) return res.status(404).json({ error: 'Question not found' });
 
-    const isCorrect = gradeAnswer(question, answer);
-    const scoreResult = calculateScore(isCorrect, timeRemaining || 0, quiz.time_per_question, 0, question.points);
+    const { isCorrect, fraction } = gradeAnswer(question, answer);
+    const scoreResult = calculateScore(fraction, timeRemaining || 0, quiz.time_per_question, 0, question.points);
 
     res.json({
       isCorrect,
+      fraction,
       correctAnswer: question.correct_answer,
       explanation: question.explanation,
       pointsEarned: scoreResult.totalScore

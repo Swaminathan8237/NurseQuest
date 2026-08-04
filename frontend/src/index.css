@@ -1828,6 +1828,20 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
   animation: successFlash 0.6s ease-out;
 }
 
+/* Draw-on tick for the verification-sent popup (VerificationSentModal). The path length is ~46px;
+   dasharray/offset of 48 hides it, then the offset animates to 0 to "draw" the check. Slight delay
+   so it strokes on after the badge's bounceIn settles. */
+@keyframes checkDraw {
+  from { stroke-dashoffset: 48; }
+  to   { stroke-dashoffset: 0; }
+}
+
+.animate-checkDraw {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: checkDraw 0.5s ease-out 0.15s forwards;
+}
+
 .animate-errorShake {
   animation: errorShake 0.4s ease-out;
 }

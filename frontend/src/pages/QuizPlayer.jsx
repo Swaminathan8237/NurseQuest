@@ -96,7 +96,9 @@ export default function QuizPlayer() {
   const [streak, setStreak] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
-  const [isCurrentAnswerCorrect, setIsCurrentAnswerCorrect] = useState(false);
+  // Fraction (0..1) of the current answer that was right — drives the three-state
+  // (correct / partial / incorrect) feedback for matching & jumbled_sequence.
+  const [currentFraction, setCurrentFraction] = useState(0);
   const [results, setResults] = useState(null);
   const [submitError, setSubmitError] = useState(false);
   const [lobbyCount, setLobbyCount] = useState(3);
@@ -152,7 +154,7 @@ export default function QuizPlayer() {
 
   // Timer timeout handler
   const answeredQuestionsRef = useRef(new Set());
-  
+
   useEffect(() => {
     if (phase === 'playing' && timeLeft === 0 && !showAnswer) {
       if (!answeredQuestionsRef.current.has(currentQRef.current)) {
@@ -171,12 +173,12 @@ export default function QuizPlayer() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    
+
     setCurrentQ(index);
     currentQRef.current = index;
     setSelectedAnswer(null);
     setShowAnswer(false);
-    setIsCurrentAnswerCorrect(false);
+    setCurrentFraction(0);
     showAnswerRef.current = false;
     setTimeLeft(quiz?.time_per_question || 30);
     startTimeRef.current = Date.now();
@@ -237,15 +239,15 @@ export default function QuizPlayer() {
 
   async function handleSubmit(answer) {
     const qIndex = currentQRef.current;
-    
+
     if (answeredQuestionsRef.current.has(qIndex)) return;
     if (showAnswerRef.current || !quiz) return;
 
     answeredQuestionsRef.current.add(qIndex);
-    
+
     clearInterval(timerRef.current);
     timerRef.current = null;
-    
+
     const q = quiz.questions[qIndex];
     const timeTaken = Math.round((Date.now() - startTimeRef.current) / 1000);
     const timeRemaining = Math.max(0, quiz.time_per_question - timeTaken);
@@ -256,9 +258,15 @@ export default function QuizPlayer() {
     // this answer on the server. /check returns the correct answer + explanation for
     // THIS question only, and only after the student commits — never upfront.
     let isCorrect = false;
+    let fraction = 0;
+    let awarded = 0;
     try {
       const res = await scoreAPI.check(id, q.id, answer, timeRemaining);
       isCorrect = res.isCorrect;
+      // fraction (0..1) and the server-awarded marks drive partial credit. Fall back to
+      // the boolean for older payloads that don't carry a fraction.
+      fraction = res.fraction ?? (res.isCorrect ? 1 : 0);
+      awarded = res.pointsEarned ?? 0;
       // Inject the revealed key back into the in-memory question so every existing
       // showAnswer-guarded render site displays it unchanged.
       q.correct_answer = res.correctAnswer;
@@ -268,21 +276,25 @@ export default function QuizPlayer() {
       // No client-side key to fall back on. Record the attempt and let the
       // authoritative final grade come from scoreAPI.submit in finishQuiz.
       isCorrect = false;
+      fraction = 0;
+      awarded = 0;
     }
 
     setShowAnswer(true);
     showAnswerRef.current = true;
-    setIsCurrentAnswerCorrect(isCorrect);
+    setCurrentFraction(fraction);
+
+    // Add the marks the SERVER awarded for this answer (partial for matching/sequence,
+    // full or zero otherwise). No time/streak bonus, so this running tally matches the
+    // authoritative server score exactly.
+    setTotalScore(prev => prev + awarded);
 
     if (isCorrect) {
+      // Only a fully-correct answer continues the streak; a partial resets it.
       const newStreak = streakRef.current + 1;
       setStreak(newStreak);
       streakRef.current = newStreak;
-      // Fixed marks: a correct answer earns the question's full marks. No time or streak
-      // bonus, so this running tally matches the authoritative server score exactly.
-      // The streak is still tracked and still shown, it just no longer adds marks.
-      setTotalScore(prev => prev + (q.points ?? 1));
-      
+
       // Correct answer micro-burst animation
       confetti({
         particleCount: 35,
@@ -364,14 +376,14 @@ export default function QuizPlayer() {
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
           <div className="w-[600px] h-[600px] bg-primary-container rounded-full blur-[150px]"></div>
         </div>
-        
+
         <div className="z-10 flex flex-col items-center text-center max-w-2xl px-6 animate-fadeInScale">
           <div className="w-24 h-24 bg-surface-variant/50 rounded-3xl flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(0,229,255,0.2)] mb-8">
             <span className="material-symbols-outlined text-primary text-5xl">health_and_safety</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-display font-black text-on-surface mb-4">{quiz?.title}</h1>
           <p className="text-xl text-on-surface-variant font-body mb-8">{quiz?.description}</p>
-          
+
           <div className="flex flex-wrap gap-4 mb-12">
             <div className="bg-surface-container border border-outline-variant/30 px-6 py-3 rounded-xl flex items-center gap-3">
               <span className="material-symbols-outlined text-primary">format_list_numbered</span>
@@ -382,7 +394,7 @@ export default function QuizPlayer() {
               <span className="font-headline font-bold">{quiz?.time_per_question}s per Q</span>
             </div>
           </div>
-          
+
           <div className="text-9xl font-mono font-black text-primary drop-shadow-[0_0_20px_rgba(0,229,255,0.6)] animate-bounceIn" key={lobbyCount}>
             {lobbyCount}
           </div>
@@ -407,9 +419,9 @@ export default function QuizPlayer() {
       <div className="min-h-screen bg-surface-container-lowest flex flex-col items-center py-12 px-6 overflow-y-auto relative">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-[10%] left-[20%] w-[500px] h-[500px] bg-[#FFD700]/10 rounded-full blur-[150px] animate-pulse"></div>
-          <div className="absolute bottom-[20%] right-[10%] w-[400px] h-[400px] bg-primary/8 rounded-full blur-[120px] animate-pulse" style={{animationDelay: '1s'}}></div>
+          <div className="absolute bottom-[20%] right-[10%] w-[400px] h-[400px] bg-primary/8 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
         </div>
-        
+
         <div className="z-10 max-w-4xl w-full">
           <div className="text-center mb-12 animate-slideUp">
             {showFailPrompt ? (
@@ -452,7 +464,7 @@ export default function QuizPlayer() {
 
               {/* Score Overview */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className={`md:col-span-2 clay-card p-8 border-2 flex flex-col items-center justify-center animate-slideUp ${passed ? 'border-[#FFD700]/30' : 'border-amber-500/30'}`} style={{animationDelay: '0.2s'}}>
+                <div className={`md:col-span-2 clay-card p-8 border-2 flex flex-col items-center justify-center animate-slideUp ${passed ? 'border-[#FFD700]/30' : 'border-amber-500/30'}`} style={{ animationDelay: '0.2s' }}>
                   <div className="relative w-48 h-48 flex items-center justify-center mb-4">
                     <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                       <circle className="text-brand-surface shadow-clay-sunken" cx="50" cy="50" fill="none" r="45" stroke="currentColor" strokeWidth="8"></circle>
@@ -463,7 +475,7 @@ export default function QuizPlayer() {
                         strokeDasharray="282.7"
                         strokeDashoffset={282.7 - (282.7 * (results.scorePercent / 100))}
                         strokeLinecap="round" strokeWidth="8"
-                        style={{transition: 'stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)'}}
+                        style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)' }}
                       ></circle>
                     </svg>
                     <div className="text-center">
@@ -484,28 +496,28 @@ export default function QuizPlayer() {
                 </div>
 
                 <div className="flex flex-col gap-6 md:col-span-2">
-                  <div className="clay-card p-6 flex items-center justify-between animate-slideInRight" style={{animationDelay: '0.3s'}}>
+                  <div className="clay-card p-6 flex items-center justify-between animate-slideInRight" style={{ animationDelay: '0.3s' }}>
                     <div>
                       <div className="text-sm font-headline tracking-widest text-on-surface-variant uppercase mb-1">Accuracy</div>
-                      <div className="text-4xl font-mono font-bold text-primary score-number" style={{animationDelay: '0.6s'}}>
+                      <div className="text-4xl font-mono font-bold text-primary score-number" style={{ animationDelay: '0.6s' }}>
                         <AnimatedCounter value={results.percentage} />%
                       </div>
                     </div>
                     <div className="w-16 h-16 bg-brand-surface shadow-clay-sunken rounded-2xl flex items-center justify-center text-3xl">🎯</div>
                   </div>
-                  <div className="clay-card p-6 flex items-center justify-between animate-slideInRight" style={{animationDelay: '0.4s'}}>
+                  <div className="clay-card p-6 flex items-center justify-between animate-slideInRight" style={{ animationDelay: '0.4s' }}>
                     <div>
                       <div className="text-sm font-headline tracking-widest text-on-surface-variant uppercase mb-1">Best Streak</div>
-                      <div className="text-4xl font-mono font-bold text-[#FF6B6B] score-number" style={{animationDelay: '0.7s'}}>
+                      <div className="text-4xl font-mono font-bold text-[#FF6B6B] score-number" style={{ animationDelay: '0.7s' }}>
                         <AnimatedCounter value={results.maxStreak} />
                       </div>
                     </div>
                     <div className="w-16 h-16 bg-brand-surface shadow-clay-sunken rounded-2xl flex items-center justify-center text-3xl">🔥</div>
                   </div>
-                  <div className="clay-card p-6 flex items-center justify-between animate-slideInRight" style={{animationDelay: '0.5s'}}>
+                  <div className="clay-card p-6 flex items-center justify-between animate-slideInRight" style={{ animationDelay: '0.5s' }}>
                     <div>
                       <div className="text-sm font-headline tracking-widest text-on-surface-variant uppercase mb-1">XP Earned</div>
-                      <div className="text-4xl font-mono font-bold text-tertiary score-number" style={{animationDelay: '0.8s'}}>
+                      <div className="text-4xl font-mono font-bold text-tertiary score-number" style={{ animationDelay: '0.8s' }}>
                         +<AnimatedCounter value={results.xpEarned} />
                       </div>
                     </div>
@@ -533,38 +545,45 @@ export default function QuizPlayer() {
               )}
 
               {/* Review */}
-              <div className="clay-card p-8 animate-slideUp" style={{animationDelay: '0.6s'}}>
+              <div className="clay-card p-8 animate-slideUp" style={{ animationDelay: '0.6s' }}>
                 <h3 className="text-xl font-headline font-bold uppercase tracking-widest mb-6 flex items-center gap-3 border-b border-brand-elevated/40 pb-4">
-                  <span className="material-symbols-outlined text-primary" style={{fontVariationSettings: "'FILL' 1"}}>analytics</span>
+                  <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>analytics</span>
                   Clinical Review
                 </h3>
                 <div className="flex flex-col gap-6">
-                  {results.questionResults?.map((qr, i) => (
-                    <div key={i} className={`p-6 rounded-xl border-2 transition-all animate-slideUp ${qr.isCorrect ? 'bg-brand-surface border-success/30 shadow-clay-outer' : 'bg-brand-surface border-error/30 shadow-clay-outer'}`} style={{animationDelay: `${0.7 + i * 0.1}s`}}>
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="font-mono text-sm text-on-surface-variant tracking-widest">QUESTION {i+1}</span>
-                        <div className="flex items-center gap-3">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-brand-surface shadow-clay-sunken ${qr.isCorrect ? 'text-success' : 'text-error'}`}>
-                            {qr.isCorrect ? '✓ Correct' : '✗ Incorrect'}
-                          </span>
-                          <span className="font-mono text-sm text-primary">+{qr.pointsEarned} pts</span>
+                  {results.questionResults?.map((qr, i) => {
+                    // Three states: fully correct (1), partial (0<f<1), incorrect (0).
+                    const f = qr.fraction ?? (qr.isCorrect ? 1 : 0);
+                    const isPartial = f > 0 && f < 1;
+                    return (
+                      <div key={i} className={`p-6 rounded-xl border-2 transition-all animate-slideUp shadow-clay-outer bg-brand-surface ${f === 1 ? 'border-success/30' : f === 0 ? 'border-error/30' : 'border-amber-500/40'}`} style={{ animationDelay: `${0.7 + i * 0.1}s` }}>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="font-mono text-sm text-on-surface-variant tracking-widest">QUESTION {i + 1}</span>
+                          <div className="flex items-center gap-3">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-brand-surface shadow-clay-sunken ${f === 1 ? 'text-success' : f === 0 ? 'text-error' : 'text-amber-500'}`}>
+                              {f === 1 ? '✓ Correct' : f === 0 ? '✗ Incorrect' : '◐ Partial'}
+                            </span>
+                            <span className="font-mono text-sm text-primary">
+                              {isPartial ? `+${qr.pointsEarned} / ${qr.pointsPossible} marks` : `+${qr.pointsEarned} pts`}
+                            </span>
+                          </div>
                         </div>
+                        <p className="text-lg font-headline mb-4">{quiz?.questions[i]?.question_text}</p>
+                        <div className="bg-brand-surface shadow-clay-sunken p-4 rounded-lg mb-4">
+                          <span className="text-xs font-mono text-on-surface-variant tracking-widest uppercase block mb-2">Correct Answer</span>
+                          <div className="text-left">
+                            {renderCorrectAnswer(qr.correctAnswer)}
+                          </div>
+                        </div>
+                        {qr.explanation && (
+                          <div className="flex items-start gap-3 text-on-surface-variant bg-brand-surface shadow-clay-outer p-4 rounded-lg border border-primary/20">
+                            <span className="material-symbols-outlined text-primary mt-0.5">lightbulb</span>
+                            <p className="text-sm leading-relaxed">{qr.explanation}</p>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-lg font-headline mb-4">{quiz?.questions[i]?.question_text}</p>
-                      <div className="bg-brand-surface shadow-clay-sunken p-4 rounded-lg mb-4">
-                        <span className="text-xs font-mono text-on-surface-variant tracking-widest uppercase block mb-2">Correct Answer</span>
-                        <div className="text-left">
-                          {renderCorrectAnswer(qr.correctAnswer)}
-                        </div>
-                      </div>
-                      {qr.explanation && (
-                        <div className="flex items-start gap-3 text-on-surface-variant bg-brand-surface shadow-clay-outer p-4 rounded-lg border border-primary/20">
-                          <span className="material-symbols-outlined text-primary mt-0.5">lightbulb</span>
-                          <p className="text-sm leading-relaxed">{qr.explanation}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -582,7 +601,7 @@ export default function QuizPlayer() {
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mt-12 animate-slideUp" style={{animationDelay: '1s'}}>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mt-12 animate-slideUp" style={{ animationDelay: '1s' }}>
             {/* On a failed level, retrying is the action that matters, so it leads and the
                 secondary button goes to the learning path rather than the dashboard. */}
             <button
@@ -617,7 +636,7 @@ export default function QuizPlayer() {
       {/* Ambient Glow Background Effects */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary-container opacity-20 blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-[#71d7cd] opacity-10 blur-[100px] pointer-events-none"></div>
-      
+
       <main className="flex-1 flex flex-col relative z-10 p-6 pt-10 md:p-12 md:pt-16 max-w-7xl mx-auto w-full">
         {/* Top HUD */}
         <header className="flex justify-between items-center mb-8 gap-4 flex-wrap">
@@ -625,13 +644,13 @@ export default function QuizPlayer() {
           <div className="flex flex-col gap-2 w-full md:w-1/3 md:max-w-[240px]">
             <span className="font-headline font-bold text-on-surface text-lg">{currentQ + 1}/{quiz.questions.length}</span>
             <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-[#71d7cd] to-primary rounded-full transition-all duration-300" 
+              <div
+                className="h-full bg-gradient-to-r from-[#71d7cd] to-primary rounded-full transition-all duration-300"
                 style={{ width: `${((currentQ + 1) / quiz.questions.length) * 100}%` }}
               ></div>
             </div>
           </div>
-          
+
           {/* Score */}
           <div className="flex flex-col md:items-end gap-1 w-full md:w-1/3 text-center md:text-right">
             <span className="font-headline font-extrabold text-2xl text-on-surface">{totalScore.toLocaleString()} pts</span>
@@ -648,7 +667,7 @@ export default function QuizPlayer() {
           const percentage = Math.min(100, Math.max(0, (timeLeft / totalTime) * 100));
           const isCritical = timeLeft <= 5;
           const isWarning = timeLeft <= 10 && timeLeft > 5;
-          
+
           return (
             <div className="w-full max-w-4xl mx-auto mb-8 bg-surface-container-low border border-outline-variant/20 rounded-2xl p-4 flex items-center gap-4 shadow-[0_8px_32px_0_rgba(11,19,38,0.5)]">
               <div className="flex items-center gap-3 shrink-0">
@@ -662,17 +681,16 @@ export default function QuizPlayer() {
                   </span>
                 </div>
               </div>
-              
+
               {/* The depletion bar container */}
               <div className="flex-1 bg-surface-container-highest/40 h-6 rounded-full overflow-hidden border border-outline-variant/10 relative p-1">
-                <div 
-                  className={`h-full rounded-full transition-all duration-300 ${
-                    isCritical 
-                      ? 'bg-gradient-to-r from-red-500 to-rose-600 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.6)]' 
-                      : isWarning
-                        ? 'bg-gradient-to-r from-amber-400 to-orange-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]'
-                        : 'bg-gradient-to-r from-[#00CEC9] to-[#6C5CE7] shadow-[0_0_15px_rgba(0,206,201,0.4)]'
-                  }`}
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${isCritical
+                    ? 'bg-gradient-to-r from-red-500 to-rose-600 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.6)]'
+                    : isWarning
+                      ? 'bg-gradient-to-r from-amber-400 to-orange-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                      : 'bg-gradient-to-r from-[#00CEC9] to-[#6C5CE7] shadow-[0_0_15px_rgba(0,206,201,0.4)]'
+                    }`}
                   style={{ width: `${percentage}%` }}
                 ></div>
                 {/* Subtle ticks/grid overlay inside the bar */}
@@ -686,7 +704,7 @@ export default function QuizPlayer() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2 shrink-0">
                 <span className={`font-mono text-3xl font-black tracking-tight ${isCritical ? 'text-red-500 animate-ping' : isWarning ? 'text-amber-400' : 'text-primary'}`}>
                   {timeLeft}
@@ -701,15 +719,15 @@ export default function QuizPlayer() {
         <div className="flex flex-col items-center text-center mb-10 md:mb-16 flex-1 justify-center relative">
           {/* Notification for result */}
           {showAnswer && (
-            <div className={`px-6 py-2 rounded-full border shadow-lg animate-bounceIn z-20 mb-8 ${isCurrentAnswerCorrect ? 'bg-tertiary-fixed-dim/20 border-tertiary-fixed-dim/50 text-tertiary-fixed-dim' : 'bg-error/20 border-error/50 text-error'}`}>
+            <div className={`px-6 py-2 rounded-full border shadow-lg animate-bounceIn z-20 mb-8 ${currentFraction === 1 ? 'bg-tertiary-fixed-dim/20 border-tertiary-fixed-dim/50 text-tertiary-fixed-dim' : currentFraction === 0 ? 'bg-error/20 border-error/50 text-error' : 'bg-amber-500/20 border-amber-500/50 text-amber-500'}`}>
               <span className="font-headline font-bold tracking-widest uppercase">
-                {isCurrentAnswerCorrect ? '✓ Correct Answer!' : '✗ Incorrect'}
+                {currentFraction === 1 ? '✓ Correct Answer!' : currentFraction === 0 ? '✗ Incorrect' : '◐ Partial Credit'}
               </span>
             </div>
           )}
 
           <div className="bg-surface-container-low px-4 py-2 rounded-full flex items-center gap-2 mb-8 shadow-[0_8px_32px_0_rgba(11,19,38,0.8)] border border-outline-variant/20">
-            <span className="material-symbols-outlined text-[#71d7cd] text-sm" style={{fontVariationSettings: "'FILL' 1"}}>
+            <span className="material-symbols-outlined text-[#71d7cd] text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
               {question.type === 'mcq' && 'assignment'}
               {question.type === 'image' && 'image'}
               {question.type === 'video' && 'movie'}
@@ -724,7 +742,7 @@ export default function QuizPlayer() {
               {question.type.replace('_', ' ')}
             </span>
           </div>
-          
+
           <h1 className="font-display font-extrabold text-xl md:text-2xl lg:text-3xl tracking-tight leading-snug max-w-4xl px-4 z-10 relative">
             {question.question_text}
           </h1>
@@ -752,9 +770,9 @@ export default function QuizPlayer() {
           )}
           {question.type === 'audio' && question.media_url && (
             <div className="mt-8 w-full max-w-xl bg-surface-container-low rounded-2xl flex items-center justify-center border border-outline-variant/20 shadow-2xl relative z-10 p-6">
-              <audio 
+              <audio
                 src={question.media_url}
-                controls 
+                controls
                 className="w-full"
               />
             </div>
@@ -782,32 +800,30 @@ export default function QuizPlayer() {
                   key={i}
                   disabled={showAnswer}
                   onClick={() => handleSubmit(opt)}
-                  className={`group relative overflow-hidden rounded-2xl text-left transition-all duration-300 transform animate-slideUp stagger-${(i % 4) + 1} ${
-                    isFaded 
-                      ? 'opacity-40 scale-95 shadow-clay-sunken bg-brand-surface' 
-                      : isCorrect 
-                        ? 'bg-brand-surface shadow-clay-sunken border-4 border-success text-success scale-[1.02]' 
-                        : isWrong 
-                          ? 'bg-brand-surface shadow-clay-sunken border-4 border-error text-error animate-shake' 
-                          : isSelected 
-                            ? 'bg-brand-surface shadow-clay-sunken border-4 border-primary text-primary scale-[1.02]' 
-                            : 'bg-brand-surface shadow-clay-outer hover:scale-[1.02] hover:shadow-clay-hover'
-                  }`}
+                  className={`group relative overflow-hidden rounded-2xl text-left transition-all duration-300 transform animate-slideUp stagger-${(i % 4) + 1} ${isFaded
+                    ? 'opacity-40 scale-95 shadow-clay-sunken bg-brand-surface'
+                    : isCorrect
+                      ? 'bg-brand-surface shadow-clay-sunken border-4 border-success text-success scale-[1.02]'
+                      : isWrong
+                        ? 'bg-brand-surface shadow-clay-sunken border-4 border-error text-error animate-shake'
+                        : isSelected
+                          ? 'bg-brand-surface shadow-clay-sunken border-4 border-primary text-primary scale-[1.02]'
+                          : 'bg-brand-surface shadow-clay-outer hover:scale-[1.02] hover:shadow-clay-hover'
+                    }`}
                   style={{ minHeight: '80px' }}
                 >
                   <div className="p-6 flex items-center justify-between gap-4">
                     <span className="font-headline font-bold text-lg text-on-surface break-words flex-1">
                       {opt}
                     </span>
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-brand-surface shadow-clay-sunken border-2 ${
-                      isCorrect 
-                        ? 'border-success text-success' 
-                        : isWrong 
-                          ? 'border-error text-error' 
-                          : isSelected 
-                            ? 'border-primary text-primary' 
-                            : 'border-brand-elevated/40 text-on-surface-variant'
-                    }`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-brand-surface shadow-clay-sunken border-2 ${isCorrect
+                      ? 'border-success text-success'
+                      : isWrong
+                        ? 'border-error text-error'
+                        : isSelected
+                          ? 'border-primary text-primary'
+                          : 'border-brand-elevated/40 text-on-surface-variant'
+                      }`}>
                       <span className="font-headline font-black text-sm">
                         {isCorrect ? '✓' : isWrong ? '✗' : letters[i]}
                       </span>
@@ -822,12 +838,12 @@ export default function QuizPlayer() {
         {/* Jumbled Letters */}
         {question.type === 'jumbled_letters' && (
           <div className="flex flex-col gap-8 max-w-4xl mx-auto w-full mt-auto mb-8 relative z-10">
-            <div className={`flex flex-wrap gap-2 justify-center p-8 rounded-2xl border min-h-[120px] transition-all ${showAnswer ? (placedLetters.map(l=>l.letter).join('') === question.correct_answer ? 'bg-[#71d7cd]/10 border-[#71d7cd]/50 shadow-[0_0_30px_rgba(113,215,205,0.2)]' : 'bg-error/10 border-error/50') : 'bg-surface-container-low border-outline-variant/20 shadow-[0_8px_32px_0_rgba(11,19,38,0.5)]'}`}>
+            <div className={`flex flex-wrap gap-2 justify-center p-8 rounded-2xl border min-h-[120px] transition-all ${showAnswer ? (placedLetters.map(l => l.letter).join('') === question.correct_answer ? 'bg-[#71d7cd]/10 border-[#71d7cd]/50 shadow-[0_0_30px_rgba(113,215,205,0.2)]' : 'bg-error/10 border-error/50') : 'bg-surface-container-low border-outline-variant/20 shadow-[0_8px_32px_0_rgba(11,19,38,0.5)]'}`}>
               {placedLetters.map((l, i) => (
-                <button 
-                  key={`${l.id}-${i}`} 
-                  className={`w-14 h-16 md:w-20 md:h-24 font-display font-bold text-3xl md:text-5xl rounded-xl flex items-center justify-center transition-all shadow-lg ${showAnswer ? (placedLetters.map(l=>l.letter).join('') === question.correct_answer ? 'bg-[#71d7cd] text-[#003733]' : 'bg-error text-on-error') : 'bg-primary border border-primary text-on-primary hover:bg-error hover:border-error hover:text-on-error'}`}
-                  onClick={() => removePlacedLetter(i)} 
+                <button
+                  key={`${l.id}-${i}`}
+                  className={`w-14 h-16 md:w-20 md:h-24 font-display font-bold text-3xl md:text-5xl rounded-xl flex items-center justify-center transition-all shadow-lg ${showAnswer ? (placedLetters.map(l => l.letter).join('') === question.correct_answer ? 'bg-[#71d7cd] text-[#003733]' : 'bg-error text-on-error') : 'bg-primary border border-primary text-on-primary hover:bg-error hover:border-error hover:text-on-error'}`}
+                  onClick={() => removePlacedLetter(i)}
                   disabled={showAnswer}
                 >
                   {l.letter}
@@ -842,10 +858,10 @@ export default function QuizPlayer() {
 
             <div className="flex flex-wrap gap-4 justify-center">
               {jumbledLetters.map(l => (
-                <button 
-                  key={l.id} 
+                <button
+                  key={l.id}
                   className={`w-14 h-16 md:w-20 md:h-24 bg-surface-variant border border-outline-variant/30 text-on-surface font-display font-bold text-3xl md:text-5xl rounded-xl flex items-center justify-center transition-all shadow-md ${l.placed || showAnswer ? 'opacity-20 scale-90 cursor-not-allowed grayscale' : 'hover:-translate-y-2 hover:border-primary hover:shadow-[0_10px_20px_rgba(221,183,255,0.2)]'}`}
-                  onClick={() => placeLetter(l)} 
+                  onClick={() => placeLetter(l)}
                   disabled={l.placed || showAnswer}
                 >
                   {l.letter}
@@ -855,13 +871,13 @@ export default function QuizPlayer() {
 
             {!showAnswer && placedLetters.length === question.options.length && (
               <div className="flex justify-center mt-6">
-                <button className="bg-primary text-on-primary px-12 py-4 rounded-full font-headline font-bold text-lg tracking-widest uppercase hover:bg-primary-container transition-colors shadow-[0_0_20px_rgba(221,183,255,0.4)] active:scale-95" onClick={() => handleSubmit(placedLetters.map(l=>l.letter).join(''))}>
+                <button className="bg-primary text-on-primary px-12 py-4 rounded-full font-headline font-bold text-lg tracking-widest uppercase hover:bg-primary-container transition-colors shadow-[0_0_20px_rgba(221,183,255,0.4)] active:scale-95" onClick={() => handleSubmit(placedLetters.map(l => l.letter).join(''))}>
                   Submit Answer
                 </button>
               </div>
             )}
 
-            {showAnswer && placedLetters.map(l=>l.letter).join('') !== question.correct_answer && (
+            {showAnswer && placedLetters.map(l => l.letter).join('') !== question.correct_answer && (
               <div className="text-center mt-4 p-4 bg-surface-container rounded-xl border border-outline-variant/20">
                 <span className="font-mono text-sm text-on-surface-variant uppercase tracking-widest block mb-1">Correct Answer</span>
                 <span className="font-display font-bold text-2xl text-[#71d7cd] tracking-widest">{question.correct_answer}</span>
@@ -990,7 +1006,7 @@ export default function QuizPlayer() {
                       const correct = JSON.parse(question.correct_answer);
                       const isCorrectPair = matchingSelections[leftItem] === correct[leftItem];
                       resultCls = isCorrectPair ? 'ring-2 ring-[#71d7cd] bg-[#71d7cd]/10' : 'ring-2 ring-error bg-error/10';
-                    } catch {}
+                    } catch { }
                   }
 
                   return (
@@ -1004,7 +1020,7 @@ export default function QuizPlayer() {
                         if (showAnswer) return;
                         if (isMatched) {
                           // Remove connection
-                          setMatchingSelections(prev => { const n = {...prev}; delete n[leftItem]; return n; });
+                          setMatchingSelections(prev => { const n = { ...prev }; delete n[leftItem]; return n; });
                           setSelectedLeft(null);
                         } else {
                           setSelectedLeft(isSelected ? null : leftItem);
@@ -1244,24 +1260,23 @@ export default function QuizPlayer() {
                 {/* Student's bounding box */}
                 {captchaBox && captchaBox.w > 0.005 && captchaBox.h > 0.005 && (
                   <div
-                    className={`absolute border-[3px] rounded-sm transition-colors ${
-                      showAnswer
-                        ? ((() => {
-                            try {
-                              const cb = typeof question.correct_answer === 'string' ? JSON.parse(question.correct_answer) : question.correct_answer;
-                              const ub = captchaBox;
-                              const ix1 = Math.max(ub.x, cb.x), iy1 = Math.max(ub.y, cb.y);
-                              const ix2 = Math.min(ub.x + ub.w, cb.x + cb.w), iy2 = Math.min(ub.y + ub.h, cb.y + cb.h);
-                              const inter = Math.max(0, ix2 - ix1) * Math.max(0, iy2 - iy1);
-                              const union = (ub.w * ub.h) + (cb.w * cb.h) - inter;
-                              return (union > 0 ? inter / union : 0) >= 0.3;
-                            } catch { return false; }
-                          })()
-                            ? 'border-[#71d7cd] shadow-[0_0_20px_rgba(113,215,205,0.6)]'
-                            : 'border-error shadow-[0_0_20px_rgba(255,100,100,0.6)]'
-                          )
-                        : 'border-primary shadow-[0_0_20px_rgba(108,92,231,0.6)]'
-                    }`}
+                    className={`absolute border-[3px] rounded-sm transition-colors ${showAnswer
+                      ? ((() => {
+                        try {
+                          const cb = typeof question.correct_answer === 'string' ? JSON.parse(question.correct_answer) : question.correct_answer;
+                          const ub = captchaBox;
+                          const ix1 = Math.max(ub.x, cb.x), iy1 = Math.max(ub.y, cb.y);
+                          const ix2 = Math.min(ub.x + ub.w, cb.x + cb.w), iy2 = Math.min(ub.y + ub.h, cb.y + cb.h);
+                          const inter = Math.max(0, ix2 - ix1) * Math.max(0, iy2 - iy1);
+                          const union = (ub.w * ub.h) + (cb.w * cb.h) - inter;
+                          return (union > 0 ? inter / union : 0) >= 0.3;
+                        } catch { return false; }
+                      })()
+                        ? 'border-[#71d7cd] shadow-[0_0_20px_rgba(113,215,205,0.6)]'
+                        : 'border-error shadow-[0_0_20px_rgba(255,100,100,0.6)]'
+                      )
+                      : 'border-primary shadow-[0_0_20px_rgba(108,92,231,0.6)]'
+                      }`}
                     style={{
                       left: `${captchaBox.x * 100}%`,
                       top: `${captchaBox.y * 100}%`,
@@ -1270,9 +1285,8 @@ export default function QuizPlayer() {
                       pointerEvents: 'none',
                     }}
                   >
-                    <div className={`absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-mono font-bold px-2 py-0.5 rounded whitespace-nowrap ${
-                      showAnswer ? 'bg-surface-container text-on-surface' : 'bg-primary/90 text-on-primary'
-                    }`}>
+                    <div className={`absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-mono font-bold px-2 py-0.5 rounded whitespace-nowrap ${showAnswer ? 'bg-surface-container text-on-surface' : 'bg-primary/90 text-on-primary'
+                      }`}>
                       {showAnswer ? 'Your Selection' : `${(captchaBox.w * 100).toFixed(0)}% × ${(captchaBox.h * 100).toFixed(0)}%`}
                     </div>
                   </div>

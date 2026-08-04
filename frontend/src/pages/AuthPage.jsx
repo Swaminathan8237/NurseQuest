@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../supabaseClient';
 import { Button, Input } from '../components/ui';
+import VerificationSentModal from '../components/VerificationSentModal';
 
 import logo from '../assets/skillquest-logo.png';
 
@@ -39,6 +40,7 @@ export default function AuthPage() {
   // Email verification pending state
   const [isVerificationPending, setIsVerificationPending] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
+  const [showSentModal, setShowSentModal] = useState(false);
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -81,8 +83,9 @@ export default function AuthPage() {
         navigate(getDashboardRoute(loggedUser.role));
       } else {
         const registeredUser = await register(formData);
-        if (registeredUser?.isVerificationPending) {
+        if (registeredUser?.emailVerificationPending) {
           setPendingEmail(formData.email);
+          setShowSentModal(true);
           setIsVerificationPending(true);
           setLoading(false);
           return;
@@ -93,7 +96,7 @@ export default function AuthPage() {
         navigate(getDashboardRoute(registeredUser.role));
       }
     } catch (err) {
-      setError(err.message || 'Authentication failed');
+      setError(err.message || t('Authentication failed'));
     } finally {
       setLoading(false);
     }
@@ -107,7 +110,7 @@ export default function AuthPage() {
       const updatedUser = await syncOAuthProfile(profileFormData.name, profileFormData.role);
       navigate(getDashboardRoute(updatedUser.role));
     } catch (err) {
-      setError(err.message || 'Failed to update profile');
+      setError(err.message || t('Failed to update profile'));
     } finally {
       setLoading(false);
     }
@@ -125,7 +128,7 @@ export default function AuthPage() {
       if (resetErr) throw resetErr;
       setResetSent(true);
     } catch (err) {
-      setError(err.message || 'Failed to send password reset email');
+      setError(err.message || t('Failed to send password reset email'));
     } finally {
       setLoading(false);
     }
@@ -135,7 +138,7 @@ export default function AuthPage() {
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('Passwords do not match'));
       return;
     }
     setError('');
@@ -143,7 +146,7 @@ export default function AuthPage() {
     try {
       const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
       if (updateErr) throw updateErr;
-      alert('Password updated successfully! Please sign in with your new password.');
+      alert(t('Password updated successfully! Please sign in with your new password.'));
       window.location.hash = '';
       setIsResettingPassword(false);
     } finally {
@@ -237,7 +240,7 @@ export default function AuthPage() {
         boxShadow: 'var(--shadow-hard-sm)',
       }}
     >
-      <span className="material-symbols-outlined text-[20px]">error</span>
+      <span className="material-symbols-outlined text-[20px]">{t('error')}</span>
       <span>{error}</span>
     </div>
   );
@@ -251,12 +254,19 @@ export default function AuthPage() {
       className="min-h-screen flex items-center justify-center font-body relative overflow-hidden px-4 transition-colors duration-300"
       style={{ background: 'var(--bg-base)' }}
     >
+      {/* "Verification email sent" popup with animated tick (shown after sign-up) */}
+      <VerificationSentModal
+        isOpen={showSentModal}
+        email={pendingEmail}
+        onClose={() => setShowSentModal(false)}
+      />
+
       {/* Theme Toggle in Top Right */}
       <div className="absolute top-6 right-6 z-50">
         <button
           onClick={toggleTheme}
           className="btn btn-ghost btn-icon"
-          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          title={theme === 'dark' ? t('Switch to Light Mode') : t('Switch to Dark Mode')}
         >
           <span className="material-symbols-outlined">
             {theme === 'dark' ? 'light_mode' : 'dark_mode'}
@@ -300,7 +310,7 @@ export default function AuthPage() {
             <img src={logo} alt="SkillQuest" className="w-14 h-14 object-contain" />
           </div>
           <h1 className="text-4xl font-headline font-black tracking-tight mb-1" style={{ color: 'var(--text-primary)' }}>
-            Skill<span style={{ color: 'var(--primary)' }}>Quest</span>
+            {t('Skill')}<span style={{ color: 'var(--primary)' }}>{t('Quest')}</span>
           </h1>
           <p style={{ ...eyebrowLabel, paddingLeft: 0 }}>{t('Learn · Practice · Excel')}</p>
         </div>
@@ -321,7 +331,7 @@ export default function AuthPage() {
               className="w-16 h-16 flex items-center justify-center mb-5"
               style={{ background: 'rgba(255,255,255,0.25)', border: '2px solid rgba(255,255,255,0.5)', borderRadius: 'var(--radius-full)' }}
             >
-              <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}>check_circle</span>
+              <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}>{t('check_circle')}</span>
             </div>
             <h2 className="text-xl font-headline font-black mb-2">{t('Check Your Email')}</h2>
             <p className="text-sm leading-relaxed font-semibold mb-6 px-1">
@@ -347,7 +357,7 @@ export default function AuthPage() {
                 id="profile-name"
                 type="text"
                 label={t('Full Name')}
-                placeholder="Enter your full name"
+                placeholder={t('Enter your full name')}
                 value={profileFormData.name}
                 onChange={(e) => setProfileFormData({ ...profileFormData, name: e.target.value })}
                 required
@@ -420,7 +430,7 @@ export default function AuthPage() {
 
             {resetSent ? (
               <div className="space-y-6 text-center py-4">
-                <span className="material-symbols-outlined text-5xl animate-bounce" style={{ color: 'var(--accent-sky)' }}>mail</span>
+                <span className="material-symbols-outlined text-5xl animate-bounce" style={{ color: 'var(--accent-sky)' }}>{t('mail')}</span>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                   {t("We've sent a password reset link to")} <strong style={{ color: 'var(--text-primary)' }}>{resetEmail}</strong>. {t("Please check your inbox.")}
                 </p>
@@ -471,7 +481,7 @@ export default function AuthPage() {
                 className="px-4 py-3.5 text-sm font-semibold mb-6 flex items-center gap-2.5 animate-fadeIn"
                 style={{ background: 'var(--accent-green)', color: '#fff', border: '2px solid var(--border-ink-color)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-hard-sm)' }}
               >
-                <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                <span className="material-symbols-outlined text-[20px]">{t('check_circle')}</span>
                 <span>{t('Email verified successfully! You can now sign in.')}</span>
               </div>
             )}
@@ -515,7 +525,7 @@ export default function AuthPage() {
                     id="name"
                     type="text"
                     label={t('Full Name')}
-                    placeholder="Enter your full name"
+                    placeholder={t('Enter your full name')}
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required={!isLogin}

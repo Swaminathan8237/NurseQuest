@@ -45,7 +45,32 @@ const io = new Server(server, {
 });
 
 // Middleware
-app.use(helmet());
+// CSP allow-list (evidence-based): the SPA loads Google Fonts + Material Symbols
+// (fonts.googleapis.com / fonts.gstatic.com), DiceBear avatars (api.dicebear.com),
+// Supabase Storage media (*.supabase.co), and Google Identity Services
+// (accounts.google.com). 'unsafe-inline' is required for style (the app uses inline
+// style={{…}} widely) and kept for script as a safety net against any inline the build
+// emits. Wildcard *.supabase.co avoids hardcoding the Supabase URL.
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://apis.google.com", "https://www.gstatic.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https://api.dicebear.com", "https://*.supabase.co", "https://*.googleusercontent.com"],
+      connectSrc: ["'self'", "https://accounts.google.com", "https://*.supabase.co"],
+      frameSrc: ["'self'", "https://accounts.google.com"],
+      mediaSrc: ["'self'", "blob:", "https://*.supabase.co"],
+      workerSrc: ["'self'", "blob:"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // don't require COEP — external <img>/media have no CORP header
+}));
 app.use(cookieParser());
 app.use(cors({
   origin: allowedOrigins,

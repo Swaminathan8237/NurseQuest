@@ -17,45 +17,65 @@ export default {
         mono: ['JetBrains Mono', 'monospace'],
       },
 
-      /* ── Colors ── */
+      /* ── Colors ──
+         Full Material palette consolidated here (previously supplied at runtime by the
+         Tailwind Play CDN inline config in index.html). Every token the app uses now
+         compiles into the local bundle. Values resolve to CSS vars defined for both light
+         (:root) and dark ([data-theme="dark"]) themes in index.css. */
       colors: {
+        /* Brand primary — Material tokens folded in; -light/-dark/-container/-fixed used across app */
         primary: {
           DEFAULT: '#7C3AED',
           light: '#A78BFA',
           dark: '#5B21B6',
-          container: 'rgba(124, 58, 237, 0.18)',
+          container: '#b76dff',
+          fixed: '#f0dbff',
+          'fixed-dim': '#ddb7ff',
         },
-        tertiary: {
-          DEFAULT: '#FFD43B',
-          light: '#FFE58A',
-        },
+        'on-primary': { DEFAULT: '#490080', container: '#400071', fixed: '#2c0051', 'fixed-variant': '#670dae' },
+        'inverse-primary': '#8134c7',
+
+        /* Secondary (Material) */
+        secondary: { DEFAULT: '#ddb7ff', container: '#583876', fixed: '#f0dbff', 'fixed-dim': '#ddb7ff' },
+        'on-secondary': { DEFAULT: '#40215e', container: '#cba6ed', fixed: '#2a0848', 'fixed-variant': '#583876' },
+
+        /* Tertiary — TEAL is what dev renders (CDN wins); keep config-only `light` */
+        tertiary: { DEFAULT: '#71d7cd', light: '#FFE58A', container: '#32a097', fixed: '#8ef4e9', 'fixed-dim': '#71d7cd' },
+        'on-tertiary': { DEFAULT: '#003733', container: '#00302c', fixed: '#00201d', 'fixed-variant': '#00504a' },
+
+        /* Error (Material) */
+        error: { DEFAULT: '#ffb4ab', container: '#93000a' },
+        'on-error': { DEFAULT: '#690005', container: '#ffdad6' },
+
+        /* Surfaces / background (Material) */
+        background: 'var(--bg-base)',
+        'on-background': 'var(--text-primary)',
+        surface: 'var(--bg-surface)',
+        'surface-bright': 'var(--bg-elevated)',
+        'surface-dim': 'var(--bg-base)',
+        'surface-variant': 'var(--bg-elevated)',
+        'surface-tint': '#ddb7ff',
+        'surface-container-lowest': 'var(--bg-base)',
+        'surface-container-low': 'var(--bg-card)',
+        'surface-container': 'var(--bg-surface)',
+        'surface-container-high': 'var(--bg-elevated)',
+        'surface-container-highest': 'var(--bg-hover)',
+        'on-surface': { DEFAULT: 'var(--text-primary)', variant: 'var(--text-secondary)' },
+        'inverse-surface': 'var(--bg-surface)',
+        'inverse-on-surface': 'var(--text-primary)',
+        outline: 'var(--text-muted)',
+        'outline-variant': 'var(--border)',
+        'brand-surface': 'var(--bg-surface)',
+        'brand-elevated': 'var(--bg-elevated)',
+
+        /* Playful accent scale — config-only DEFAULT+shadow variants preserved */
         ink: 'var(--ink)',
-        coral: {
-          DEFAULT: '#FF6B6B',
-          shadow: '#C1443F',
-        },
-        sky: {
-          DEFAULT: '#4DABF7',
-          shadow: '#2B7CC4',
-        },
-        gold: {
-          DEFAULT: '#FFD43B',
-          shadow: '#C79A00',
-        },
-        success: {
-          DEFAULT: '#12B76A',
-          shadow: '#0B8A50',
-        },
+        coral: { DEFAULT: '#FF6B6B', shadow: '#C1443F' },
+        sky: { DEFAULT: '#4DABF7', shadow: '#2B7CC4' },
+        gold: { DEFAULT: '#FFD43B', shadow: '#C79A00' },
+        success: { DEFAULT: '#12B76A', shadow: '#0B8A50' },
         warning: '#FFB020',
         danger: '#FF5A5F',
-        'on-surface': {
-          DEFAULT: 'var(--text-primary)',
-          variant: 'var(--text-secondary)',
-        },
-        brand: {
-          surface: 'var(--bg-surface)',
-          elevated: 'var(--bg-elevated)',
-        },
       },
 
       /* ── Border radius (chunkier) ── */
@@ -136,7 +156,15 @@ export default {
     },
   },
   corePlugins: {
-    preflight: false, // Keep our existing CSS reset in index.css
+    // Preflight ON — restores the base reset the app depends on. The UI was developed
+    // against the Tailwind Play CDN (since removed from index.html), whose preflight
+    // normalizes bare form controls — notably `button { background-color: transparent }`.
+    // Many buttons set only `color` and lean on that transparency (the auth Sign In / Sign
+    // Up toggle, "Forgot Password", admin student cards, the landing logo/nav buttons); with
+    // preflight off they painted the browser-default white/grey box. `@tailwind base` is
+    // emitted before all custom CSS in index.css, so our own reset and component styles
+    // still override preflight where they intentionally differ.
+    preflight: true,
   },
   plugins: [
     /* ── Playful component classes (clay-* names kept for back-compat) ── */

@@ -58,8 +58,14 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // NOTE: login/register/syncOAuthProfile must NOT toggle the context-level `loading` flag.
+  // That flag gates the whole route tree in App.jsx (AppRoutes shows a full-screen spinner while
+  // `loading` is true), so setting it here unmounts the mounted page (e.g. AuthPage) mid-action.
+  // The unmount made register's post-await `setShowSentModal(true)` a no-op on a dead component,
+  // so the email-verification popup never appeared and the form reset to the Sign In tab. `loading`
+  // is reserved for the INITIAL session check (see checkSession). Each caller (AuthPage) owns its
+  // own local submit-button loading state.
   const login = async (email, password) => {
-    setLoading(true);
     try {
       const response = await authAPI.login(email, password);
       const userObj = response.user || response;
@@ -68,13 +74,10 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error('Login failed:', err);
       throw err;
-    } finally {
-      setLoading(false);
     }
   };
 
   const register = async (formData) => {
-    setLoading(true);
     try {
       const response = await authAPI.register({
         email: formData.email,
@@ -94,13 +97,10 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error('Registration failed:', err);
       throw err;
-    } finally {
-      setLoading(false);
     }
   };
 
   const syncOAuthProfile = async (formData) => {
-    setLoading(true);
     try {
       const profileData = await authAPI.syncProfile(formData);
       const finalUser = profileData.user || profileData;
@@ -131,8 +131,16 @@ export function AuthProvider({ children }) {
     setUser(prev => ({ ...prev, avatar_config: avatarConfig }));
   };
 
+  // Persist client preferences (sound FX, timer alerts, ...). Mirrors updateAvatar: the
+  // server holds the source of truth (users.preferences TEXT-JSON), and we optimistically
+  // merge the same object into the local user so the UI reflects it without a refetch.
+  const updatePreferences = async (prefs) => {
+    await authAPI.updatePreferences(prefs);
+    setUser(prev => ({ ...prev, preferences: { ...(prev?.preferences || {}), ...prefs } }));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, syncOAuthProfile, logout, updateAvatar }}>
+    <AuthContext.Provider value={{ user, loading, login, register, syncOAuthProfile, logout, updateAvatar, updatePreferences }}>
       {children}
     </AuthContext.Provider>
   );

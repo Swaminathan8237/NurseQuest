@@ -10,6 +10,16 @@ const { sanitizeLogInput, escapeHtml } = require('../utils/logger');
 
 const router = express.Router();
 
+// Parse a JSON-TEXT column defensively: a malformed value (from a legacy row or a manual
+// DB edit) yields the fallback instead of throwing and 500-ing the whole /me response.
+function safeParseJSON(value, fallback) {
+  try {
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -531,7 +541,7 @@ router.post('/sync-profile', authenticateToken, async (req, res) => {
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     const sql = getDB();
-    let users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak, created_at FROM users WHERE id = ${req.user.id}`;
+    let users = await sql`SELECT id, email, name, role, avatar_config, preferences, xp, level, streak, created_at FROM users WHERE id = ${req.user.id}`;
     let user = users[0];
 
     // If no user found by Supabase Auth UUID, check by email and migrate
@@ -587,7 +597,7 @@ router.get('/me', authenticateToken, async (req, res) => {
             });
 
             // Re-fetch the now-migrated user
-            users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak, created_at FROM users WHERE id = ${req.user.id}`;
+            users = await sql`SELECT id, email, name, role, avatar_config, preferences, xp, level, streak, created_at FROM users WHERE id = ${req.user.id}`;
             user = users[0];
             console.log(`✅ Migration complete for ${req.user.email}`);
           } catch (migrationErr) {
@@ -608,7 +618,7 @@ router.get('/me', authenticateToken, async (req, res) => {
           VALUES (${req.user.id}, ${req.user.email}, ${name}, ${role}, ${JSON.stringify(avatarConfig)})
         `;
 
-        users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak, created_at FROM users WHERE id = ${req.user.id}`;
+        users = await sql`SELECT id, email, name, role, avatar_config, preferences, xp, level, streak, created_at FROM users WHERE id = ${req.user.id}`;
         user = users[0];
       }
     }
@@ -642,7 +652,8 @@ router.get('/me', authenticateToken, async (req, res) => {
 
     res.json({
       ...user,
-      avatar_config: JSON.parse(user.avatar_config || '{}'),
+      avatar_config: safeParseJSON(user.avatar_config, {}),
+      preferences: safeParseJSON(user.preferences, {}),
       achievements,
       stats
     });
@@ -661,6 +672,31 @@ router.put('/avatar', authenticateToken, async (req, res) => {
     res.json({ success: true, avatarConfig });
   } catch (err) {
     console.error('Avatar update error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update client preferences (sound FX, timer alerts, ...). Stored exactly like avatar_config:
+// a JSON string in the TEXT `preferences` column, serialized here and parsed back in /me.
+// Only a fixed allow-list of known boolean keys is persisted, each coerced to a real boolean:
+// this bounds the column to a tiny known shape so a client can't stash arbitrary or oversized
+// JSON on its own user row. Unknown keys are dropped; absent keys are simply not written.
+const ALLOWED_PREF_KEYS = ['soundEnabled', 'timerAlerts'];
+router.put('/preferences', authenticateToken, async (req, res) => {
+  try {
+    const { prefs } = req.body;
+    if (typeof prefs !== 'object' || prefs === null || Array.isArray(prefs)) {
+      return res.status(400).json({ error: 'prefs must be an object' });
+    }
+    const clean = {};
+    for (const key of ALLOWED_PREF_KEYS) {
+      if (key in prefs) clean[key] = Boolean(prefs[key]);
+    }
+    const sql = getDB();
+    await sql`UPDATE users SET preferences = ${JSON.stringify(clean)} WHERE id = ${req.user.id}`;
+    res.json({ success: true, preferences: clean });
+  } catch (err) {
+    console.error('Preferences update error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

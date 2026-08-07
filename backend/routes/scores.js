@@ -103,24 +103,64 @@ router.post('/submit', authenticateToken, async (req, res) => {
       const question = questions.find(q => q.id === answer.questionId);
       if (!question) return;
 
+      // Two optional fields the client now sends. Old/other clients omit them, so default
+      // to today's behavior: `committed` true (a real submit), `hadSelection` derived from
+      // whether any answer is present. A COMMITTED answer is one the student submitted; an
+      // UNCOMMITTED one is a selection that was still staged when the timer hit zero.
+      const committed = answer.committed !== false;
+      const hadSelection = answer.hadSelection != null
+        ? !!answer.hadSelection
+        : (answer.answer != null && answer.answer !== '');
+
       const { isCorrect, fraction } = gradeAnswer(question, answer.answer);
 
-      if (isCorrect) {
-        correctCount++;
-        currentStreak++;
-        maxStreak = Math.max(maxStreak, currentStreak);
+      // Per-answer outcome state (persisted to question_answers.status). Only a committed
+      // answer is Correct/Incorrect; an uncommitted staged selection is Selected,C/Selected,NC
+      // by what it WOULD have graded; a timeout with nothing staged is Not answered.
+      // This 5-state nuance is kept ONLY for the Admin analytics "Result" column — scoring
+      // below no longer branches on it.
+      let status;
+      if (committed) {
+        status = isCorrect ? 'correct' : 'incorrect';
+      } else if (!hadSelection || answer.answer == null) {
+        status = 'not_answered';
       } else {
-        currentStreak = 0;
+        status = isCorrect ? 'selected_correct' : 'selected_incorrect';
       }
 
-      const scoreResult = calculateScore(fraction, answer.timeRemaining || 0, quiz.time_per_question, currentStreak - 1, question.points);
+      // Scoring is gated on whether an answer was actually CHOSEN, not on whether it was
+      // committed. A staged-on-timeout selection is now graded exactly like a submit: full
+      // marks if correct, partial `fraction` for matching/jumbled_sequence, and it counts
+      // toward correctCount and the streak. Only a timeout with nothing staged
+      // (`not_answered`) scores zero and resets the streak.
+      const graded = status !== 'not_answered';
+      let scoreResult;
+      if (graded) {
+        if (isCorrect) {
+          correctCount++;
+          currentStreak++;
+          maxStreak = Math.max(maxStreak, currentStreak);
+        } else {
+          currentStreak = 0;
+        }
+        scoreResult = calculateScore(fraction, answer.timeRemaining || 0, quiz.time_per_question, currentStreak - 1, question.points);
+      } else {
+        currentStreak = 0;
+        scoreResult = calculateScore(0, answer.timeRemaining || 0, quiz.time_per_question, 0, question.points);
+      }
       totalScore += scoreResult.totalScore;
       totalTime += (answer.timeTaken || 0);
 
+      // Effective correctness for the student's own results screen: any graded answer
+      // (committed OR staged-on-timeout) that is fully correct reads as correct. A partial
+      // (matching/sequence) or a not-answered timeout reads as not-correct.
+      const effectiveCorrect = graded && isCorrect;
+
       questionResults.push({
         questionId: question.id,
-        isCorrect,
-        fraction,
+        isCorrect: effectiveCorrect,
+        fraction: graded ? fraction : 0,
+        status,
         pointsEarned: scoreResult.totalScore,
         pointsPossible: Math.max(0, parseInt(question.points, 10) || DEFAULT_QUESTION_MARKS),
         scoreBreakdown: scoreResult,
@@ -128,15 +168,19 @@ router.post('/submit', authenticateToken, async (req, res) => {
         explanation: question.explanation
       });
 
-      // Collect answer data for later insertion
+      // Collect answer data for later insertion. is_correct is 1 for any graded-correct
+      // answer (committed OR staged-on-timeout), so every existing SUM(is_correct) accuracy
+      // analytic counts a staged-correct answer too; the committed-vs-staged nuance lives
+      // entirely in the separate `status` column.
       answerInserts.push({
         id: uuidv4(),
         attemptId,
         questionId: question.id,
         userAnswer: JSON.stringify(answer.answer),
-        isCorrect: isCorrect ? 1 : 0,
+        isCorrect: effectiveCorrect ? 1 : 0,
         pointsEarned: scoreResult.totalScore,
-        timeTaken: answer.timeTaken || 0
+        timeTaken: answer.timeTaken || 0,
+        status
       });
     });
 
@@ -152,63 +196,132 @@ router.post('/submit', authenticateToken, async (req, res) => {
     );
 
     // Save attempt FIRST (parent row for foreign key)
-    await sql`
-      INSERT INTO quiz_attempts (id, quiz_id, user_id, score, total_points, correct_count, total_questions, streak_max, time_taken) 
-      VALUES (${attemptId}, ${quizId}, ${req.user.id}, ${totalScore}, ${totalPossible}, ${correctCount}, ${questions.length}, ${maxStreak}, ${totalTime})
-    `;
-
-    // NOW save individual answers (child rows referencing attempt)
-    for (const a of answerInserts) {
-      try {
-        const questionExistsResult = await sql`SELECT id FROM questions WHERE id = ${a.questionId}`;
-        if (questionExistsResult.length > 0) {
-          await sql`
-            INSERT INTO question_answers (id, attempt_id, question_id, user_answer, is_correct, points_earned, time_taken) 
-            VALUES (${a.id}, ${a.attemptId}, ${a.questionId}, ${a.userAnswer}, ${a.isCorrect}, ${a.pointsEarned}, ${a.timeTaken})
-          `;
-        } else {
-          console.warn(`⚠️  Skipping answer insert: question ${a.questionId} not found in DB`);
-        }
-      } catch (insertErr) {
-        console.warn(`⚠️  Failed to insert answer for question ${a.questionId}:`, insertErr.message);
-      }
-    }
-
-    // Update user XP
+    // XP this attempt was worth on its own (before we know if it beats the student's best).
     const xpEarned = calculateXPEarned(totalScore, totalPossible, correctCount, questions.length);
-    const users = await sql`SELECT xp, level FROM users WHERE id = ${req.user.id}`;
-    const user = users[0];
-    const newXP = (user.xp || 0) + xpEarned;
-    const levelInfo = getLevelInfo(newXP);
 
-    // XP/level, the correct-answer streak, and the daily play streak, in one statement.
-    // Daily streak uses CURRENT_DATE so the day boundary is decided by the database rather
-    // than the client clock or the Node process timezone:
-    //   no previous play      -> 1
-    //   already played today  -> unchanged
-    //   played yesterday      -> +1  (continued)
-    //   gap of 2+ days        -> 1   (reset)
-    await sql`
-      UPDATE users
-      SET xp = ${newXP},
-          level = ${levelInfo.level},
-          streak = CASE WHEN streak < ${maxStreak} THEN ${maxStreak} ELSE streak END,
-          current_streak = CASE
-            WHEN last_played_date = CURRENT_DATE     THEN COALESCE(current_streak, 0)
-            WHEN last_played_date = CURRENT_DATE - 1 THEN COALESCE(current_streak, 0) + 1
-            ELSE 1
-          END,
-          longest_streak = GREATEST(
-            COALESCE(longest_streak, 0),
-            CASE
+    // Everything that writes the attempt and recomputes the user's standing runs in ONE
+    // transaction, serialized per-user by a FOR UPDATE row lock so two concurrent submits
+    // from the same student can't interleave and double-count. Mastery XP is RECOMPUTED
+    // from the full history (Σ MAX(xp_earned) per quiz), not incremented — so retaking a
+    // quiz can never inflate rank; a worse-or-equal retry leaves users.xp unchanged, and a
+    // previously-inflated user self-heals to the correct total on their next submit.
+    const { priorXp, masteryXp, levelInfo } = await sql.begin(async (tx) => {
+      const lockedUsers = await tx`SELECT xp, level FROM users WHERE id = ${req.user.id} FOR UPDATE`;
+      const priorXp = parseInt(lockedUsers[0]?.xp || 0, 10);
+
+      // Parent attempt row, now carrying the XP it was worth.
+      await tx`
+        INSERT INTO quiz_attempts (id, quiz_id, user_id, score, total_points, correct_count, total_questions, streak_max, time_taken, xp_earned)
+        VALUES (${attemptId}, ${quizId}, ${req.user.id}, ${totalScore}, ${totalPossible}, ${correctCount}, ${questions.length}, ${maxStreak}, ${totalTime}, ${xpEarned})
+      `;
+
+      // Child answer rows. Each runs in its own SAVEPOINT so a single bad row (e.g. a
+      // question deleted mid-attempt) rolls back only itself, not the whole attempt —
+      // preserving the prior per-row-tolerant behavior now that we are inside a txn, where
+      // a plain error would otherwise abort the entire transaction.
+      for (const a of answerInserts) {
+        try {
+          await tx.savepoint(async (sp) => {
+            await sp`
+              INSERT INTO question_answers (id, attempt_id, question_id, user_answer, is_correct, points_earned, time_taken, status)
+              VALUES (${a.id}, ${a.attemptId}, ${a.questionId}, ${a.userAnswer}, ${a.isCorrect}, ${a.pointsEarned}, ${a.timeTaken}, ${a.status})
+            `;
+          });
+        } catch (insertErr) {
+          console.warn(`⚠️  Failed to insert answer for question ${a.questionId}:`, insertErr.message);
+        }
+      }
+
+      // Self-heal historical rows: any of THIS user's attempts predating the xp_earned
+      // column carry NULL, and NULL would make MAX(xp_earned) below return NULL for that
+      // quiz — collapsing an entire previously-mastered quiz to 0 and zeroing/deranking the
+      // student on this submit. Backfill their NULL rows with the SAME formula as
+      // calculateXPEarned()/recompute-xp-mastery.js so the bare MAX is correct, and so the
+      // windowed leaderboard's SUM(xp_earned) stops undercounting this user too. Scoped to
+      // this user's rows (already FOR UPDATE-locked above); after the first post-deploy
+      // submit there are no NULLs left, so it's a cheap no-op on every subsequent submit.
+      await tx`
+        UPDATE quiz_attempts
+        SET xp_earned = 100 * correct_count
+          + CASE WHEN correct_count::float / GREATEST(1, total_questions) >= 1.0 THEN 500
+                 WHEN correct_count::float / GREATEST(1, total_questions) >= 0.8 THEN 200
+                 WHEN correct_count::float / GREATEST(1, total_questions) >= 0.6 THEN 100
+                 ELSE 0 END
+          + CASE WHEN score::float / GREATEST(1, total_points) >= 0.9 THEN 150 ELSE 0 END
+        WHERE user_id = ${req.user.id} AND xp_earned IS NULL
+      `;
+
+      // Mastery XP: best XP ever earned on each DISTINCT quiz, summed.
+      const masteryRows = await tx`
+        SELECT COALESCE(SUM(best), 0)::int AS xp
+        FROM (SELECT MAX(xp_earned) AS best FROM quiz_attempts WHERE user_id = ${req.user.id} GROUP BY quiz_id) t
+      `;
+      const masteryXp = parseInt(masteryRows[0]?.xp || 0, 10);
+      const levelInfo = getLevelInfo(masteryXp);
+
+      // XP/level, the correct-answer streak, and the daily play streak, in one statement.
+      // Daily streak uses CURRENT_DATE so the day boundary is decided by the database rather
+      // than the client clock or the Node process timezone:
+      //   no previous play      -> 1
+      //   already played today  -> unchanged
+      //   played yesterday      -> +1  (continued)
+      //   gap of 2+ days        -> 1   (reset)
+      await tx`
+        UPDATE users
+        SET xp = ${masteryXp},
+            level = ${levelInfo.level},
+            streak = CASE WHEN streak < ${maxStreak} THEN ${maxStreak} ELSE streak END,
+            current_streak = CASE
               WHEN last_played_date = CURRENT_DATE     THEN COALESCE(current_streak, 0)
               WHEN last_played_date = CURRENT_DATE - 1 THEN COALESCE(current_streak, 0) + 1
               ELSE 1
-            END
-          ),
-          last_played_date = CURRENT_DATE
-      WHERE id = ${req.user.id}
+            END,
+            longest_streak = GREATEST(
+              COALESCE(longest_streak, 0),
+              CASE
+                WHEN last_played_date = CURRENT_DATE     THEN COALESCE(current_streak, 0)
+                WHEN last_played_date = CURRENT_DATE - 1 THEN COALESCE(current_streak, 0) + 1
+                ELSE 1
+              END
+            ),
+            last_played_date = CURRENT_DATE
+        WHERE id = ${req.user.id}
+      `;
+
+      return { priorXp, masteryXp, levelInfo };
+    });
+
+    // ── Level results context (runs AFTER the txn commits so the row just inserted is visible) ──
+    // previouslyPassed — had this student ALREADY cleared THIS quiz on an EARLIER attempt? Best
+    // marks-% across all of this quiz's attempts EXCEPT the one we just inserted (id != attemptId),
+    // on the same basis as the unlock check in quizzes.js. If a prior best already reached
+    // PASS_PERCENT, the results screen celebrates even on a worse re-attempt (a level, once cleared,
+    // stays unlocked). First-ever attempt → no prior rows → MAX is NULL → 0 → false.
+    const priorBest = await sql`
+      SELECT MAX(score * 100.0 / NULLIF(total_points, 0)) AS max_score_pct
+      FROM quiz_attempts
+      WHERE quiz_id = ${quizId} AND user_id = ${req.user.id} AND id != ${attemptId}
     `;
+    const previouslyPassed =
+      (priorBest[0] ? parseFloat(priorBest[0].max_score_pct || 0) : 0) >= PASS_PERCENT;
+
+    // nextLevelQuizId — id of the nearest PUBLISHED level above this one, for the "Next Level" button.
+    // Levels are units 1-11, so only 1-10 have a next level; unit 11 (final) and non-level quizzes → null.
+    // is_published is an INTEGER column here (compare = 1, never = true).
+    let nextLevelQuizId = null;
+    if (quiz.unit && quiz.unit < 11) {
+      const nextLevel = await sql`
+        SELECT id FROM quizzes
+        WHERE unit > ${quiz.unit} AND unit <= 11 AND is_published = 1
+        ORDER BY unit ASC LIMIT 1
+      `;
+      nextLevelQuizId = nextLevel[0]?.id || null;
+    }
+
+    // Mastery total after this attempt, and how much it actually moved the needle. A retry
+    // that fails to beat a prior best applies 0 — the UI can then honestly show "+0".
+    const newXP = masteryXp;
+    const xpApplied = masteryXp - priorXp;
 
     // Check for achievements
     // Fastest single answer in this attempt, for the 'speed' achievement.
@@ -238,6 +351,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
       totalQuestions: questions.length,
       maxStreak,
       xpEarned,
+      xpApplied,
       newXP,
       levelInfo,
       questionResults,
@@ -245,7 +359,9 @@ router.post('/submit', authenticateToken, async (req, res) => {
       percentage: Math.round((correctCount / questions.length) * 100),
       scorePercent,
       passPercent: PASS_PERCENT,
-      passed: totalPossible > 0 && (totalScore / totalPossible) * 100 >= PASS_PERCENT
+      passed: totalPossible > 0 && (totalScore / totalPossible) * 100 >= PASS_PERCENT,
+      previouslyPassed,
+      nextLevelQuizId
     });
   } catch (err) {
     console.error('Submit score error:', err);
@@ -292,12 +408,21 @@ router.get('/leaderboard', authenticateToken, async (req, res) => {
     const sql = getDB();
     const { quizId } = req.query;
 
+    // Timeframe filter for the GLOBAL board. Validated against a fixed allow-list so an
+    // unrecognized value can never reach SQL — anything else falls back to All Time.
+    // The cutoff is a nested sql`` fragment so the day/week boundary is decided by the
+    // DATABASE clock (now()), matching the daily-streak boundary in /submit, rather than
+    // the Node process timezone. Timeframe does NOT apply to the quiz-specific board.
+    const VALID_PERIODS = ['All Time', 'Today', 'This Week'];
+    const period = VALID_PERIODS.includes(req.query.period) ? req.query.period : 'All Time';
+
     let leaderboardResult;
 
     if (quizId) {
+      // Quiz-specific board: ranked by best marks on THIS quiz. Timeframe does not apply.
       leaderboardResult = await sql`
         SELECT u.id, u.name, u.avatar_config, u.level, u.xp,
-          MAX(qa.score) as best_score, 
+          MAX(qa.score) as best_score,
           COUNT(qa.id) as attempts,
           MAX(qa.streak_max) as best_streak
         FROM quiz_attempts qa
@@ -307,7 +432,29 @@ router.get('/leaderboard', authenticateToken, async (req, res) => {
         ORDER BY best_score DESC
         LIMIT 50
       `;
+    } else if (period !== 'All Time') {
+      // Windowed global board: rank by XP EARNED inside the window (SUM of per-attempt
+      // xp_earned), not the all-time users.xp counter. INNER JOIN so students with no
+      // activity in the window are excluded, keeping the 50 slots for real competitors.
+      // xp_earned is nullable until backfilled; SUM skips NULLs, so an un-backfilled row
+      // merely undercounts rather than erroring.
+      const windowClause = period === 'Today'
+        ? sql`qa.completed_at >= date_trunc('day', now())`
+        : sql`qa.completed_at >= now() - interval '7 days'`;
+      leaderboardResult = await sql`
+        SELECT u.id, u.name, u.avatar_config, u.level, u.xp,
+          COALESCE(SUM(qa.xp_earned), 0)::int as rank_score,
+          COUNT(qa.id) as quizzes_taken,
+          COALESCE(MAX(qa.streak_max), 0) as best_streak
+        FROM users u
+        JOIN quiz_attempts qa ON qa.user_id = u.id
+        WHERE u.role = 'student' AND ${windowClause}
+        GROUP BY u.id, u.name, u.avatar_config, u.level, u.xp
+        ORDER BY rank_score DESC, u.xp DESC
+        LIMIT 50
+      `;
     } else {
+      // All-Time global board (default): rank by the lifetime users.xp mastery counter.
       leaderboardResult = await sql`
         SELECT u.id, u.name, u.avatar_config, u.level, u.xp,
           COALESCE(SUM(qa.score), 0) as total_score,
@@ -328,7 +475,7 @@ router.get('/leaderboard', authenticateToken, async (req, res) => {
     if (userIds.length > 0) {
       try {
         attemptHistories = await sql`
-          SELECT user_id, score, completed_at
+          SELECT user_id, score, xp_earned, completed_at
           FROM quiz_attempts
           WHERE user_id IN ${sql(userIds)}
           ORDER BY completed_at ASC
@@ -344,10 +491,13 @@ router.get('/leaderboard', authenticateToken, async (req, res) => {
       let sparklineData = [];
 
       if (userAttempts.length >= 2) {
-        let runningXP = 0;
+        // Per-attempt performance curve. Shows ups and downs — each point is
+        // that quiz's XP/score, not a running total. Prefer xp_earned; fall
+        // back to raw score when absent.
         sparklineData = userAttempts.map(att => {
-          runningXP += parseInt(att.score || 0, 10);
-          return Math.min(finalXP, runningXP);
+          return att.xp_earned != null
+            ? parseInt(att.xp_earned || 0, 10)
+            : parseInt(att.score || 0, 10);
         });
         if (sparklineData.length > 10) {
           sparklineData = sparklineData.slice(-10);
@@ -373,6 +523,9 @@ router.get('/leaderboard', authenticateToken, async (req, res) => {
         best_streak: entry.best_streak !== undefined ? parseInt(entry.best_streak || 0, 10) : undefined,
         level: parseInt(entry.level || 1, 10),
         xp: finalXP,
+        // Unified headline number the client renders regardless of timeframe:
+        //   All Time / quiz board -> lifetime users.xp; Today / This Week -> windowed SUM(xp_earned).
+        rankScore: parseInt(entry.rank_score ?? entry.xp ?? 0, 10),
         rank: i + 1,
         sparklineData,
         avatar_config: typeof entry.avatar_config === 'string' ? JSON.parse(entry.avatar_config || '{}') : (entry.avatar_config || {}),

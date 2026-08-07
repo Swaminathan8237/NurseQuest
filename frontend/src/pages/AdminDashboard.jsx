@@ -44,6 +44,20 @@ const formatDuration = (sec) => {
 const orDash = (value, suffix = '') =>
   value === null || value === undefined || Number.isNaN(value) ? '—' : `${value}${suffix}`;
 
+// Per-question outcome badge for the student-attempt drill-down. Five states:
+//   correct / incorrect            — a submitted answer, graded right or wrong
+//   selected_correct / _incorrect  — a selection staged when the timer expired but never
+//                                     submitted; labelled by what it WOULD have graded (Selected,C/NC)
+//   not_answered                   — the timer expired with nothing staged
+// Historical rows (status = NULL) are mapped to correct/incorrect upstream via is_correct.
+const STATUS_BADGE = {
+  correct:            { label: 'Correct',      icon: 'check',     cls: 'bg-success/15 text-success' },
+  incorrect:          { label: 'Incorrect',    icon: 'close',     cls: 'bg-danger/15 text-danger' },
+  selected_correct:   { label: 'Selected,C',   icon: 'timer_off', cls: 'bg-amber-500/15 text-amber-500' },
+  selected_incorrect: { label: 'Selected,NC',  icon: 'timer_off', cls: 'bg-amber-500/15 text-amber-500' },
+  not_answered:       { label: 'Not Answered', icon: 'remove',    cls: 'bg-white/10 text-[var(--text-muted)]' },
+};
+
 // Unit icon + accent maps (mirrors Units.jsx)
 const UNIT_ICONS = {
   1: 'health_and_safety', 2: 'masks', 3: 'clean_hands', 4: 'sanitizer',
@@ -313,18 +327,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Actions: Developments reset
-  const handleResetStatistics = async () => {
-    if (!window.confirm(t('⚠️ CRITICAL WARNING: You are about to wipe out ALL student quiz attempts, history scores, and answers. User accounts and quizzes themselves will remain intact. This is irreversible. Proceed?'))) return;
-    try {
-      const res = await adminAPI.resetStatistics();
-      alert(res.message || t('All statistics and progress reset successfully.'));
-      fetchData();
-    } catch (err) {
-      alert(err.message || t('Failed to reset statistics'));
-    }
-  };
-
   // Filtering users
   const filteredUsers = users.filter(u => {
     const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -391,8 +393,7 @@ export default function AdminDashboard() {
             { id: 'users', label: t('Students & Teachers'), icon: 'group' },
             { id: 'analytics', label: t('Student Analytics'), icon: 'monitoring' },
             { id: 'requests', label: `${t('Quiz Requests')} (${pendingCount})`, icon: 'task' },
-            { id: 'units', label: t('Units'), icon: 'menu_book' },
-            { id: 'developments', label: t('Developments & DB'), icon: 'developer_mode' }
+            { id: 'units', label: t('Units'), icon: 'menu_book' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -1122,15 +1123,15 @@ export default function AdminDashboard() {
                                                     <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{q.type}</span>
                                                   </td>
                                                   <td className="p-3 text-center">
-                                                    {q.is_correct ? (
-                                                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-success/15 text-success">
-                                                        <span className="material-symbols-outlined text-sm">{t('check')}</span>{t('Correct')}
-                                                      </span>
-                                                    ) : (
-                                                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-danger/15 text-danger">
-                                                        <span className="material-symbols-outlined text-sm">{t('close')}</span>{t('Wrong')}
-                                                      </span>
-                                                    )}
+                                                    {(() => {
+                                                      const badge = STATUS_BADGE[q.status]
+                                                        || (q.is_correct ? STATUS_BADGE.correct : STATUS_BADGE.incorrect);
+                                                      return (
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${badge.cls}`}>
+                                                          <span className="material-symbols-outlined text-sm">{t(badge.icon)}</span>{t(badge.label)}
+                                                        </span>
+                                                      );
+                                                    })()}
                                                   </td>
                                                   <td className="p-3 text-center font-mono">
                                                     {q.points_earned.toLocaleString()}<span className="text-[var(--text-muted)]">/{q.points.toLocaleString()}</span>
@@ -1346,78 +1347,6 @@ export default function AdminDashboard() {
                 })}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Developments & Database Tab */}
-        {activeTab === 'developments' && stats && (
-          <div className="space-y-8 animate-fadeIn">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Database Metadata Explorer */}
-              <div className="bg-surface-container-high/30 border border-white/5 rounded-2xl p-6 space-y-6">
-                <div>
-                  <h3 className="text-xl font-bold font-headline">{t('PostgreSQL Database Schema')}</h3>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">{t('Real-time table rows count verified directly from database instances')}</p>
-                </div>
-
-                <div className="space-y-3">
-                  {stats.tables.map(tbl => (
-                    <div key={tbl.name} className="flex justify-between items-center p-3 rounded-xl bg-surface-container-high/60 border border-white/5 font-mono text-sm">
-                      <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">{tbl.name}</span>
-                      <span className="px-3 py-1 bg-surface-container-highest text-on-surface rounded-lg font-bold">
-                        {tbl.rows !== -1 ? `${tbl.rows} ${t('rows')}` : t('Error checking')}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Developer Operations */}
-              <div className="bg-surface-container-high/30 border border-white/5 rounded-2xl p-6 space-y-6">
-                <div>
-                  <h3 className="text-xl font-bold font-headline text-danger">{t('Administrator Systems Tools')}</h3>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">{t('Direct system hooks and administrative cleanup scripts')}</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="border border-danger/25 bg-[var(--danger-light)] p-5 rounded-xl space-y-4">
-                    <div className="flex gap-3">
-                      <span className="material-symbols-outlined text-danger text-2xl">{t('warning')}</span>
-                      <div>
-                        <h4 className="text-sm font-bold text-on-surface">{t('Reset Attempts & Scores Statistics')}</h4>
-                        <p className="text-xs text-[var(--text-secondary)] mt-1">
-                          {t('This operation clears all quiz attempts and answer logs, resetting user XP and student dashboards to clean slates. Accounts and quizzes are kept intact.')}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      className="w-full py-3 bg-danger text-white hover:bg-danger/80 rounded-xl font-headline font-bold text-xs uppercase tracking-widest active:scale-95 transition-all shadow-[0_4px_15px_rgba(255,49,49,0.3)]"
-                      onClick={handleResetStatistics}
-                    >
-                      {t('Reset statistics logs')}
-                    </button>
-                  </div>
-
-                  <div className="border border-white/5 bg-surface-container-highest/20 p-5 rounded-xl space-y-3">
-                    <h4 className="text-sm font-bold text-on-surface">{t('Admin System Status')}</h4>
-                    <div className="space-y-2 text-xs font-semibold text-[var(--text-secondary)]">
-                      <div className="flex justify-between">
-                        <span>{t('API Base URL')}</span>
-                        <span className="font-mono text-on-surface">/api</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>{t('Active Session ID')}</span>
-                        <span className="font-mono text-on-surface truncate max-w-[200px]">{user?.id}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>{t('Environment Mode')}</span>
-                        <span className="font-mono text-success bg-[var(--success-light)] px-2 py-0.5 rounded">{t('Production (Live)')}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 

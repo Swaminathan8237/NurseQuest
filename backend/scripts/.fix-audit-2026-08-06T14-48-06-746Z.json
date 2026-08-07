@@ -1,0 +1,326 @@
+[
+  {
+    "id": "87d40ed6-e8ff-4ec5-bbdc-463aa3a0b512",
+    "unit": 3,
+    "order_index": 9,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "WHO posters illustrate proper hand hygiene technique."
+    }
+  },
+  {
+    "id": "c5c92805-d1b2-4aee-9f11-6345fac651ab",
+    "unit": 3,
+    "order_index": 10,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Alcohol rub is used for routine hand hygiene."
+    }
+  },
+  {
+    "id": "8214a11e-5868-4d31-848c-05ddb4323d10",
+    "unit": 3,
+    "order_index": 11,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Surgical hand antisepsis reduces resident microbial flora."
+    }
+  },
+  {
+    "id": "50a9e44f-c6cb-4001-a4b3-11446fe209d6",
+    "unit": 4,
+    "order_index": 9,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Autoclaves sterilize instruments using steam under pressure."
+    }
+  },
+  {
+    "id": "e2e44413-8f8e-4a47-9505-46e6a7dfc376",
+    "unit": 4,
+    "order_index": 10,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Hot air ovens use dry heat to sterilize glassware."
+    }
+  },
+  {
+    "id": "585524cc-89f1-4479-9716-0a34f469ec70",
+    "unit": 4,
+    "order_index": 11,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Sodium hypochlorite disinfects contaminated surfaces."
+    }
+  },
+  {
+    "id": "ef71dc25-128c-4284-9dad-946697f2b17e",
+    "unit": 5,
+    "order_index": 9,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Sterile containers prevent contamination during sample collection."
+    }
+  },
+  {
+    "id": "47842bb7-480e-46b3-882e-c032ad3d5fe3",
+    "unit": 5,
+    "order_index": 10,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Vacutainers allow safe and sterile blood collection."
+    }
+  },
+  {
+    "id": "e3b86f9c-2324-437d-8adb-c9a39e358e40",
+    "unit": 5,
+    "order_index": 11,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Throat swabs are used to diagnose respiratory infections."
+    }
+  },
+  {
+    "id": "86f771ed-e4a2-46e4-8e16-19b019cefb8e",
+    "unit": 6,
+    "order_index": 9,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Yellow bags are used for anatomical and infectious waste."
+    }
+  },
+  {
+    "id": "b0c64600-65ce-46ad-9291-11481e341193",
+    "unit": 6,
+    "order_index": 10,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Red bags are used for contaminated recyclable plastic items."
+    }
+  },
+  {
+    "id": "98a7f77f-02fd-4200-94db-d51d7b559164",
+    "unit": 6,
+    "order_index": 11,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Sharps containers prevent injuries from needles and sharp instruments."
+    }
+  },
+  {
+    "id": "6a0b681e-46be-4566-a18a-0269bf520744",
+    "unit": 7,
+    "order_index": 9,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Petri dishes are used for culturing microorganisms."
+    }
+  },
+  {
+    "id": "04127744-9255-4187-8ee5-5b060d605825",
+    "unit": 7,
+    "order_index": 10,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Zone of inhibition indicates antibiotic effectiveness against bacteria."
+    }
+  },
+  {
+    "id": "46899daa-0bc0-4569-b375-74cc3194c629",
+    "unit": 7,
+    "order_index": 11,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Stewardship ensures appropriate antibiotic selection and usage."
+    }
+  },
+  {
+    "id": "16f423c2-c05b-4e59-92cf-b9247403dc6d",
+    "unit": 8,
+    "order_index": 9,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Wristbands help ensure correct patient identification before procedures."
+    }
+  },
+  {
+    "id": "3b01584e-e753-46d8-aa27-06940f89ebca",
+    "unit": 8,
+    "order_index": 10,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Checklists reduce medication errors and improve patient safety."
+    }
+  },
+  {
+    "id": "8f836f3d-b209-4927-a132-c0561f5694ff",
+    "unit": 8,
+    "order_index": 11,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Fall risk indicators help prevent patient injury from falls."
+    }
+  },
+  {
+    "id": "038cd527-6292-4301-8c96-36b338920ffe",
+    "unit": 9,
+    "order_index": 9,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Wristbands ensure the correct patient receives treatment."
+    }
+  },
+  {
+    "id": "81ddffd8-b784-4689-b737-97f5be03de52",
+    "unit": 9,
+    "order_index": 10,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Time-out confirms patient identity, procedure, and site."
+    }
+  },
+  {
+    "id": "4c5fa83a-a223-4a1f-9f77-1607fffda496",
+    "unit": 9,
+    "order_index": 11,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Hand hygiene reduces healthcare-associated infections."
+    }
+  },
+  {
+    "id": "f0950d79-35d1-465f-b44b-3d8ab474c086",
+    "unit": 10,
+    "order_index": 9,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Fire extinguishers are used to control small fires in emergency situations."
+    }
+  },
+  {
+    "id": "32166f65-cf1a-4e19-97f3-db65763bd598",
+    "unit": 10,
+    "order_index": 10,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Lead aprons protect staff from radiation exposure."
+    }
+  },
+  {
+    "id": "82314e66-d89c-44ce-9ce1-84ae23e3dd72",
+    "unit": 10,
+    "order_index": 11,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Emergency exit signs help guide safe evacuation during emergencies."
+    }
+  },
+  {
+    "id": "8dbbb680-4575-448c-93e8-96e528db8e0f",
+    "unit": 11,
+    "order_index": 9,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "PPE protects healthcare workers from occupational hazards."
+    }
+  },
+  {
+    "id": "1fa4dca0-da07-4d21-8e6d-00286b4608ec",
+    "unit": 11,
+    "order_index": 10,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "Sharps containers safely store needles and sharp instruments."
+    }
+  },
+  {
+    "id": "d62e7849-b42a-46f7-b2a6-440195e940c8",
+    "unit": 11,
+    "order_index": 11,
+    "step": "image_explanation_fill",
+    "before": {
+      "explanation": ""
+    },
+    "after": {
+      "explanation": "The biohazard symbol warns of potential exposure to infectious biological material."
+    }
+  }
+]

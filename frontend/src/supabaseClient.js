@@ -14,7 +14,7 @@ export const supabase = {
       return {
         data: {
           subscription: {
-            unsubscribe: () => {}
+            unsubscribe: () => { }
           }
         }
       };

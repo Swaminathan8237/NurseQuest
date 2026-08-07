@@ -27,6 +27,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS current_streak   INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS longest_streak   INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_played_date DATE;
 
+-- Per-user client preferences (sound FX, timer alerts, ...). Stored as a JSON string in a
+-- TEXT column exactly like avatar_config above — serialized/deserialized in application code
+-- (no JSONB). DEFAULT '{}' so the existing hardcoded INSERT sites need no change. Idempotent.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences TEXT DEFAULT '{}';
+
 -- Quizzes table
 CREATE TABLE IF NOT EXISTS quizzes (
   id TEXT PRIMARY KEY,
@@ -86,6 +91,16 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- XP a single attempt was worth (calculateXPEarned: ~100/correct + accuracy/mastery bonuses).
+-- Previously computed at submit and discarded into users.xp; persisted now so the leaderboard
+-- can rank time-windowed activity (SUM per window) and so users.xp can be recomputed as
+-- mastery (Σ MAX(xp_earned) per quiz) instead of inflating on every retry. Nullable / no
+-- default so the one-time backfill can find historical rows via WHERE xp_earned IS NULL;
+-- SUM/MAX skip NULLs, so windowed boards merely undercount until backfilled rather than error.
+ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS xp_earned INTEGER;
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user_completed
+  ON quiz_attempts (user_id, completed_at);
+
 -- Individual question answers
 CREATE TABLE IF NOT EXISTS question_answers (
   id TEXT PRIMARY KEY,
@@ -98,6 +113,11 @@ CREATE TABLE IF NOT EXISTS question_answers (
   FOREIGN KEY (attempt_id) REFERENCES quiz_attempts(id) ON DELETE CASCADE,
   FOREIGN KEY (question_id) REFERENCES questions(id)
 );
+-- Per-answer outcome state. Distinguishes a wrong answer from a timed-out
+-- staged selection from a never-answered question. Nullable: historical rows
+-- predate this column and fall back to the is_correct-derived label in the UI.
+-- Values: 'correct' | 'incorrect' | 'selected_correct' | 'selected_incorrect' | 'not_answered'.
+ALTER TABLE question_answers ADD COLUMN IF NOT EXISTS status TEXT;
 
 -- Live game sessions
 CREATE TABLE IF NOT EXISTS live_sessions (

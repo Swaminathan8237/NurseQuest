@@ -5,13 +5,21 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 
-// SVG Sparkline Component matching reference design
-const Sparkline = ({ color = '#7C3AED', data = [30, 45, 35, 60, 55, 80, 95], id = 'spark' }) => {
+// SVG Sparkline Component matching reference design.
+// `stretch` (mobile list rows) fills the row width via a viewBox so the trend spans the full
+// line instead of a fixed 110px; the pulsing end dot is dropped there because the non-uniform
+// horizontal scale would distort it into an ellipse.
+const SPARK_DEFAULT = [30, 45, 35, 60, 55, 80, 95];
+const Sparkline = ({ color = '#7C3AED', data = SPARK_DEFAULT, id = 'spark', stretch = false }) => {
   const width = 110;
   const height = 32;
+  // An empty array is truthy, so `data || fallback` at call sites doesn't guard
+  // it. A single point can't form a line either. Fall back here so a graph
+  // always renders.
+  if (!Array.isArray(data) || data.length < 2) data = SPARK_DEFAULT;
   const max = Math.max(...data);
   const min = Math.min(...data);
-  
+
   const points = data.map((val, i) => {
     const x = (i / (data.length - 1)) * width;
     const y = height - ((val - min) / (max - min || 1)) * (height - 8) - 4;
@@ -21,8 +29,12 @@ const Sparkline = ({ color = '#7C3AED', data = [30, 45, 35, 60, 55, 80, 95], id 
   const lastX = width;
   const lastY = height - ((data[data.length - 1] - min) / (max - min || 1)) * (height - 8) - 4;
 
+  const svgAttrs = stretch
+    ? { viewBox: `0 0 ${width} ${height}`, preserveAspectRatio: 'none', className: 'w-full h-6 overflow-visible' }
+    : { width, height, className: 'overflow-visible' };
+
   return (
-    <svg width={width} height={height} className="overflow-visible">
+    <svg {...svgAttrs}>
       <defs>
         <linearGradient id={`grad-${id}`} x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor={color} stopOpacity="0.4" />
@@ -37,7 +49,7 @@ const Sparkline = ({ color = '#7C3AED', data = [30, 45, 35, 60, 55, 80, 95], id 
         strokeLinejoin="round"
         points={points}
       />
-      <circle cx={lastX} cy={lastY} r="4" fill={color} className="animate-pulse" />
+      {!stretch && <circle cx={lastX} cy={lastY} r="4" fill={color} className="animate-pulse" />}
     </svg>
   );
 };
@@ -49,14 +61,28 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true);
   const [filterPeriod, setFilterPeriod] = useState('All Time');
   const [selectedUser, setSelectedUser] = useState(null);
-  const [duelChallengeSent, setDuelChallengeSent] = useState(false);
 
+  // Fetch the board for the active timeframe and keep it live. The full-screen spinner shows
+  // only until the first response arrives; switching timeframe or the 30s background poll
+  // refreshes the data in place without blanking the page.
   useEffect(() => {
-    scoreAPI.getLeaderboard()
-      .then(setData)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+    let cancelled = false;
+
+    const fetchBoard = () => {
+      scoreAPI.getLeaderboard({ period: filterPeriod })
+        .then((res) => { if (!cancelled) setData(res); })
+        .catch((err) => { if (!cancelled) console.error(err); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    };
+
+    fetchBoard();
+    const intervalId = setInterval(fetchBoard, 30000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [filterPeriod]);
 
   if (loading) {
     return (
@@ -73,19 +99,29 @@ export default function Leaderboard() {
   const top3 = leaderboardList.slice(0, 3);
   const rest = leaderboardList.slice(3);
 
+  // Headline score for an entry: the windowed XP earned for Today / This Week, else the
+  // lifetime users.xp. The backend sends both as `rankScore` (falling back to `xp`).
+  const scoreOf = (entry) => entry?.rankScore ?? entry?.xp ?? 0;
+  // Honest sublabel for that number so a windowed sum is never mislabeled "Total XP".
+  const scoreLabel = filterPeriod === 'All Time'
+    ? 'Total XP'
+    : (filterPeriod === 'Today' ? 'XP Today' : 'XP This Week');
+
   // User details
   const userEntry = leaderboardList.find(entry => entry.id === user?.id) || {};
-  const userXp = userEntry.xp || user?.xp || 0;
+  // Your headline number must reflect the ACTIVE metric. When you're on the board, use your
+  // row's score. When you're not: All Time falls back to lifetime users.xp (which IS your
+  // All-Time rank score), but a window falls back to 0 — showing lifetime XP under an
+  // "XP Today"/"XP This Week" label would misreport it.
+  const onBoard = Boolean(userEntry.id);
+  const userXp = onBoard
+    ? scoreOf(userEntry)
+    : (filterPeriod === 'All Time' ? (user?.xp || 0) : 0);
   const userRank = data.userRank || userEntry.rank || 0;
 
   // Target entry (person directly above user)
   const targetEntry = userRank > 1 ? leaderboardList[userRank - 2] : null;
-  const xpToTarget = targetEntry ? (targetEntry.xp - userXp) : 0;
-
-  const handleDuelClick = (targetName) => {
-    setDuelChallengeSent(true);
-    setTimeout(() => setDuelChallengeSent(false), 3000);
-  };
+  const xpToTarget = targetEntry ? (scoreOf(targetEntry) - userXp) : 0;
 
   // Sparkline data presets for visual elegance
   const sparklinePresets = [
@@ -161,12 +197,12 @@ export default function Leaderboard() {
             {/* Top 3 Winner Cards (Podium Cards matching reference image) */}
             {top3.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                
-                {/* Winner 2 (Second Place) */}
+
+                {/* Winner 2 (Second Place) — order-2 on mobile so the champion shows first */}
                 {top3[1] && (
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between relative overflow-hidden group order-2 sm:order-none">
                     <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
-                    
+
                     <div>
                       {/* Top Row: Rank Tag & Avatar */}
                       <div className="flex justify-between items-start mb-3">
@@ -177,58 +213,48 @@ export default function Leaderboard() {
                           <div className="w-16 h-16 rounded-full border-2 border-slate-300 dark:border-slate-700 shadow-md overflow-hidden bg-slate-100 dark:bg-slate-800 mx-auto">
                             <Avatar config={top3[1]?.avatar_config} size={60} showBg={false} />
                           </div>
-                          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
                         </div>
                       </div>
 
-                      {/* Name & Badge */}
+                      {/* Name */}
                       <div className="text-center mt-2">
                         <h3 className="font-headline font-extrabold text-base text-slate-900 dark:text-white truncate">
                           {top3[1]?.name}
                         </h3>
-                        <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-headline font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                          ⚡ Clinical Specialist
-                        </span>
                       </div>
 
                       {/* Sparkline Curve & Score */}
                       <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                         <div>
                           <Sparkline color="#06B6D4" data={top3[1]?.sparklineData || sparklinePresets[1]} id="rank2" />
-                          <span className="text-[10px] font-bold text-slate-400">7-Day Trend</span>
+                          <span className="text-[10px] font-bold text-slate-400">Progress Trend</span>
                         </div>
                         <div className="text-right">
                           <div className="font-headline font-black text-2xl text-slate-900 dark:text-white leading-tight">
-                            {top3[1]?.xp?.toLocaleString()}
+                            {scoreOf(top3[1]).toLocaleString()}
                           </div>
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total XP</span>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{scoreLabel}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Bottom Action Footer */}
-                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between gap-2 text-xs font-headline font-bold">
-                      <button 
+                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex text-xs font-headline font-bold">
+                      <button
                         onClick={() => setSelectedUser(top3[1])}
                         className="flex-1 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all text-center"
                       >
                         PROFILE
                       </button>
-                      <button 
-                        onClick={() => handleDuelClick(top3[1]?.name)}
-                        className="flex-1 py-1.5 rounded-xl bg-primary/10 text-primary dark:bg-primary/20 hover:bg-primary hover:text-white transition-all text-center"
-                      >
-                        CHALLENGE
-                      </button>
                     </div>
                   </div>
                 )}
 
-                {/* Winner 1 (First Place - Champion) */}
+                {/* Winner 1 (First Place - Champion) — order-first on mobile, centered on desktop */}
                 {top3[0] && (
-                  <div className="bg-white dark:bg-slate-900 border-2 border-primary/40 dark:border-primary/60 rounded-3xl p-5 shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col justify-between relative overflow-hidden group sm:-translate-y-2">
+                  <div className="bg-white dark:bg-slate-900 border-2 border-primary/40 dark:border-primary/60 rounded-3xl p-5 shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col justify-between relative overflow-hidden group order-first sm:order-none sm:-translate-y-2">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-                    
+
                     <div>
                       {/* Top Row: Champion Badge & Avatar */}
                       <div className="flex justify-between items-start mb-3">
@@ -240,58 +266,48 @@ export default function Leaderboard() {
                           <div className="w-20 h-20 rounded-full border-4 border-amber-400 shadow-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mx-auto">
                             <Avatar config={top3[0]?.avatar_config} size={76} showBg={false} />
                           </div>
-                          <span className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
                         </div>
                       </div>
 
-                      {/* Name & Badge */}
+                      {/* Name */}
                       <div className="text-center mt-2">
                         <h3 className="font-headline font-black text-lg text-slate-900 dark:text-white truncate">
                           {top3[0]?.name}
                         </h3>
-                        <span className="inline-block mt-1 px-3 py-0.5 rounded-full text-[10px] font-headline font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-sm">
-                          🔥 Top Quizzer!
-                        </span>
                       </div>
 
                       {/* Sparkline Curve & Score */}
                       <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                         <div>
                           <Sparkline color="#7C3AED" data={top3[0]?.sparklineData || sparklinePresets[0]} id="rank1" />
-                          <span className="text-[10px] font-bold text-slate-400">7-Day Trend</span>
+                          <span className="text-[10px] font-bold text-slate-400">Progress Trend</span>
                         </div>
                         <div className="text-right">
                           <div className="font-headline font-black text-3xl text-primary leading-tight">
-                            {top3[0]?.xp?.toLocaleString()}
+                            {scoreOf(top3[0]).toLocaleString()}
                           </div>
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total XP</span>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{scoreLabel}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Bottom Action Footer */}
-                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between gap-2 text-xs font-headline font-bold">
-                      <button 
+                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex text-xs font-headline font-bold">
+                      <button
                         onClick={() => setSelectedUser(top3[0])}
                         className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all text-center"
                       >
                         PROFILE
                       </button>
-                      <button 
-                        onClick={() => handleDuelClick(top3[0]?.name)}
-                        className="flex-1 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark shadow-md transition-all text-center font-black"
-                      >
-                        CHALLENGE
-                      </button>
                     </div>
                   </div>
                 )}
 
-                {/* Winner 3 (Third Place) */}
+                {/* Winner 3 (Third Place) — order-3 on mobile */}
                 {top3[2] && (
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-between relative overflow-hidden group order-3 sm:order-none">
                     <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
-                    
+
                     <div>
                       {/* Top Row: Rank Tag & Avatar */}
                       <div className="flex justify-between items-start mb-3">
@@ -302,48 +318,38 @@ export default function Leaderboard() {
                           <div className="w-16 h-16 rounded-full border-2 border-amber-600/40 dark:border-amber-700 shadow-md overflow-hidden bg-slate-100 dark:bg-slate-800 mx-auto">
                             <Avatar config={top3[2]?.avatar_config} size={60} showBg={false} />
                           </div>
-                          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
                         </div>
                       </div>
 
-                      {/* Name & Badge */}
+                      {/* Name */}
                       <div className="text-center mt-2">
                         <h3 className="font-headline font-extrabold text-base text-slate-900 dark:text-white truncate">
                           {top3[2]?.name}
                         </h3>
-                        <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-headline font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                          🏆 Clinical Star
-                        </span>
                       </div>
 
                       {/* Sparkline Curve & Score */}
                       <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                         <div>
                           <Sparkline color="#F59E0B" data={top3[2]?.sparklineData || sparklinePresets[2]} id="rank3" />
-                          <span className="text-[10px] font-bold text-slate-400">7-Day Trend</span>
+                          <span className="text-[10px] font-bold text-slate-400">Progress Trend</span>
                         </div>
                         <div className="text-right">
                           <div className="font-headline font-black text-2xl text-slate-900 dark:text-white leading-tight">
-                            {top3[2]?.xp?.toLocaleString()}
+                            {scoreOf(top3[2]).toLocaleString()}
                           </div>
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total XP</span>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{scoreLabel}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Bottom Action Footer */}
-                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between gap-2 text-xs font-headline font-bold">
-                      <button 
+                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex text-xs font-headline font-bold">
+                      <button
                         onClick={() => setSelectedUser(top3[2])}
                         className="flex-1 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all text-center"
                       >
                         PROFILE
-                      </button>
-                      <button 
-                        onClick={() => handleDuelClick(top3[2]?.name)}
-                        className="flex-1 py-1.5 rounded-xl bg-primary/10 text-primary dark:bg-primary/20 hover:bg-primary hover:text-white transition-all text-center"
-                      >
-                        CHALLENGE
                       </button>
                     </div>
                   </div>
@@ -370,72 +376,86 @@ export default function Leaderboard() {
                   const sparkColor = isMe ? '#7C3AED' : (idx % 2 === 0 ? '#06B6D4' : '#EC4899');
 
                   return (
-                    <div 
+                    <div
                       key={entry.id}
-                      className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border transition-all duration-200 gap-4 ${
+                      className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 p-4 rounded-2xl border transition-all duration-200 ${
                         isMe
                           ? 'bg-primary/5 dark:bg-primary/10 border-primary shadow-lg ring-2 ring-primary/20'
                           : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md'
                       }`}
                     >
-                      {/* Left: Rank, Avatar & Name */}
-                      <div className="flex items-center gap-4 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-8 h-8 rounded-xl font-headline font-black text-xs flex items-center justify-center ${
-                            isMe ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                          }`}>
-                            #{entry.rank < 10 ? `0${entry.rank}` : entry.rank}
-                          </span>
-                        </div>
-
-                        <div className="relative shrink-0">
-                          <div className={`w-11 h-11 rounded-full border-2 overflow-hidden bg-slate-100 dark:bg-slate-800 ${
-                            isMe ? 'border-primary' : 'border-slate-200 dark:border-slate-700'
-                          }`}>
-                            <Avatar config={entry.avatar_config} size={44} showBg={false} />
-                          </div>
-                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
-                        </div>
-
-                        <div className="min-w-0">
+                      {/* Top row: rank, avatar & name — plus the XP on the right (mobile only,
+                          so a phone shows the score beside the name and keeps the graph on its
+                          own line below) */}
+                      <div className="flex items-center justify-between gap-4 min-w-0 sm:justify-start sm:flex-1">
+                        <div className="flex items-center gap-4 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-headline font-extrabold text-sm text-slate-900 dark:text-white truncate">
-                              {entry.name}
+                            <span className={`w-8 h-8 rounded-xl font-headline font-black text-xs flex items-center justify-center shrink-0 ${
+                              isMe ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                            }`}>
+                              #{entry.rank < 10 ? `0${entry.rank}` : entry.rank}
                             </span>
-                            {isMe && (
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-headline font-black uppercase bg-primary text-white">
-                                YOU
-                              </span>
-                            )}
                           </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
-                            Unit {String((idx % 10) + 1).padStart(2, '0')} Clinical Training
-                          </p>
+
+                          <div className="relative shrink-0">
+                            <div className={`w-11 h-11 rounded-full border-2 overflow-hidden bg-slate-100 dark:bg-slate-800 ${
+                              isMe ? 'border-primary' : 'border-slate-200 dark:border-slate-700'
+                            }`}>
+                              <Avatar config={entry.avatar_config} size={44} showBg={false} />
+                            </div>
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-headline font-extrabold text-sm text-slate-900 dark:text-white truncate">
+                                {entry.name}
+                              </span>
+                              {isMe && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-headline font-black uppercase bg-primary text-white">
+                                  YOU
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
+                              Level {entry.level ?? 1} · {entry.quizzes_taken || 0} quizzes taken
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* XP — mobile position (top-right, beside the name) */}
+                        <div className="text-right shrink-0 sm:hidden">
+                          <div className="font-headline font-black text-lg text-slate-900 dark:text-white">
+                            {scoreOf(entry).toLocaleString()}
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            {scoreLabel}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Right: Sparkline Graph & XP Score */}
-                      <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
-                        <div className="hidden sm:block">
-                          <Sparkline color={sparkColor} data={entry.sparklineData || sparklinePresets[presetIdx]} id={`list-${entry.id}`} />
+                      {/* Sparkline zone: full-width trend line on its own row on mobile, or the
+                          fixed 110px graph inline before the XP on desktop */}
+                      <div className="flex items-center gap-6 pt-3 border-t border-slate-100 dark:border-slate-800 sm:pt-0 sm:border-t-0 sm:justify-end sm:shrink-0">
+                        {/* Mobile: stretched full-width sparkline + label */}
+                        <div className="flex-1 min-w-0 sm:hidden">
+                          <Sparkline color={sparkColor} data={entry.sparklineData || sparklinePresets[presetIdx]} id={`list-m-${entry.id}`} stretch />
+                          <span className="block text-[10px] font-bold text-slate-400 mt-1">Progress Trend</span>
                         </div>
 
-                        <div className="text-right">
+                        {/* Desktop: fixed 110px sparkline */}
+                        <div className="hidden sm:block">
+                          <Sparkline color={sparkColor} data={entry.sparklineData || sparklinePresets[presetIdx]} id={`list-d-${entry.id}`} />
+                        </div>
+
+                        {/* XP — desktop position (right of the sparkline) */}
+                        <div className="text-right hidden sm:block">
                           <div className="font-headline font-black text-lg text-slate-900 dark:text-white">
-                            {entry.xp?.toLocaleString()}
+                            {scoreOf(entry).toLocaleString()}
                           </div>
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            Closed Quizzes: {entry.quizzes_taken || 5}
+                            {scoreLabel}
                           </span>
                         </div>
-
-                        <button
-                          onClick={() => handleDuelClick(entry.name)}
-                          className="p-2 rounded-xl text-slate-400 hover:text-primary hover:bg-primary/10 transition-all"
-                          title="Challenge Scholar"
-                        >
-                          <span className="material-symbols-outlined text-xl">swords</span>
-                        </button>
                       </div>
                     </div>
                   );
@@ -452,17 +472,6 @@ export default function Leaderboard() {
 
           {/* Right Sidebar: Your Status & Target Acquired */}
           <aside className="lg:col-span-4 space-y-6">
-            
-            {/* Duel Challenge Notification Banner */}
-            {duelChallengeSent && (
-              <div className="p-4 rounded-2xl bg-emerald-500 text-white font-headline font-bold text-xs flex items-center justify-between shadow-lg animate-bounce">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-lg">swords</span>
-                  <span>Clinical Duel Challenge Sent!</span>
-                </div>
-                <span className="material-symbols-outlined text-base">check_circle</span>
-              </div>
-            )}
 
             {/* Your Status Card */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden">
@@ -502,63 +511,10 @@ export default function Leaderboard() {
               </div>
             </div>
 
-            {/* Target Acquired Card */}
-            {targetEntry && (
-              <div className="bg-gradient-to-br from-rose-500/10 via-slate-900 to-purple-950 text-white rounded-3xl p-6 shadow-xl border border-rose-500/30 relative overflow-hidden">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-xs font-headline font-black text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm animate-ping">my_location</span>
-                    <span>TARGET ACQUIRED</span>
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-headline font-black bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                    RANK #{targetEntry.rank < 10 ? `0${targetEntry.rank}` : targetEntry.rank}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 rounded-full border-2 border-rose-400 overflow-hidden bg-slate-800 shrink-0">
-                    <Avatar config={targetEntry.avatar_config} size={56} showBg={false} />
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="font-headline font-black text-lg truncate text-white">
-                      {targetEntry.name}
-                    </h4>
-                    <p className="text-xs font-headline font-bold text-rose-300">
-                      {targetEntry.xp?.toLocaleString()} XP Total
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleDuelClick(targetEntry.name)}
-                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-headline font-black text-xs uppercase tracking-wider shadow-lg hover:shadow-rose-500/30 hover:scale-105 transition-all flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-base">swords</span>
-                  <span>CHALLENGE TO DUEL</span>
-                </button>
-              </div>
-            )}
-
-            {/* Achievements Grid */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 shadow-xl">
-              <h3 className="font-headline font-black text-xs text-slate-400 uppercase tracking-wider mb-4">
-                RARE ACHIEVEMENTS
-              </h3>
-              <div className="grid grid-cols-4 gap-3">
-                <div className="aspect-square rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 hover:scale-110 transition-transform cursor-pointer" title="Master Quizzer">
-                  <span className="material-symbols-outlined text-2xl">military_tech</span>
-                </div>
-                <div className="aspect-square rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-600 dark:text-cyan-400 hover:scale-110 transition-transform cursor-pointer" title="Clinical Networker">
-                  <span className="material-symbols-outlined text-2xl">hub</span>
-                </div>
-                <div className="aspect-square rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:scale-110 transition-transform cursor-pointer" title="Vital Signs Expert">
-                  <span className="material-symbols-outlined text-2xl">vital_signs</span>
-                </div>
-                <div className="aspect-square rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 hover:scale-110 transition-transform cursor-pointer" title="Streak Champion">
-                  <span className="material-symbols-outlined text-2xl">local_fire_department</span>
-                </div>
-              </div>
-            </div>
+            {/* NOTE: The "Target Acquired" duel card and the hardcoded "Rare Achievements"
+                grid were removed. The former was Challenge UI (hidden for now); the latter
+                showed identical fabricated badges for every user with no backing data. The
+                Your Status card above shows the real rank and honest XP-to-next-rank progress. */}
 
           </aside>
         </div>
@@ -592,24 +548,14 @@ export default function Leaderboard() {
                 <span className="text-primary font-black">{selectedUser.xp?.toLocaleString()} XP</span>
               </div>
               <div className="flex justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
-                <span>Quizzes Completed</span>
-                <span>{selectedUser.quizzes_taken || 0} Units</span>
+                <span>Level</span>
+                <span>Level {selectedUser.level ?? 1}</span>
               </div>
               <div className="flex justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
-                <span>Average Clinical Score</span>
-                <span className="text-emerald-600 dark:text-emerald-400">{Math.round(selectedUser.avg_score || 85)}%</span>
+                <span>Quizzes Completed</span>
+                <span>{selectedUser.quizzes_taken || 0}</span>
               </div>
             </div>
-
-            <button
-              onClick={() => {
-                handleDuelClick(selectedUser.name);
-                setSelectedUser(null);
-              }}
-              className="w-full mt-5 py-3 rounded-2xl bg-primary text-white font-headline font-black text-xs uppercase tracking-wider shadow-md hover:bg-primary-dark transition-all"
-            >
-              Challenge {selectedUser.name} to Duel
-            </button>
           </div>
         </div>
       )}

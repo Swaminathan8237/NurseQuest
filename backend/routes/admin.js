@@ -544,7 +544,7 @@ router.get('/attempts/:attemptId/questions', authenticateToken, requireAdmin, as
 
     const rows = await sql`
       SELECT q.id, q.question_text, q.type, q.points, q.order_index,
-        qans.is_correct, qans.points_earned, qans.time_taken, qans.user_answer
+        qans.is_correct, qans.points_earned, qans.time_taken, qans.user_answer, qans.status
       FROM question_answers qans
       JOIN questions q ON q.id = qans.question_id
       WHERE qans.attempt_id = ${attemptId}
@@ -554,6 +554,7 @@ router.get('/attempts/:attemptId/questions', authenticateToken, requireAdmin, as
     const questions = rows.map(r => {
       const points = parseInt(r.points || 0, 10);
       const pointsEarned = parseInt(r.points_earned || 0, 10);
+      const isCorrect = parseInt(r.is_correct || 0, 10) === 1;
       return {
         id: r.id,
         question_text: r.question_text,
@@ -561,7 +562,10 @@ router.get('/attempts/:attemptId/questions', authenticateToken, requireAdmin, as
         order_index: parseInt(r.order_index || 0, 10),
         points,
         points_earned: pointsEarned,
-        is_correct: parseInt(r.is_correct || 0, 10) === 1,
+        is_correct: isCorrect,
+        // Five-state outcome. Historical rows predate this column (status = NULL); for them
+        // the truthful best we can show is the old correct/incorrect split derived from is_correct.
+        status: r.status || (isCorrect ? 'correct' : 'incorrect'),
         time_taken: parseInt(r.time_taken || 0, 10),
         accuracy: points > 0 ? Math.round((pointsEarned * 100.0) / points) : 0,
         user_answer: r.user_answer

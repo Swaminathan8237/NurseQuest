@@ -12,6 +12,7 @@ const { sanitizeLogInput } = require('./utils/logger');
 
 // Routes
 const authRoutes = require('./routes/auth');
+const googleAuthRoutes = require('./routes/googleAuth');
 const quizRoutes = require('./routes/quizzes');
 const scoreRoutes = require('./routes/scores');
 const userRoutes = require('./routes/users');
@@ -21,10 +22,23 @@ const adminRoutes = require('./routes/admin');
 const { initializeSocket } = require('./socket');
 
 const app = express();
+// Behind Nginx in production: trust the first proxy hop so req.secure reflects the
+// client's X-Forwarded-Proto (→ correct Secure-cookie decisions) and req.ip is the real client.
+app.set('trust proxy', 1);
+
+// Allowed CORS / Socket.IO origins. Localhost entries cover local dev; production domains
+// arrive via the CORS_ORIGINS env var (comma-separated) so the bundle stays domain-agnostic
+// and the same code runs everywhere. Socket.IO enforces this list server-side, so the custom
+// domain MUST be present here or real-time connections from it are rejected.
+const allowedOrigins = [
+  'http://localhost:5173', 'http://localhost:3000', 'http://localhost:5050',
+  ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean) : []),
+];
+
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { 
-    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5050'], 
+  cors: {
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -33,16 +47,15 @@ const io = new Server(server, {
 // Middleware
 app.use(helmet());
 app.use(cookieParser());
-app.use(cors({ 
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5050'],
-  credentials: true 
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // File upload endpoint (for quiz media: images, videos, audio)
 const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
 
 // Ensure upload directories exist
 if (!fs.existsSync('./uploads/images')) {
@@ -58,23 +71,11 @@ if (!fs.existsSync('./uploads/audio')) {
   console.log('📁 Created upload directory: uploads/audio');
 }
 
-const mediaStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    if (file.mimetype.startsWith('video/')) {
-      cb(null, './uploads/videos');
-    } else if (file.mimetype.startsWith('audio/')) {
-      cb(null, './uploads/audio');
-    } else {
-      cb(null, './uploads/images');
-    }
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname) || '';
-    cb(null, uuidv4() + ext);
-  }
-});
+// Media is uploaded to Supabase Storage (a shared, durable bucket) rather than
+// local disk, so the same URL renders on both local and hosted. multer keeps
+// the file in memory; the buffer is streamed to the bucket in the handler below.
 const mediaUpload = multer({
-  storage: mediaStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
   fileFilter: function (req, file, cb) {
     const allowed = /^(image|video|audio)\//;
@@ -84,19 +85,30 @@ const mediaUpload = multer({
 });
 
 const { authenticateToken: authUpload } = require('./middleware/auth');
+const { uploadToBucket, isConfigured: isStorageConfigured } = require('./lib/supabaseStorage');
 app.post('/api/upload', authUpload, (req, res) => {
-  mediaUpload.single('media')(req, res, function (err) {
+  mediaUpload.single('media')(req, res, async function (err) {
     if (err) {
       console.error('Upload error:', err.message);
       return res.status(400).json({ error: err.message });
     }
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    // Build the URL relative to the server
-    const filePath = req.file.path.replace(/\\/g, '/');
-    const relativePath = filePath.substring(filePath.indexOf('uploads/'));
-    const url = `/${relativePath}`;
-    console.log(`✅ File uploaded: ${sanitizeLogInput(req.file.originalname)} -> ${sanitizeLogInput(url)}`);
-    res.json({ url, filename: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype });
+    if (!isStorageConfigured()) {
+      // Fail loud rather than silently writing to local disk, which the hosted
+      // server cannot serve (separate disk, no per-deploy sync).
+      console.error('Upload rejected: Supabase Storage is not configured on the server.');
+      return res.status(503).json({ error: 'Media storage is not configured on the server.' });
+    }
+    try {
+      const ext = path.extname(req.file.originalname) || '';
+      const { publicUrl } = await uploadToBucket(req.file.buffer, req.file.mimetype, ext);
+      console.log(`✅ File uploaded to Storage: ${sanitizeLogInput(req.file.originalname)} -> ${sanitizeLogInput(publicUrl)}`);
+      res.json({ url: publicUrl, filename: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype });
+    } catch (uploadErr) {
+      // uploadErr.message comes from the storage helper and never contains the key.
+      console.error('Storage upload error:', uploadErr.message);
+      res.status(502).json({ error: 'Failed to store uploaded file' });
+    }
   });
 });
 
@@ -110,6 +122,7 @@ app.get('/api/config', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/auth', googleAuthRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/scores', scoreRoutes);
 app.use('/api/users', userRoutes);

@@ -1,0 +1,342 @@
+[
+  {
+    "question_id": "83efe727-7d71-4099-b2aa-09eeafba567b",
+    "unit": 1,
+    "order_index": 9,
+    "prior": {
+      "type": "image",
+      "media_url": "/uploads/images/d0cebdf8-a467-4adf-aa78-d72549ae6011.png",
+      "question_text": "Patient using ventilator in ICU. Which infection is commonly associated with this device?\n\n"
+    }
+  },
+  {
+    "question_id": "5747dddd-5d70-4294-b1a4-4ea9ce1f2bcf",
+    "unit": 1,
+    "order_index": 10,
+    "prior": {
+      "type": "image",
+      "media_url": "/uploads/images/c6561b00-bb0d-4b2f-a0ed-1e7aca327282.png",
+      "question_text": "Central venous catheter inserted in patient. Which infection is most commonly associated?\n\n"
+    }
+  },
+  {
+    "question_id": "3d8ca5e3-d826-44c4-b240-d2411bb6a978",
+    "unit": 1,
+    "order_index": 11,
+    "prior": {
+      "type": "image",
+      "media_url": "/uploads/images/8c21acad-cac4-4b3e-9f23-097a2c5e4f63.png",
+      "question_text": "Urinary catheter attached to collection bag. Which infection is associated with this device?\n\n"
+    }
+  },
+  {
+    "question_id": "0457f2cb-4dec-44d3-9997-629ed904a26a",
+    "unit": 2,
+    "order_index": 9,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 N95 respirator mask.What is its primary purpose?\n\n"
+    }
+  },
+  {
+    "question_id": "81b00ea0-ab8f-4bb8-82b7-5b29e6d9e571",
+    "unit": 2,
+    "order_index": 10,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Healthcare worker wearing gloves.What precaution is this demonstrating?\n\n"
+    }
+  },
+  {
+    "question_id": "f596adc3-4e43-472f-a53c-b4c1163d24ce",
+    "unit": 2,
+    "order_index": 11,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Complete PPE kit.What is its primary purpose?\n\n"
+    }
+  },
+  {
+    "question_id": "87d40ed6-e8ff-4ec5-bbdc-463aa3a0b512",
+    "unit": 3,
+    "order_index": 9,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 WHO hand hygiene steps poster.What does the poster demonstrate?\n\n"
+    }
+  },
+  {
+    "question_id": "c5c92805-d1b2-4aee-9f11-6345fac651ab",
+    "unit": 3,
+    "order_index": 10,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Healthcare worker rubbing palms with sanitizer.Which method is shown?\n\n"
+    }
+  },
+  {
+    "question_id": "8214a11e-5868-4d31-848c-05ddb4323d10",
+    "unit": 3,
+    "order_index": 11,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Surgical scrub sink in operation theatre.What procedure is being performed?\n\n"
+    }
+  },
+  {
+    "question_id": "50a9e44f-c6cb-4001-a4b3-11446fe209d6",
+    "unit": 4,
+    "order_index": 9,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Autoclave machine.What is the main function of this equipment?\n\n"
+    }
+  },
+  {
+    "question_id": "e2e44413-8f8e-4a47-9505-46e6a7dfc376",
+    "unit": 4,
+    "order_index": 10,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Hot air oven used in laboratory.Which sterilization method is shown?\n\n"
+    }
+  },
+  {
+    "question_id": "585524cc-89f1-4479-9716-0a34f469ec70",
+    "unit": 4,
+    "order_index": 11,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Bottle labeled sodium hypochlorite.What is its primary purpose in hospitals?\n\n"
+    }
+  },
+  {
+    "question_id": "ef71dc25-128c-4284-9dad-946697f2b17e",
+    "unit": 5,
+    "order_index": 9,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Sterile specimen container.What is the primary purpose of this container?\n\n"
+    }
+  },
+  {
+    "question_id": "47842bb7-480e-46b3-882e-c032ad3d5fe3",
+    "unit": 5,
+    "order_index": 10,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Vacutainer blood collection system.What is the main purpose of this device?\n\n"
+    }
+  },
+  {
+    "question_id": "e3b86f9c-2324-437d-8adb-c9a39e358e40",
+    "unit": 5,
+    "order_index": 11,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Throat swab collection.Which diagnostic test commonly uses this specimen?\n\n"
+    }
+  },
+  {
+    "question_id": "86f771ed-e4a2-46e4-8e16-19b019cefb8e",
+    "unit": 6,
+    "order_index": 9,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Yellow biomedical waste bag.What type of waste is disposed here?\n\n"
+    }
+  },
+  {
+    "question_id": "b0c64600-65ce-46ad-9291-11481e341193",
+    "unit": 6,
+    "order_index": 10,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Red biomedical waste bag.What type of waste is disposed here?\n\n"
+    }
+  },
+  {
+    "question_id": "98a7f77f-02fd-4200-94db-d51d7b559164",
+    "unit": 6,
+    "order_index": 11,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Sharps container.What is the main purpose of this container?\n\n"
+    }
+  },
+  {
+    "question_id": "6a0b681e-46be-4566-a18a-0269bf520744",
+    "unit": 7,
+    "order_index": 9,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Petri dish showing bacterial culture.What laboratory test does this represent?\n\n"
+    }
+  },
+  {
+    "question_id": "04127744-9255-4187-8ee5-5b060d605825",
+    "unit": 7,
+    "order_index": 10,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Antibiotic sensitivity testing plate with zones of inhibition.What does the clear zone represent?\n\n"
+    }
+  },
+  {
+    "question_id": "46899daa-0bc0-4569-b375-74cc3194c629",
+    "unit": 7,
+    "order_index": 11,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Antibiotic tablets in hospital pharmacy.What is the main goal of antibiotic stewardship regarding these drugs?\n\n"
+    }
+  },
+  {
+    "question_id": "16f423c2-c05b-4e59-92cf-b9247403dc6d",
+    "unit": 8,
+    "order_index": 9,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Patient wearing identification wristband.What is the purpose of this safety measure?\n\n"
+    }
+  },
+  {
+    "question_id": "3b01584e-e753-46d8-aa27-06940f89ebca",
+    "unit": 8,
+    "order_index": 10,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Nurse using medication checklist.What safety practice does this demonstrate?\n\n"
+    }
+  },
+  {
+    "question_id": "8f836f3d-b209-4927-a132-c0561f5694ff",
+    "unit": 8,
+    "order_index": 11,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Hospital fall risk warning sign near patient bed.What safety indicator does this represent?\n\n"
+    }
+  },
+  {
+    "question_id": "038cd527-6292-4301-8c96-36b338920ffe",
+    "unit": 9,
+    "order_index": 9,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Patient wristband with identification details.Which IPSG goal is represented?\n\n"
+    }
+  },
+  {
+    "question_id": "81ddffd8-b784-4689-b737-97f5be03de52",
+    "unit": 9,
+    "order_index": 10,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Surgical team performing time-out before surgery.What safety practice is shown?\n\n"
+    }
+  },
+  {
+    "question_id": "4c5fa83a-a223-4a1f-9f77-1607fffda496",
+    "unit": 9,
+    "order_index": 11,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Alcohol-based hand rub dispenser near patient bed.Which IPSG goal does this support?\n\n"
+    }
+  },
+  {
+    "question_id": "f0950d79-35d1-465f-b44b-3d8ab474c086",
+    "unit": 10,
+    "order_index": 9,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Fire extinguisher mounted on hospital wall.What is the primary purpose of this device?\n\n"
+    }
+  },
+  {
+    "question_id": "32166f65-cf1a-4e19-97f3-db65763bd598",
+    "unit": 10,
+    "order_index": 10,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Healthcare worker wearing lead apron during X-ray.Which safety protocol is demonstrated?\n\n"
+    }
+  },
+  {
+    "question_id": "82314e66-d89c-44ce-9ce1-84ae23e3dd72",
+    "unit": 10,
+    "order_index": 11,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Emergency exit sign in hospital corridor.What is its purpose?\n\n"
+    }
+  },
+  {
+    "question_id": "8dbbb680-4575-448c-93e8-96e528db8e0f",
+    "unit": 11,
+    "order_index": 9,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Healthcare worker wearing gloves and mask.What safety practice is shown?\n\n"
+    }
+  },
+  {
+    "question_id": "1fa4dca0-da07-4d21-8e6d-00286b4608ec",
+    "unit": 11,
+    "order_index": 10,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Sharps container in hospital ward.What is its purpose?\n\n"
+    }
+  },
+  {
+    "question_id": "d62e7849-b42a-46f7-b2a6-440195e940c8",
+    "unit": 11,
+    "order_index": 11,
+    "prior": {
+      "type": "mcq",
+      "media_url": null,
+      "question_text": "📷 Biohazard warning sign.What does this symbol indicate?\n\n"
+    }
+  },
+  {
+    "question_id": "bc26b28b-6732-4d55-b385-32ecb9a88306",
+    "unit": null,
+    "order_index": null,
+    "prior": {
+      "type": "image",
+      "media_url": "/uploads/images/a7041ea5-43a6-43b4-82a6-e016e8f3c27f.png",
+      "question_text": "Oh I forget"
+    }
+  }
+]

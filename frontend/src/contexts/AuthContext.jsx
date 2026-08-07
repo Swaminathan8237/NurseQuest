@@ -77,6 +77,18 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const googleLogin = async (credential) => {
+    try {
+      const response = await authAPI.googleLogin(credential);
+      const userObj = response.user || response;
+      setUser(userObj);
+      return userObj;
+    } catch (err) {
+      console.error('Google login failed:', err);
+      throw err;
+    }
+  };
+
   const register = async (formData) => {
     try {
       const response = await authAPI.register({
@@ -140,7 +152,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, syncOAuthProfile, logout, updateAvatar, updatePreferences }}>
+    <AuthContext.Provider value={{ user, loading, login, googleLogin, register, syncOAuthProfile, logout, updateAvatar, updatePreferences }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,25 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { userAPI } from '../api';
 import Avatar from './Avatar';
 
 export default function AccountSettingsModal({ isOpen, onClose, initialTab = 'profile' }) {
-  const { user } = useAuth();
+  const { user, updatePreferences } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState(initialTab);
-  
-  // Settings local state
+
+  // Real per-request profile stats (unitsPassed, dailyStreak, avgScore) from
+  // GET /users/dashboard-stats. Loaded lazily when the Profile tab is shown so the modal
+  // reflects true progress instead of xp-derived fabrications.
+  const [stats, setStats] = useState(null);
+
+  // Preference toggles — hydrated from the persisted user.preferences (server source of truth).
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [timerAlerts, setTimerAlerts] = useState(true);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Hydrate the toggles from the persisted preferences whenever the modal opens (or the
+  // stored preferences change after a save / profile refetch).
+  useEffect(() => {
+    if (!isOpen) return;
+    const prefs = user?.preferences || {};
+    // Hydrate the editable toggles from the persisted prefs each time the modal opens.
+    // Intentional derived-state sync (not a cascading render): runs only on open or when
+    // the saved preferences change after a successful save / profile refetch.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setSoundEnabled(prefs.soundEnabled !== false);
+    setTimerAlerts(prefs.timerAlerts !== false);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [isOpen, user?.preferences]);
+
+  // Load real profile stats when the Profile tab is active (students only — the endpoint
+  // returns a different shape for teachers).
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'profile' || user?.role !== 'student') return;
+    let cancelled = false;
+    userAPI.getDashboardStats()
+      .then((data) => { if (!cancelled) setStats(data); })
+      .catch((err) => { if (!cancelled) console.error('Failed to load profile stats:', err); });
+    return () => { cancelled = true; };
+  }, [isOpen, activeTab, user?.role]);
 
   if (!isOpen) return null;
 
-  const handleSavePreferences = () => {
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
+  const handleSavePreferences = async () => {
+    setSaving(true);
+    try {
+      await updatePreferences({ soundEnabled, timerAlerts });
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2500);
+    } catch (err) {
+      console.error('Failed to save preferences:', err);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  // Honest, navigator-derived device label (no hardcoded "Windows 11").
+  const deviceLabel = typeof navigator !== 'undefined' && navigator.platform
+    ? `Web Browser (${navigator.platform})`
+    : 'Web Browser';
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
@@ -121,7 +166,7 @@ export default function AccountSettingsModal({ isOpen, onClose, initialTab = 'pr
                     <span>•</span>
                     <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                       <span className="material-symbols-outlined text-base">verified</span>
-                      <span>Level {Math.floor((user?.xp || 0) / 250) + 1} Nurse</span>
+                      <span>Level {user?.level ?? 1} Nurse</span>
                     </span>
                   </div>
                 </div>
@@ -132,17 +177,17 @@ export default function AccountSettingsModal({ isOpen, onClose, initialTab = 'pr
                 <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-center">
                   <span className="material-symbols-outlined text-2xl text-primary mb-1">workspace_premium</span>
                   <div className="font-headline font-black text-xl text-slate-900 dark:text-white">
-                    {Math.floor((user?.xp || 0) / 100)}
+                    {stats ? stats.unitsPassed : '—'}
                   </div>
                   <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Units Unlocked
+                    Units Passed
                   </div>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-center">
                   <span className="material-symbols-outlined text-2xl text-emerald-500 mb-1">local_fire_department</span>
                   <div className="font-headline font-black text-xl text-slate-900 dark:text-white">
-                    {user?.streakDays || 3} Days
+                    {stats ? `${stats.dailyStreak} ${stats.dailyStreak === 1 ? 'Day' : 'Days'}` : '—'}
                   </div>
                   <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     Current Streak
@@ -152,10 +197,10 @@ export default function AccountSettingsModal({ isOpen, onClose, initialTab = 'pr
                 <div className="col-span-2 sm:col-span-1 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-center">
                   <span className="material-symbols-outlined text-2xl text-cyan-500 mb-1">timer</span>
                   <div className="font-headline font-black text-xl text-slate-900 dark:text-white">
-                    94.2%
+                    {stats && stats.avgScore != null ? `${stats.avgScore.toFixed(1)}%` : '—'}
                   </div>
                   <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Clinical Accuracy
+                    Avg Quiz Score
                   </div>
                 </div>
               </div>
@@ -258,7 +303,7 @@ export default function AccountSettingsModal({ isOpen, onClose, initialTab = 'pr
                   </div>
                   <div className="flex justify-between py-1">
                     <span className="text-slate-500">Active Device</span>
-                    <span className="font-mono">Web Browser (Windows 11)</span>
+                    <span className="font-mono">{deviceLabel}</span>
                   </div>
                 </div>
               </div>
@@ -285,9 +330,10 @@ export default function AccountSettingsModal({ isOpen, onClose, initialTab = 'pr
             </button>
             <button
               onClick={handleSavePreferences}
-              className="px-5 py-2 rounded-xl text-xs font-headline font-black bg-primary text-white hover:bg-primary-dark shadow-md hover:shadow-lg hover:scale-105 transition-all"
+              disabled={saving}
+              className="px-5 py-2 rounded-xl text-xs font-headline font-black bg-primary text-white hover:bg-primary-dark shadow-md hover:shadow-lg hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              Save Changes
+              {saving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
         </div>

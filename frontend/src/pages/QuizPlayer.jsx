@@ -96,9 +96,11 @@ export default function QuizPlayer() {
   const [streak, setStreak] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
-  // Fraction (0..1) of the current answer that was right — drives the three-state
-  // (correct / partial / incorrect) feedback for matching & jumbled_sequence.
-  const [currentFraction, setCurrentFraction] = useState(0);
+  // Feedback status for the current question, mirroring the server's per-answer status
+  // (correct / partial / incorrect / selected_correct / selected_incorrect / not_answered).
+  // A timed-out staged selection is Selected,C / Selected,NC — labelled by what it WOULD
+  // have graded, even though it scores 0. This is what the feedback banner reads.
+  const [currentStatus, setCurrentStatus] = useState(null);
   const [results, setResults] = useState(null);
   const [submitError, setSubmitError] = useState(false);
   const [lobbyCount, setLobbyCount] = useState(3);
@@ -126,11 +128,21 @@ export default function QuizPlayer() {
   const answersRef = useRef([]);
   const streakRef = useRef(0);
   const currentQRef = useRef(0);
+  // Staged-but-unsubmitted selections, read by the timeout handler so an expired timer can
+  // record Selected,C / Selected,NC instead of losing the student's in-progress answer.
+  const sliderValueRef = useRef(50);
+  const sliderTouchedRef = useRef(false);       // slider always shows a default, so track real moves
+  const matchingSelectionsRef = useRef({});
+  const placedLettersRef = useRef([]);
+  const procedureOrderRef = useRef(null);       // jumbled_sequence order, mirrored from ProcedureOrder
 
   // Keep refs in sync
   useEffect(() => { showAnswerRef.current = showAnswer; }, [showAnswer]);
   useEffect(() => { streakRef.current = streak; }, [streak]);
   useEffect(() => { currentQRef.current = currentQ; }, [currentQ]);
+  useEffect(() => { sliderValueRef.current = sliderValue; }, [sliderValue]);
+  useEffect(() => { matchingSelectionsRef.current = matchingSelections; }, [matchingSelections]);
+  useEffect(() => { placedLettersRef.current = placedLetters; }, [placedLetters]);
 
   // Load quiz
   useEffect(() => {
@@ -155,14 +167,54 @@ export default function QuizPlayer() {
   // Timer timeout handler
   const answeredQuestionsRef = useRef(new Set());
 
+  // Read whatever the student has STAGED but not submitted for the current question, so an
+  // expired timer can be recorded as Selected,C / Selected,NC. Returns null when nothing is
+  // staged (→ Not answered). Instant-submit types (mcq/image/video/audio) have no staged
+  // state — a click is the submit — so they always return null here.
+  function readStagedAnswer(q) {
+    if (!q) return null;
+    switch (q.type) {
+      case 'captcha': {
+        const b = captchaBox;
+        if (b && b.w > 0.01 && b.h > 0.01) {
+          return JSON.stringify({ x: +b.x.toFixed(4), y: +b.y.toFixed(4), w: +b.w.toFixed(4), h: +b.h.toFixed(4) });
+        }
+        return null;
+      }
+      case 'slider':
+        // The slider always shows a default value, so only a real drag counts as a selection.
+        return sliderTouchedRef.current ? sliderValueRef.current.toString() : null;
+      case 'matching': {
+        const sel = matchingSelectionsRef.current;
+        return sel && Object.keys(sel).length > 0 ? JSON.stringify(sel) : null;
+      }
+      case 'jumbled_letters': {
+        const placed = placedLettersRef.current;
+        return placed && placed.length > 0 ? placed.map(l => l.letter).join('') : null;
+      }
+      case 'jumbled_sequence':
+        // procedureOrderRef is mirrored by ProcedureOrder ONLY after a real rearrangement.
+        return procedureOrderRef.current;
+      default:
+        // mcq / image / video / audio and anything else: no staged state to recover.
+        return null;
+    }
+  }
+
   useEffect(() => {
     if (phase === 'playing' && timeLeft === 0 && !showAnswer) {
       if (!answeredQuestionsRef.current.has(currentQRef.current)) {
         const q = quiz?.questions[currentQRef.current];
-        if (q && q.type === 'captcha' && captchaBox && captchaBox.w > 0.01 && captchaBox.h > 0.01) {
-          handleSubmit(JSON.stringify({ x: +captchaBox.x.toFixed(4), y: +captchaBox.y.toFixed(4), w: +captchaBox.w.toFixed(4), h: +captchaBox.h.toFixed(4) }));
+        const staged = readStagedAnswer(q);
+        // Captcha keeps its long-standing behaviour: a drawn box auto-SUBMITS on timeout and is
+        // scored exactly as before (committed), so no captcha marks are ever lost. Every other
+        // type records its staged selection as UNCOMMITTED — 0 marks, identical to the old
+        // handleSubmit(null) timeout, but now labelled Selected,C / Selected,NC (or Not answered
+        // when nothing was staged). committed:false is what gates scoring off on the server.
+        if (q && q.type === 'captcha' && staged != null) {
+          handleSubmit(staged);                          // committed defaults true — unchanged
         } else {
-          handleSubmit(null);
+          handleSubmit(staged, { committed: false });
         }
       }
     }
@@ -178,8 +230,13 @@ export default function QuizPlayer() {
     currentQRef.current = index;
     setSelectedAnswer(null);
     setShowAnswer(false);
-    setCurrentFraction(0);
+    setCurrentStatus(null);
     showAnswerRef.current = false;
+    // Reset staged-selection tracking for the new question.
+    sliderTouchedRef.current = false;
+    procedureOrderRef.current = null;
+    matchingSelectionsRef.current = {};
+    placedLettersRef.current = [];
     setTimeLeft(quiz?.time_per_question || 30);
     startTimeRef.current = Date.now();
 
@@ -237,7 +294,8 @@ export default function QuizPlayer() {
     }, 100);
   }
 
-  async function handleSubmit(answer) {
+  async function handleSubmit(answer, meta = { committed: true }) {
+    const committed = meta.committed !== false;
     const qIndex = currentQRef.current;
 
     if (answeredQuestionsRef.current.has(qIndex)) return;
@@ -257,6 +315,9 @@ export default function QuizPlayer() {
     // SECURITY: the answer key is no longer shipped in the quiz payload, so grade
     // this answer on the server. /check returns the correct answer + explanation for
     // THIS question only, and only after the student commits — never upfront.
+    // NOTE: /check is read-only (SELECT + grade, no DB write), so calling it for an
+    // uncommitted timeout selection is safe — it only reveals the key and tells us
+    // whether the staged value WOULD grade correct (selected_correct vs selected_incorrect).
     let isCorrect = false;
     let fraction = 0;
     let awarded = 0;
@@ -282,15 +343,31 @@ export default function QuizPlayer() {
 
     setShowAnswer(true);
     showAnswerRef.current = true;
-    setCurrentFraction(fraction);
+    // A staged-on-timeout answer is now graded exactly like a submit (see scores.js /submit):
+    // full marks if correct, partial `fraction` for matching/sequence. So the student-facing
+    // banner is driven purely by `fraction` — a half-right matching timeout reads "Partial",
+    // a fully-correct one "Correct" — and only a timeout with nothing staged reads "Not Answered".
+    // The committed-vs-staged distinction is NOT shown to the student; it survives only in the
+    // Admin analytics "Result" column, computed from the `committed`/`hadSelection` flags below.
+    const hadSelection = answer != null && answer !== '';
+    setCurrentStatus(
+      fraction === 1 ? 'correct'
+        : fraction > 0 ? 'partial'
+        : hadSelection ? 'incorrect'
+        : 'not_answered'
+    );
 
     // Add the marks the SERVER awarded for this answer (partial for matching/sequence,
     // full or zero otherwise). No time/streak bonus, so this running tally matches the
-    // authoritative server score exactly.
+    // authoritative server score exactly. A staged-on-timeout selection adds its marks too
+    // (the server now grades it like a submit); an empty timeout awarded 0, so the tally
+    // never drifts from the final grade.
     setTotalScore(prev => prev + awarded);
 
     if (isCorrect) {
-      // Only a fully-correct answer continues the streak; a partial resets it.
+      // Any fully-correct answer — submitted OR staged-on-timeout — continues the streak,
+      // matching the server. A partial resets it. `isCorrect` is already false for an empty
+      // timeout, so nothing-staged still breaks the streak.
       const newStreak = streakRef.current + 1;
       setStreak(newStreak);
       streakRef.current = newStreak;
@@ -320,6 +397,12 @@ export default function QuizPlayer() {
       answer,
       timeTaken,
       timeRemaining,
+      // committed: false only on the timeout path. hadSelection distinguishes a staged
+      // selection from a truly untouched question. These no longer affect scoring (a staged
+      // selection is now graded like a submit); the server uses them ONLY to compute the
+      // analytics `status` (Selected,C / Selected,NC vs Not answered) for the Admin Result column.
+      committed,
+      hadSelection: answer != null && answer !== '',
     }];
 
     // Auto-advance disabled. Student manually advances using the Next Question button.
@@ -413,7 +496,12 @@ export default function QuizPlayer() {
     // then and are used purely to pick the heading treatment.
     const passed = !!results?.passed;
     const passMark = results?.passPercent ?? PASS_PERCENT;
-    const showFailPrompt = !!results && !passed && isLevel;
+    // A student who has ALREADY cleared this level (best marks-% ≥ pass mark on an earlier attempt)
+    // keeps it unlocked forever, so a worse re-attempt must still celebrate rather than show the
+    // "isn't complete" fail prompt. `nextLevelQuizId` is the forward-navigation target from the server.
+    const previouslyPassed = !!results?.previouslyPassed;
+    const nextLevelQuizId = results?.nextLevelQuizId ?? null;
+    const showFailPrompt = !!results && isLevel && !passed && !previouslyPassed;
 
     return (
       <div className="min-h-screen bg-surface-container-lowest flex flex-col items-center py-12 px-6 overflow-y-auto relative">
@@ -421,6 +509,16 @@ export default function QuizPlayer() {
           <div className="absolute top-[10%] left-[20%] w-[500px] h-[500px] bg-[#FFD700]/10 rounded-full blur-[150px] animate-pulse"></div>
           <div className="absolute bottom-[20%] right-[10%] w-[400px] h-[400px] bg-primary/8 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
         </div>
+
+        {/* Persistent escape hatch to the dashboard, shown in the top-left for BOTH pass and fail
+            results (the forward/next-level button no longer routes to the dashboard). */}
+        <button
+          onClick={() => navigate('/student')}
+          className="absolute top-6 left-6 z-20 clay-button clay-button-outline px-5 py-2.5 font-headline font-bold tracking-widest uppercase text-sm flex items-center gap-2"
+        >
+          <span className="material-symbols-outlined text-xl">arrow_back</span>
+          Back to Dashboard
+        </button>
 
         <div className="z-10 max-w-4xl w-full">
           <div className="text-center mb-12 animate-slideUp">
@@ -552,16 +650,37 @@ export default function QuizPlayer() {
                 </h3>
                 <div className="flex flex-col gap-6">
                   {results.questionResults?.map((qr, i) => {
-                    // Three states: fully correct (1), partial (0<f<1), incorrect (0).
+                    // The backend captures 5 states (correct, incorrect, selected_correct,
+                    // selected_incorrect, not_answered) for Admin analytics. Students see only a
+                    // collapsed 4-state display: Correct / Incorrect / Partial / Not Answered.
+                    // Drive the label from `fraction` (marks share) so a partial always reads
+                    // "Partial" — a matching/sequence answer that is half-right has status
+                    // `incorrect`/`selected_incorrect` (isCorrect === false) yet fraction > 0.
+                    // `status` is used only to single out a genuinely unanswered timeout; the
+                    // committed-vs-staged nuance stays hidden here and lives in the Admin column.
                     const f = qr.fraction ?? (qr.isCorrect ? 1 : 0);
-                    const isPartial = f > 0 && f < 1;
+                    let kind;
+                    if (qr.status === 'not_answered') kind = 'not_answered';
+                    else if (f === 1) kind = 'correct';
+                    else if (f > 0) kind = 'partial';
+                    else kind = 'incorrect';
+
+                    const isCorrectish = kind === 'correct';
+                    const isPartial = kind === 'partial';
+                    const isNotAnswered = kind === 'not_answered';
+                    const borderClass = isCorrectish ? 'border-success/30' : isPartial ? 'border-amber-500/40' : isNotAnswered ? 'border-white/10' : 'border-error/30';
+                    const pillColor = isCorrectish ? 'text-success' : isPartial ? 'text-amber-500' : isNotAnswered ? 'text-on-surface-variant' : 'text-error';
+                    const pillLabel = kind === 'correct' ? '✓ Correct'
+                      : kind === 'partial' ? '◐ Partial'
+                      : kind === 'not_answered' ? 'Not Answered'
+                      : '✗ Incorrect';
                     return (
-                      <div key={i} className={`p-6 rounded-xl border-2 transition-all animate-slideUp shadow-clay-outer bg-brand-surface ${f === 1 ? 'border-success/30' : f === 0 ? 'border-error/30' : 'border-amber-500/40'}`} style={{ animationDelay: `${0.7 + i * 0.1}s` }}>
+                      <div key={i} className={`p-6 rounded-xl border-2 transition-all animate-slideUp shadow-clay-outer bg-brand-surface ${borderClass}`} style={{ animationDelay: `${0.7 + i * 0.1}s` }}>
                         <div className="flex items-center justify-between mb-4">
                           <span className="font-mono text-sm text-on-surface-variant tracking-widest">QUESTION {i + 1}</span>
                           <div className="flex items-center gap-3">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-brand-surface shadow-clay-sunken ${f === 1 ? 'text-success' : f === 0 ? 'text-error' : 'text-amber-500'}`}>
-                              {f === 1 ? '✓ Correct' : f === 0 ? '✗ Incorrect' : '◐ Partial'}
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-brand-surface shadow-clay-sunken ${pillColor}`}>
+                              {pillLabel}
                             </span>
                             <span className="font-mono text-sm text-primary">
                               {isPartial ? `+${qr.pointsEarned} / ${qr.pointsPossible} marks` : `+${qr.pointsEarned} pts`}
@@ -616,10 +735,25 @@ export default function QuizPlayer() {
                 <span className="material-symbols-outlined">route</span>
                 Back to Levels
               </button>
-            ) : (
+            ) : !isLevel ? (
               <button className="w-full sm:w-auto clay-button clay-button-primary px-10 py-4 font-headline font-bold tracking-widest uppercase flex items-center justify-center gap-3" onClick={() => navigate('/student')}>
                 <span className="material-symbols-outlined">home</span>
                 Return to Dashboard
+              </button>
+            ) : quiz.unit === 11 ? (
+              <button className="w-full sm:w-auto clay-button clay-button-primary px-10 py-4 font-headline font-bold tracking-widest uppercase flex items-center justify-center gap-3" onClick={() => navigate('/units')}>
+                <span className="material-symbols-outlined">celebration</span>
+                Hatts Off
+              </button>
+            ) : nextLevelQuizId ? (
+              <button className="w-full sm:w-auto clay-button clay-button-primary px-10 py-4 font-headline font-bold tracking-widest uppercase flex items-center justify-center gap-3" onClick={() => window.location.href = `/quiz/${nextLevelQuizId}`}>
+                <span className="material-symbols-outlined">arrow_forward</span>
+                Next Level
+              </button>
+            ) : (
+              <button className="w-full sm:w-auto clay-button clay-button-primary px-10 py-4 font-headline font-bold tracking-widest uppercase flex items-center justify-center gap-3" onClick={() => navigate('/units')}>
+                <span className="material-symbols-outlined">route</span>
+                Back to Levels
               </button>
             )}
           </div>
@@ -718,13 +852,35 @@ export default function QuizPlayer() {
         {/* Question Area */}
         <div className="flex flex-col items-center text-center mb-10 md:mb-16 flex-1 justify-center relative">
           {/* Notification for result */}
-          {showAnswer && (
-            <div className={`px-6 py-2 rounded-full border shadow-lg animate-bounceIn z-20 mb-8 ${currentFraction === 1 ? 'bg-tertiary-fixed-dim/20 border-tertiary-fixed-dim/50 text-tertiary-fixed-dim' : currentFraction === 0 ? 'bg-error/20 border-error/50 text-error' : 'bg-amber-500/20 border-amber-500/50 text-amber-500'}`}>
-              <span className="font-headline font-bold tracking-widest uppercase">
-                {currentFraction === 1 ? '✓ Correct Answer!' : currentFraction === 0 ? '✗ Incorrect' : '◐ Partial Credit'}
-              </span>
-            </div>
-          )}
+          {showAnswer && (() => {
+            // The backend captures 5 states for Admin analytics (see handleSubmit / scores.js), but
+            // students only ever see a collapsed 4-state banner: Correct / Incorrect / Partial /
+            // Not Answered. The committed-vs-staged-on-timeout nuance (selected_correct/NC) is
+            // hidden here — selected_correct reads as plain Correct, selected_incorrect as plain
+            // Incorrect — and surfaces only in the Admin attempt "Result" column.
+            const s = currentStatus;
+            const isCorrectish = s === 'correct' || s === 'selected_correct';
+            const isPartial = s === 'partial';
+            const isNotAnswered = s === 'not_answered';
+            const colorClass = isCorrectish
+              ? 'bg-tertiary-fixed-dim/20 border-tertiary-fixed-dim/50 text-tertiary-fixed-dim'
+              : isPartial
+                ? 'bg-amber-500/20 border-amber-500/50 text-amber-500'
+                : isNotAnswered
+                  ? 'bg-white/10 border-white/20 text-on-surface-variant'
+                  : 'bg-error/20 border-error/50 text-error';
+            const label = isCorrectish ? '✓ Correct Answer!'
+              : isPartial ? '◐ Partial Credit'
+              : isNotAnswered ? 'Not Answered'
+              : '✗ Incorrect';
+            return (
+              <div className={`px-6 py-2 rounded-full border shadow-lg animate-bounceIn z-20 mb-8 ${colorClass}`}>
+                <span className="font-headline font-bold tracking-widest uppercase">
+                  {label}
+                </span>
+              </div>
+            );
+          })()}
 
           <div className="bg-surface-container-low px-4 py-2 rounded-full flex items-center gap-2 mb-8 shadow-[0_8px_32px_0_rgba(11,19,38,0.8)] border border-outline-variant/20">
             <span className="material-symbols-outlined text-[#71d7cd] text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -894,6 +1050,7 @@ export default function QuizPlayer() {
               options={question.options}
               correctAnswer={showAnswer ? question.correct_answer : null}
               answered={showAnswer}
+              onChange={(orderedTexts) => { procedureOrderRef.current = orderedTexts; }}
               onSubmit={(orderedTexts) => handleSubmit(orderedTexts)}
             />
           </div>
@@ -949,7 +1106,7 @@ export default function QuizPlayer() {
                   max={question.slider_max ?? 100}
                   step={question.slider_step ?? 1}
                   value={sliderValue}
-                  onChange={e => setSliderValue(parseFloat(e.target.value))}
+                  onChange={e => { sliderTouchedRef.current = true; setSliderValue(parseFloat(e.target.value)); }}
                   disabled={showAnswer}
                 />
               </div>

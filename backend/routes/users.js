@@ -1,7 +1,7 @@
 const express = require('express');
 const { getDB } = require('../db/init');
 const { authenticateToken, requireRole } = require('../middleware/auth');
-const { getLevelInfo } = require('../utils/scoring');
+const { getLevelInfo, PASS_PERCENT } = require('../utils/scoring');
 
 const router = express.Router();
 
@@ -170,6 +170,20 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
       // NULLIF ignores attempts recorded with 0 elapsed time so they don't drag the mean down.
       const avgTimeResult = await db`SELECT COALESCE(AVG(NULLIF(time_taken, 0)), 0) as avg FROM quiz_attempts WHERE user_id = ${req.user.id}`;
 
+      // Units genuinely PASSED — the same rule that drives the Units-page unlock gate and the
+      // admin report: for each published unit, the student's BEST marks% (score*100/total_points)
+      // across that unit's quizzes must reach PASS_PERCENT. Grouped by q.unit (not quiz_id) so a
+      // multi-quiz unit collapses to one, matching the Units page. Never fabricated / capped at 11.
+      const unitsPassedResult = await db`
+        SELECT COUNT(*)::int AS units_passed FROM (
+          SELECT q.unit, MAX(qa.score * 100.0 / NULLIF(qa.total_points, 0)) AS best_pct
+          FROM quiz_attempts qa
+          JOIN quizzes q ON q.id = qa.quiz_id
+          WHERE qa.user_id = ${req.user.id} AND q.unit IS NOT NULL AND q.is_published = 1
+          GROUP BY q.unit
+        ) t WHERE t.best_pct >= ${PASS_PERCENT}
+      `;
+
       const recentAttemptsResult = await db`
         SELECT quiz_attempts.*, quizzes.title AS quiz_title, quizzes.category, quizzes.unit
         FROM quiz_attempts
@@ -213,6 +227,8 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
         // above, which are consecutive-correct-ANSWER streaks.
         dailyStreak: parseInt(user.current_streak || 0, 10),
         longestStreak: parseInt(user.longest_streak || 0, 10),
+        // Real count of units the student has passed (0..number of published units).
+        unitsPassed: parseInt(unitsPassedResult[0].units_passed || 0, 10),
         recentAttempts,
         achievements
       };

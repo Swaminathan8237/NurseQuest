@@ -13,7 +13,7 @@ const t = (val) => val;
 export default function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login, register, syncOAuthProfile, user } = useAuth();
+  const { login, register, googleLogin, syncOAuthProfile, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   // State flags for different views
@@ -177,21 +177,78 @@ export default function AuthPage() {
     }
   };
 
-  // Trigger Google/GitHub OAuth logins
-  const handleOAuthLogin = async (provider) => {
-    setError('');
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: window.location.origin + '/auth'
+  // Google Identity Services — real backend-owned OAuth flow.
+  // The backend's POST /api/auth/google verifies the ID token, upserts the user,
+  // and mints the same skillquest_token JWT/cookie as password login.
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+  // Load GIS script once on mount
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+    const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    if (existing) return;
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  }, [GOOGLE_CLIENT_ID]);
+
+  // Initialize GIS and render Google's official sign-in button once the script has loaded.
+  // renderButton is the reliable, officially-supported flow (One Tap / prompt() can be silently
+  // suppressed by browser FedCM settings or dismissal cooldowns, so it's unfit as the primary path).
+  // We poll briefly for window.google because the GIS script loads async.
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const tryInit = () => {
+      if (cancelled) return;
+      if (!window.google?.accounts?.id) {
+        // GIS not ready yet — retry for ~5s (50 × 100ms) then give up silently.
+        if (attempts++ < 50) setTimeout(tryInit, 100);
+        return;
+      }
+
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: async (response) => {
+          setError('');
+          try {
+            const userObj = await googleLogin(response.credential);
+            if (!userObj.needProfileSetup) {
+              navigate(getDashboardRoute(userObj.role));
+            }
+          } catch (err) {
+            // The backend returns a user-safe message (never internal details).
+            setError(err.message || 'Google sign-in failed. Please try again.');
+          }
         }
       });
-      if (error) throw error;
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+
+      const target = document.getElementById('google-signin-button');
+      if (target) {
+        window.google.accounts.id.renderButton(target, {
+          theme: theme === 'dark' ? 'filled_black' : 'outline',
+          size: 'large',
+          width: target.offsetWidth || 320,
+          text: 'continue_with',
+          shape: 'rectangular'
+        });
+      }
+    };
+
+    tryInit();
+
+    return () => {
+      cancelled = true;
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.cancel();
+      }
+    };
+  }, [GOOGLE_CLIENT_ID, googleLogin, navigate, theme]);
 
   // Playful role-selector tile: chunky outlined block that presses into its shadow when active.
   const roleTile = (active, accentVar) => ({
@@ -369,10 +426,6 @@ export default function AuthPage() {
                   <button type="button" style={roleTile(profileFormData.role === 'student', '--primary')} onClick={() => setProfileFormData({ ...profileFormData, role: 'student' })}>
                     <span className="text-2xl">🎓</span>
                     <span className="text-sm">{t('Student')}</span>
-                  </button>
-                  <button type="button" style={roleTile(profileFormData.role === 'teacher', '--accent-coral')} onClick={() => setProfileFormData({ ...profileFormData, role: 'teacher' })}>
-                    <span className="text-2xl">👩‍⚕️</span>
-                    <span className="text-sm">{t('Teacher')}</span>
                   </button>
                 </div>
               </div>
@@ -576,10 +629,6 @@ export default function AuthPage() {
                       <span className="text-2xl">🎓</span>
                       <span className="text-sm">{t('Student')}</span>
                     </button>
-                    <button type="button" style={roleTile(formData.role === 'teacher', '--accent-coral')} onClick={() => setFormData({ ...formData, role: 'teacher' })}>
-                      <span className="text-2xl">👩‍⚕️</span>
-                      <span className="text-sm">{t('Teacher')}</span>
-                    </button>
                   </div>
                 </div>
               )}
@@ -599,59 +648,13 @@ export default function AuthPage() {
               </div>
 
               <div className="grid grid-cols-1">
-                <Button
-                  onClick={() => handleOAuthLogin('google')}
-                  variant="secondary"
-                  className="text-sm"
-                  type="button"
-                  leftIcon={
-                    <svg className="w-4 h-4" viewBox="0 0 24 24">
-                      <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.68 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.85 2.99c.92-2.75 3.5-4.51 6.76-4.51z" />
-                      <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.35H12v4.46h6.44c-.28 1.47-1.11 2.71-2.36 3.55l3.66 2.84c2.14-1.98 3.39-4.89 3.39-8.5z" />
-                      <path fill="#FBBC05" d="M5.24 10.55c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3L1.39 2.96C.5 4.77 0 6.81 0 8.97s.5 4.2 1.39 6.01l3.85-2.99c-.24-.72-.38-1.5-.38-2.3-.01-.58.05-1.15.15-1.71c.08-.43.08-.85.22-1.28z" />
-                      <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.66-2.84c-1.1.74-2.51 1.18-4.3 1.18-3.26 0-5.84-1.76-6.76-4.51L1.39 16.9C3.37 20.8 7.35 23 12 23z" />
-                    </svg>
-                  }
-                >
-                  {t('Google')}
-                </Button>
+                {/* Google Identity Services renders its official button into this container
+                    (see the renderButton effect above). It requires VITE_GOOGLE_CLIENT_ID at
+                    build time; without it the container stays empty and this section is a no-op. */}
+                <div id="google-signin-button" className="w-full flex justify-center" />
               </div>
             </div>
 
-            {isLogin && (
-              <div className="mt-8 pt-6 animate-fadeIn" style={{ borderTop: '2px solid var(--border-ink-color)' }}>
-                <p style={{ ...eyebrowLabel, paddingLeft: 0, textAlign: 'center', marginBottom: '16px' }}>{t('Demo Accounts')}</p>
-                <div className="grid grid-cols-3 gap-3">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="flex-col gap-1 !py-2.5"
-                    onClick={() => setFormData({ ...formData, email: 'teacher@skillquest.io', password: 'teacher123' })}
-                    type="button"
-                  >
-                    <span>👩‍🏫</span> {t('Teacher')}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="flex-col gap-1 !py-2.5"
-                    onClick={() => setFormData({ ...formData, email: 'student1@skillquest.io', password: 'student123' })}
-                    type="button"
-                  >
-                    <span>🎓</span> {t('Student')}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="flex-col gap-1 !py-2.5"
-                    onClick={() => setFormData({ ...formData, email: 'admin@skillquest.io', password: 'admin123' })}
-                    type="button"
-                  >
-                    <span>👨‍💻</span> {t('Admin')}
-                  </Button>
-                </div>
-              </div>
-            )}
           </>
         )}
 

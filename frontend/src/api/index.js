@@ -38,6 +38,8 @@ export const authAPI = {
   syncProfile: (data) => request('/auth/sync-profile', { method: 'POST', body: JSON.stringify(data) }),
   getProfile: () => request('/auth/me'),
   updateAvatar: (avatarConfig) => request('/auth/avatar', { method: 'PUT', body: JSON.stringify({ avatarConfig }) }),
+  updatePreferences: (prefs) => request('/auth/preferences', { method: 'PUT', body: JSON.stringify({ prefs }) }),
+  googleLogin: (credential) => request('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
 };
 
 // Quizzes

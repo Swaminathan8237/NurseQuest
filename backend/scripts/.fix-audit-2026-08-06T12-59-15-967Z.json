@@ -1,0 +1,866 @@
+[
+  {
+    "id": "41efb73c-ee41-4dfe-bf93-9cb063b46681",
+    "unit": 2,
+    "order_index": 6,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange the correct order of donning PPE.\n1. Gown\n2. Mask\n3. Eye protection\n4. Gloves",
+      "options": "[\"1 → 2 → 3 → 4\",\"2 → 1 → 3 → 4\",\"3 → 2 → 1 → 4\",\"1 → 3 → 2 → 4\"]",
+      "correct_answer": "1 → 2 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange the correct order of donning PPE.",
+      "options": "[\"Gown\",\"Mask\",\"Eye protection\",\"Gloves\"]",
+      "correct_answer": "[\"Gown\",\"Mask\",\"Eye protection\",\"Gloves\"]"
+    }
+  },
+  {
+    "id": "00004d12-aa5c-44d2-b229-3699d328c625",
+    "unit": 2,
+    "order_index": 7,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange the correct order of removing PPE.\n1. Gloves\n2. Goggles\n3. Gown\n4. Mask",
+      "options": "[\"1 → 2 → 3 → 4\",\"3 → 1 → 2 → 4\",\"2 → 3 → 1 → 4\",\"1 → 3 → 2 → 4\"]",
+      "correct_answer": "1 → 2 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange the correct order of removing PPE.",
+      "options": "[\"Gloves\",\"Goggles\",\"Gown\",\"Mask\"]",
+      "correct_answer": "[\"Gloves\",\"Goggles\",\"Gown\",\"Mask\"]"
+    }
+  },
+  {
+    "id": "f2f044b7-64ca-46b0-b4e4-945eece1fe8e",
+    "unit": 2,
+    "order_index": 8,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange infection control procedure.\n1. Hand hygiene\n2. Wear PPE\n3. Perform patient care\n4. Dispose waste",
+      "options": "[\"1 → 2 → 3 → 4\",\"2 → 1 → 3 → 4\",\"3 → 1 → 2 → 4\",\"4 → 3 → 2 → 1\"]",
+      "correct_answer": "1 → 2 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange infection control procedure.",
+      "options": "[\"Hand hygiene\",\"Wear PPE\",\"Perform patient care\",\"Dispose waste\"]",
+      "correct_answer": "[\"Hand hygiene\",\"Wear PPE\",\"Perform patient care\",\"Dispose waste\"]"
+    }
+  },
+  {
+    "id": "59e264a0-e191-4685-8300-4384f0556596",
+    "unit": 3,
+    "order_index": 6,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange the steps of proper hand washing.\n1. Wet hands\n2. Apply soap\n3. Rub hands together\n4. Rinse hands",
+      "options": "[\"1 → 2 → 3 → 4\",\"2 → 1 → 4 → 3\",\"3 → 1 → 2 → 4\",\"4 → 3 → 2 → 1\"]",
+      "correct_answer": "1 → 2 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange the steps of proper hand washing.",
+      "options": "[\"Wet hands\",\"Apply soap\",\"Rub hands together\",\"Rinse hands\"]",
+      "correct_answer": "[\"Wet hands\",\"Apply soap\",\"Rub hands together\",\"Rinse hands\"]"
+    }
+  },
+  {
+    "id": "d12f58db-a9c8-4d62-9d7c-a11d2717f28b",
+    "unit": 3,
+    "order_index": 7,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange surgical hand scrub process.\n1. Remove jewelry\n2. Apply antiseptic scrub\n3. Rinse hands\n4. Dry with sterile towelCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange surgical hand scrub process.",
+      "options": "[\"Remove jewelry\",\"Apply antiseptic scrub\",\"Rinse hands\",\"Dry with sterile towel\"]",
+      "correct_answer": "[\"Remove jewelry\",\"Apply antiseptic scrub\",\"Rinse hands\",\"Dry with sterile towel\"]"
+    }
+  },
+  {
+    "id": "8bd2cda1-f4a6-43d7-94fc-941ba512063a",
+    "unit": 3,
+    "order_index": 8,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange alcohol-based hand rub technique.\n1. Apply sanitizer\n2. Rub palms\n3. Rub fingers and thumbs\n4. Allow hands to dryCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange alcohol-based hand rub technique.",
+      "options": "[\"Apply sanitizer\",\"Rub palms\",\"Rub fingers and thumbs\",\"Allow hands to dry\"]",
+      "correct_answer": "[\"Apply sanitizer\",\"Rub palms\",\"Rub fingers and thumbs\",\"Allow hands to dry\"]"
+    }
+  },
+  {
+    "id": "438599aa-fee1-4e8d-b990-b444d8e96c5c",
+    "unit": 4,
+    "order_index": 6,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange the steps for instrument sterilization.\n1. Cleaning\n2. Packaging\n3. Sterilization\n4. Storage",
+      "options": "[\"1 → 2 → 3 → 4\",\"2 → 1 → 3 → 4\",\"1 → 3 → 2 → 4\",\"4 → 3 → 2 → 1\"]",
+      "correct_answer": "1 → 2 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange the steps for instrument sterilization.",
+      "options": "[\"Cleaning\",\"Packaging\",\"Sterilization\",\"Storage\"]",
+      "correct_answer": "[\"Cleaning\",\"Packaging\",\"Sterilization\",\"Storage\"]"
+    }
+  },
+  {
+    "id": "2d5a001c-97e4-491d-9daf-e431946b6cfe",
+    "unit": 4,
+    "order_index": 7,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange the autoclave process steps.\n1. Load instruments\n2. Apply steam pressure\n3. Maintain sterilization time\n4. Remove and coolCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange the autoclave process steps.",
+      "options": "[\"Load instruments\",\"Apply steam pressure\",\"Maintain sterilization time\",\"Remove and cool\"]",
+      "correct_answer": "[\"Load instruments\",\"Apply steam pressure\",\"Maintain sterilization time\",\"Remove and cool\"]"
+    }
+  },
+  {
+    "id": "73134b07-c2c6-4cc9-8f65-76a87bc30184",
+    "unit": 4,
+    "order_index": 8,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange steps for disinfecting hospital surfaces.\n1. Wear PPE\n2. Prepare disinfectant solution\n3. Clean surface\n4. Allow contact timeCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange steps for disinfecting hospital surfaces.",
+      "options": "[\"Wear PPE\",\"Prepare disinfectant solution\",\"Clean surface\",\"Allow contact time\"]",
+      "correct_answer": "[\"Wear PPE\",\"Prepare disinfectant solution\",\"Clean surface\",\"Allow contact time\"]"
+    }
+  },
+  {
+    "id": "2af10cab-65b3-4db7-b5de-e5bda7944c90",
+    "unit": 5,
+    "order_index": 6,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange steps for blood specimen collection.\n1. Identify patient\n2. Perform hand hygiene\n3. Collect blood sample\n4. Label specimen",
+      "options": "[\"2 → 1 → 3 → 4\",\"1 → 2 → 3 → 4\",\"3 → 2 → 1 → 4\",\"4 → 3 → 2 → 1\"]",
+      "correct_answer": "2 → 1 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange steps for blood specimen collection.",
+      "options": "[\"Perform hand hygiene\",\"Identify patient\",\"Collect blood sample\",\"Label specimen\"]",
+      "correct_answer": "[\"Perform hand hygiene\",\"Identify patient\",\"Collect blood sample\",\"Label specimen\"]"
+    }
+  },
+  {
+    "id": "33101446-04f4-41aa-9ae3-8b06a1bc7d9b",
+    "unit": 5,
+    "order_index": 7,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange urine sample collection procedure.\n1. Clean genital area\n2. Start urinating\n3. Collect midstream urine\n4. Close containerCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange urine sample collection procedure.",
+      "options": "[\"Clean genital area\",\"Start urinating\",\"Collect midstream urine\",\"Close container\"]",
+      "correct_answer": "[\"Clean genital area\",\"Start urinating\",\"Collect midstream urine\",\"Close container\"]"
+    }
+  },
+  {
+    "id": "dacbc604-8056-4e27-aa10-fcc070763aed",
+    "unit": 5,
+    "order_index": 8,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange specimen handling steps.\n1. Label specimen\n2. Transport to laboratory\n3. Store appropriately\n4. Record documentationCorrect Order: 1 → 3 → 2 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange specimen handling steps.",
+      "options": "[\"Label specimen\",\"Store appropriately\",\"Transport to laboratory\",\"Record documentation\"]",
+      "correct_answer": "[\"Label specimen\",\"Store appropriately\",\"Transport to laboratory\",\"Record documentation\"]"
+    }
+  },
+  {
+    "id": "e975b1a7-a26d-4e54-a8c1-52498e6b0cb4",
+    "unit": 6,
+    "order_index": 6,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange biomedical waste management steps.\n1. Segregation\n2. Collection\n3. Transportation\n4. Treatment and disposal",
+      "options": "[\"1 → 2 → 3 → 4\",\"2 → 1 → 3 → 4\",\"3 → 1 → 2 → 4\",\"4 → 3 → 2 → 1\"]",
+      "correct_answer": "1 → 2 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange biomedical waste management steps.",
+      "options": "[\"Segregation\",\"Collection\",\"Transportation\",\"Treatment and disposal\"]",
+      "correct_answer": "[\"Segregation\",\"Collection\",\"Transportation\",\"Treatment and disposal\"]"
+    }
+  },
+  {
+    "id": "fb3a58ab-e0f9-425d-add7-4051ed8d9bfb",
+    "unit": 6,
+    "order_index": 7,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange sharps disposal process.\n1. Use needle\n2. Discard in sharps container\n3. Seal container\n4. Send for disposalCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange sharps disposal process.",
+      "options": "[\"Use needle\",\"Discard in sharps container\",\"Seal container\",\"Send for disposal\"]",
+      "correct_answer": "[\"Use needle\",\"Discard in sharps container\",\"Seal container\",\"Send for disposal\"]"
+    }
+  },
+  {
+    "id": "f8cbe6cc-f48c-41bc-a61c-b1a12e0a7caa",
+    "unit": 6,
+    "order_index": 8,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange biomedical waste segregation process.\n1. Identify waste type\n2. Select correct color bag\n3. Dispose waste\n4. Close containerCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange biomedical waste segregation process.",
+      "options": "[\"Identify waste type\",\"Select correct color bag\",\"Dispose waste\",\"Close container\"]",
+      "correct_answer": "[\"Identify waste type\",\"Select correct color bag\",\"Dispose waste\",\"Close container\"]"
+    }
+  },
+  {
+    "id": "ed5724f7-2576-4a34-818c-cda659294ca5",
+    "unit": 7,
+    "order_index": 6,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange steps in rational antibiotic therapy.\n1. Clinical assessment\n2. Specimen collection\n3. Empirical antibiotic therapy\n4. Culture result review",
+      "options": "[\"1 → 2 → 3 → 4\",\"2 → 1 → 3 → 4\",\"1 → 3 → 2 → 4\",\"3 → 2 → 1 → 4\"]",
+      "correct_answer": "1 → 2 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange steps in rational antibiotic therapy.",
+      "options": "[\"Clinical assessment\",\"Specimen collection\",\"Empirical antibiotic therapy\",\"Culture result review\"]",
+      "correct_answer": "[\"Clinical assessment\",\"Specimen collection\",\"Empirical antibiotic therapy\",\"Culture result review\"]"
+    }
+  },
+  {
+    "id": "f5d1ef43-96c2-44a9-9b48-08b0e24a17a1",
+    "unit": 7,
+    "order_index": 7,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange antibiotic stewardship program implementation steps.\n1. Establish guidelines\n2. Monitor antibiotic use\n3. Educate healthcare staff\n4. Evaluate outcomesCorrect Order: 1 → 3 → 2 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange antibiotic stewardship program implementation steps.",
+      "options": "[\"Establish guidelines\",\"Educate healthcare staff\",\"Monitor antibiotic use\",\"Evaluate outcomes\"]",
+      "correct_answer": "[\"Establish guidelines\",\"Educate healthcare staff\",\"Monitor antibiotic use\",\"Evaluate outcomes\"]"
+    }
+  },
+  {
+    "id": "568d3815-304d-4b4b-9c69-069ba5f9a376",
+    "unit": 7,
+    "order_index": 8,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange process of antimicrobial resistance development.\n1. Antibiotic exposure\n2. Survival of resistant bacteria\n3. Bacterial multiplication\n4. Spread of resistant strainsCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange process of antimicrobial resistance development.",
+      "options": "[\"Antibiotic exposure\",\"Survival of resistant bacteria\",\"Bacterial multiplication\",\"Spread of resistant strains\"]",
+      "correct_answer": "[\"Antibiotic exposure\",\"Survival of resistant bacteria\",\"Bacterial multiplication\",\"Spread of resistant strains\"]"
+    }
+  },
+  {
+    "id": "45bd91a9-fdfb-47ea-ade6-db60a0380596",
+    "unit": 8,
+    "order_index": 6,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange steps in patient safety incident management.\n1. Identify incident\n2. Report incident\n3. Investigate cause\n4. Implement corrective action",
+      "options": "[\"1 → 2 → 3 → 4\",\"2 → 1 → 3 → 4\",\"3 → 1 → 2 → 4\",\"4 → 3 → 2 → 1\"]",
+      "correct_answer": "1 → 2 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange steps in patient safety incident management.",
+      "options": "[\"Identify incident\",\"Report incident\",\"Investigate cause\",\"Implement corrective action\"]",
+      "correct_answer": "[\"Identify incident\",\"Report incident\",\"Investigate cause\",\"Implement corrective action\"]"
+    }
+  },
+  {
+    "id": "4b8d7a12-ce5b-41d0-848b-3c360c9cb26f",
+    "unit": 8,
+    "order_index": 7,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange steps of patient identification process.\n1. Ask patient name\n2. Check wristband\n3. Confirm date of birth\n4. Provide treatmentCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange steps of patient identification process.",
+      "options": "[\"Ask patient name\",\"Check wristband\",\"Confirm date of birth\",\"Provide treatment\"]",
+      "correct_answer": "[\"Ask patient name\",\"Check wristband\",\"Confirm date of birth\",\"Provide treatment\"]"
+    }
+  },
+  {
+    "id": "0dde083d-ce94-4c99-aeb1-111182d781b3",
+    "unit": 8,
+    "order_index": 8,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange medication safety process.\n1. Verify prescription\n2. Check patient identity\n3. Administer medication\n4. Document administrationCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange medication safety process.",
+      "options": "[\"Verify prescription\",\"Check patient identity\",\"Administer medication\",\"Document administration\"]",
+      "correct_answer": "[\"Verify prescription\",\"Check patient identity\",\"Administer medication\",\"Document administration\"]"
+    }
+  },
+  {
+    "id": "da976cf9-8984-402d-96dc-ae139212c65a",
+    "unit": 9,
+    "order_index": 6,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange steps of surgical safety checklist.\n1. Patient identification\n2. Procedure confirmation\n3. Surgical site marking\n4. Begin surgery",
+      "options": "[\"1 → 2 → 3 → 4\",\"2 → 1 → 3 → 4\",\"3 → 2 → 1 → 4\",\"4 → 3 → 2 → 1\"]",
+      "correct_answer": "1 → 2 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange steps of surgical safety checklist.",
+      "options": "[\"Patient identification\",\"Procedure confirmation\",\"Surgical site marking\",\"Begin surgery\"]",
+      "correct_answer": "[\"Patient identification\",\"Procedure confirmation\",\"Surgical site marking\",\"Begin surgery\"]"
+    }
+  },
+  {
+    "id": "041dd494-f78d-4626-9f00-c5be8f903911",
+    "unit": 9,
+    "order_index": 7,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange medication safety process.\n1. Verify prescription\n2. Identify patient\n3. Administer medication\n4. Document administrationCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange medication safety process.",
+      "options": "[\"Verify prescription\",\"Identify patient\",\"Administer medication\",\"Document administration\"]",
+      "correct_answer": "[\"Verify prescription\",\"Identify patient\",\"Administer medication\",\"Document administration\"]"
+    }
+  },
+  {
+    "id": "29e6838d-bc0e-480d-96b5-671595281d4e",
+    "unit": 9,
+    "order_index": 8,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange steps for communication during verbal order.\n1. Physician gives order\n2. Nurse records order\n3. Nurse reads back order\n4. Physician confirms accuracyCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange steps for communication during verbal order.",
+      "options": "[\"Physician gives order\",\"Nurse records order\",\"Nurse reads back order\",\"Physician confirms accuracy\"]",
+      "correct_answer": "[\"Physician gives order\",\"Nurse records order\",\"Nurse reads back order\",\"Physician confirms accuracy\"]"
+    }
+  },
+  {
+    "id": "3f6d082f-9ecf-4b96-8851-7f40f2fe4dfd",
+    "unit": 10,
+    "order_index": 6,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange steps of RACE fire safety protocol.\n1. Rescue individuals in danger\n2. Activate alarm\n3. Contain fire\n4. Extinguish or evacuate",
+      "options": "[\"1 → 2 → 3 → 4\",\"2 → 1 → 3 → 4\",\"3 → 2 → 1 → 4\",\"4 → 3 → 2 → 1\"]",
+      "correct_answer": "1 → 2 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange steps of RACE fire safety protocol.",
+      "options": "[\"Rescue individuals in danger\",\"Activate alarm\",\"Contain fire\",\"Extinguish or evacuate\"]",
+      "correct_answer": "[\"Rescue individuals in danger\",\"Activate alarm\",\"Contain fire\",\"Extinguish or evacuate\"]"
+    }
+  },
+  {
+    "id": "b229b47f-58d6-46ea-9b39-fa1e383746a1",
+    "unit": 10,
+    "order_index": 7,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange PASS fire extinguisher technique.\n1. Pull the pin\n2. Aim nozzle at base of fire\n3. Squeeze handle\n4. Sweep side to sideCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange PASS fire extinguisher technique.",
+      "options": "[\"Pull the pin\",\"Aim nozzle at base of fire\",\"Squeeze handle\",\"Sweep side to side\"]",
+      "correct_answer": "[\"Pull the pin\",\"Aim nozzle at base of fire\",\"Squeeze handle\",\"Sweep side to side\"]"
+    }
+  },
+  {
+    "id": "28c4f904-044d-4ed2-b3c8-00b3849c9de3",
+    "unit": 10,
+    "order_index": 8,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange safety incident reporting steps.\n1. Identify hazard\n2. Report incident\n3. Investigate cause\n4. Implement corrective measuresCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange safety incident reporting steps.",
+      "options": "[\"Identify hazard\",\"Report incident\",\"Investigate cause\",\"Implement corrective measures\"]",
+      "correct_answer": "[\"Identify hazard\",\"Report incident\",\"Investigate cause\",\"Implement corrective measures\"]"
+    }
+  },
+  {
+    "id": "47912a4d-0509-4b3e-94b7-92b96a2f8945",
+    "unit": 11,
+    "order_index": 6,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange steps after needle stick injury.\n1. Wash area with soap and water\n2. Report incident\n3. Seek medical evaluation\n4. Document incident",
+      "options": "[\"1 → 2 → 3 → 4\",\"2 → 1 → 3 → 4\",\"1 → 3 → 2 → 4\",\"4 → 3 → 2 → 1\"]",
+      "correct_answer": "1 → 2 → 3 → 4"
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange steps after needle stick injury.",
+      "options": "[\"Wash area with soap and water\",\"Report incident\",\"Seek medical evaluation\",\"Document incident\"]",
+      "correct_answer": "[\"Wash area with soap and water\",\"Report incident\",\"Seek medical evaluation\",\"Document incident\"]"
+    }
+  },
+  {
+    "id": "69231a03-f705-45a1-92c3-01c03264a3d9",
+    "unit": 11,
+    "order_index": 7,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange PPE usage process.\n1. Perform hand hygiene\n2. Wear PPE\n3. Perform procedure\n4. Remove PPE safelyCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange PPE usage process.",
+      "options": "[\"Perform hand hygiene\",\"Wear PPE\",\"Perform procedure\",\"Remove PPE safely\"]",
+      "correct_answer": "[\"Perform hand hygiene\",\"Wear PPE\",\"Perform procedure\",\"Remove PPE safely\"]"
+    }
+  },
+  {
+    "id": "94e51abc-2f47-4e76-8622-74177739e8a1",
+    "unit": 11,
+    "order_index": 8,
+    "step": "sequence_reshape",
+    "before": {
+      "type": "mcq",
+      "question_text": "Arrange incident reporting procedure.\n1. Identify hazard\n2. Report incident\n3. Investigate cause\n4. Implement corrective measuresCorrect Order: 1 → 2 → 3 → 4",
+      "options": "[]",
+      "correct_answer": ""
+    },
+    "after": {
+      "type": "jumbled_sequence",
+      "question_text": "Arrange incident reporting procedure.",
+      "options": "[\"Identify hazard\",\"Report incident\",\"Investigate cause\",\"Implement corrective measures\"]",
+      "correct_answer": "[\"Identify hazard\",\"Report incident\",\"Investigate cause\",\"Implement corrective measures\"]"
+    }
+  },
+  {
+    "id": "87d40ed6-e8ff-4ec5-bbdc-463aa3a0b512",
+    "unit": 3,
+    "order_index": 9,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Hand washing technique"
+    }
+  },
+  {
+    "id": "c5c92805-d1b2-4aee-9f11-6345fac651ab",
+    "unit": 3,
+    "order_index": 10,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Alcohol-based hand rub"
+    }
+  },
+  {
+    "id": "8214a11e-5868-4d31-848c-05ddb4323d10",
+    "unit": 3,
+    "order_index": 11,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Surgical hand antisepsis"
+    }
+  },
+  {
+    "id": "50a9e44f-c6cb-4001-a4b3-11446fe209d6",
+    "unit": 4,
+    "order_index": 9,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Sterilization using moist heat"
+    }
+  },
+  {
+    "id": "e2e44413-8f8e-4a47-9505-46e6a7dfc376",
+    "unit": 4,
+    "order_index": 10,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Dry heat sterilization"
+    }
+  },
+  {
+    "id": "585524cc-89f1-4479-9716-0a34f469ec70",
+    "unit": 4,
+    "order_index": 11,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Surface disinfectant"
+    }
+  },
+  {
+    "id": "ef71dc25-128c-4284-9dad-946697f2b17e",
+    "unit": 5,
+    "order_index": 9,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Prevent contamination"
+    }
+  },
+  {
+    "id": "47842bb7-480e-46b3-882e-c032ad3d5fe3",
+    "unit": 5,
+    "order_index": 10,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Sterile blood collection"
+    }
+  },
+  {
+    "id": "e3b86f9c-2324-437d-8adb-c9a39e358e40",
+    "unit": 5,
+    "order_index": 11,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Respiratory infection detection"
+    }
+  },
+  {
+    "id": "86f771ed-e4a2-46e4-8e16-19b019cefb8e",
+    "unit": 6,
+    "order_index": 9,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Anatomical waste"
+    }
+  },
+  {
+    "id": "b0c64600-65ce-46ad-9291-11481e341193",
+    "unit": 6,
+    "order_index": 10,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Contaminated plastic waste"
+    }
+  },
+  {
+    "id": "98a7f77f-02fd-4200-94db-d51d7b559164",
+    "unit": 6,
+    "order_index": 11,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Prevent needle stick injury"
+    }
+  },
+  {
+    "id": "6a0b681e-46be-4566-a18a-0269bf520744",
+    "unit": 7,
+    "order_index": 9,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Culture test"
+    }
+  },
+  {
+    "id": "04127744-9255-4187-8ee5-5b060d605825",
+    "unit": 7,
+    "order_index": 10,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Antibiotic effectiveness"
+    }
+  },
+  {
+    "id": "46899daa-0bc0-4569-b375-74cc3194c629",
+    "unit": 7,
+    "order_index": 11,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Promote rational antibiotic use"
+    }
+  },
+  {
+    "id": "16f423c2-c05b-4e59-92cf-b9247403dc6d",
+    "unit": 8,
+    "order_index": 9,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Patient identification"
+    }
+  },
+  {
+    "id": "3b01584e-e753-46d8-aa27-06940f89ebca",
+    "unit": 8,
+    "order_index": 10,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Medication verification"
+    }
+  },
+  {
+    "id": "8f836f3d-b209-4927-a132-c0561f5694ff",
+    "unit": 8,
+    "order_index": 11,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Fall prevention"
+    }
+  },
+  {
+    "id": "038cd527-6292-4301-8c96-36b338920ffe",
+    "unit": 9,
+    "order_index": 9,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Patient identification"
+    }
+  },
+  {
+    "id": "81ddffd8-b784-4689-b737-97f5be03de52",
+    "unit": 9,
+    "order_index": 10,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Surgical verification"
+    }
+  },
+  {
+    "id": "4c5fa83a-a223-4a1f-9f77-1607fffda496",
+    "unit": 9,
+    "order_index": 11,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Infection prevention"
+    }
+  },
+  {
+    "id": "f0950d79-35d1-465f-b44b-3d8ab474c086",
+    "unit": 10,
+    "order_index": 9,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Fire suppression"
+    }
+  },
+  {
+    "id": "32166f65-cf1a-4e19-97f3-db65763bd598",
+    "unit": 10,
+    "order_index": 10,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Radiation protection"
+    }
+  },
+  {
+    "id": "82314e66-d89c-44ce-9ce1-84ae23e3dd72",
+    "unit": 10,
+    "order_index": 11,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Guide evacuation during emergencies"
+    }
+  },
+  {
+    "id": "8dbbb680-4575-448c-93e8-96e528db8e0f",
+    "unit": 11,
+    "order_index": 9,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Personal protective equipment use"
+    }
+  },
+  {
+    "id": "1fa4dca0-da07-4d21-8e6d-00286b4608ec",
+    "unit": 11,
+    "order_index": 10,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Prevent needle stick injuries"
+    }
+  },
+  {
+    "id": "d62e7849-b42a-46f7-b2a6-440195e940c8",
+    "unit": 11,
+    "order_index": 11,
+    "step": "image_answer_fill",
+    "before": {
+      "correct_answer": ""
+    },
+    "after": {
+      "correct_answer": "Biological hazard"
+    }
+  }
+]

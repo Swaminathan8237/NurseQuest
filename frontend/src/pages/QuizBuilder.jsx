@@ -584,12 +584,28 @@ export default function QuizBuilder() {
                     </div>
                     <div className="flex items-center gap-3 bg-surface-container-highest border border-outline-variant/30 rounded-lg p-2 pl-4 mt-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 transition-all">
                       <span className="material-symbols-outlined text-slate-400 text-[18px]">link</span>
-                      <input 
-                        className="bg-transparent border-none text-sm text-on-surface flex-1 outline-none" 
-                        value={q.mediaUrl} 
-                        onChange={e => updateQuestion(activeQ, 'mediaUrl', e.target.value)} 
+                      <input
+                        className="bg-transparent border-none text-sm text-on-surface flex-1 outline-none"
+                        value={
+                          q.mediaUrl && q.mediaUrl.includes('.supabase.co/storage/')
+                            ? q.mediaUrl.split('/').pop()
+                            : q.mediaUrl
+                        }
+                        onChange={e => updateQuestion(activeQ, 'mediaUrl', e.target.value)}
                         placeholder="https://example.com/media-file"
+                        title={q.mediaUrl}
                       />
+                      {q.mediaUrl && q.mediaUrl.includes('.supabase.co/storage/') && (
+                        <a
+                          href={q.mediaUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-slate-500 hover:text-primary shrink-0"
+                          title="Open in new tab"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                        </a>
+                      )}
                     </div>
                   </div>
                 )}

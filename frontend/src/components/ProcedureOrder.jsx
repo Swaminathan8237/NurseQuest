@@ -76,6 +76,7 @@ export default function ProcedureOrder({
   mode = 'solo',
   revealSignal = false,
   onSubmit,
+  onChange,
   onRevealComplete,
 }) {
   // slots[i] is the card currently sitting in container i+1. Always full.
@@ -96,6 +97,7 @@ export default function ProcedureOrder({
   const dragStartRef = useRef({ x: 0, y: 0 });
   const prevLiftRef = useRef(null);
   const flipRef = useRef(null);
+  const touchedRef = useRef(false);   // true once the student actually rearranges a card
 
   // Measure the real available width so sizing adapts to the device instead of guessing.
   useLayoutEffect(() => {
@@ -120,8 +122,20 @@ export default function ProcedureOrder({
     setRevealed(false);
     prevLiftRef.current = null;
     flipRef.current = null;
+    touchedRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [optionsKey]);
+
+  // Mirror the current on-screen order to the parent, but ONLY after the student has actually
+  // rearranged a card (touchedRef). This lets a quiz timeout read the staged (unsubmitted)
+  // arrangement so it can be recorded as Selected,C / Selected,NC. Before any real swap the
+  // order is just the random shuffle, which must stay "Not answered" — so we don't emit it.
+  // onChange is intentionally left out of the deps — we only re-emit when slots move.
+  useEffect(() => {
+    if (!touchedRef.current) return;
+    onChange?.(slots.map(s => s?.text ?? ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slots]);
 
   const locked = answered || disabled || submitted;
   const count = slots.length;
@@ -153,6 +167,7 @@ export default function ProcedureOrder({
    */
   const swapAnimated = useCallback((a, b) => {
     if (a === b || a == null || b == null) return;
+    touchedRef.current = true;   // a genuine user rearrangement — start mirroring to the parent
     if (!reducedMotion()) flipRef.current = { first: measureCards(), opts: { duration: 0.34 } };
     setSlots(prev => {
       const next = prev.slice();

@@ -61,7 +61,9 @@ export default function ProfileDropdown() {
     navigate('/auth');
   };
 
-  const level = Math.floor((user?.xp || 0) / 250) + 1;
+  // Real backend level (7-tier system, getLevelInfo in scoring.js), stored on the user row.
+  // NOT the old xp/250 fabrication that produced impossible values like "Level 13".
+  const level = user?.level ?? 1;
 
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>
@@ -89,9 +91,6 @@ export default function ProfileDropdown() {
             </div>
           )}
         </div>
-
-        {/* Online Status Dot */}
-        <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full shadow-sm"></span>
       </button>
 
       {/* Profile Dropdown Popover Container */}

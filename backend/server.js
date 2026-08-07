@@ -62,7 +62,7 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "blob:", "https://api.dicebear.com", "https://*.supabase.co", "https://*.googleusercontent.com"],
       connectSrc: ["'self'", "https://accounts.google.com", "https://*.supabase.co"],
       frameSrc: ["'self'", "https://accounts.google.com"],
-      mediaSrc: ["'self'", "blob:", "https://*.supabase.co"],
+      mediaSrc: ["'self'", "data:", "blob:", "https://*.supabase.co"], // data: — quiz plays short base64 WAV sound effects inline
       workerSrc: ["'self'", "blob:"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],

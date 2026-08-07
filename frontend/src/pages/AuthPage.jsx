@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -194,10 +194,31 @@ export default function AuthPage() {
     document.head.appendChild(script);
   }, [GOOGLE_CLIENT_ID]);
 
+  // Keep the credential handler in a ref so GIS can be initialized EXACTLY once while
+  // still calling the latest googleLogin/navigate. Re-initializing on every render (the
+  // /api/auth/me check resolving, a theme toggle, etc.) triggers GIS's "initialize() is
+  // called multiple times" warning.
+  const handleGoogleCredentialRef = useRef(null);
+  useEffect(() => {
+    handleGoogleCredentialRef.current = async (response) => {
+      setError('');
+      try {
+        const userObj = await googleLogin(response.credential);
+        if (!userObj.needProfileSetup) {
+          navigate(getDashboardRoute(userObj.role));
+        }
+      } catch (err) {
+        // The backend returns a user-safe message (never internal details).
+        setError(err.message || 'Google sign-in failed. Please try again.');
+      }
+    };
+  });
+
   // Initialize GIS and render Google's official sign-in button once the script has loaded.
   // renderButton is the reliable, officially-supported flow (One Tap / prompt() can be silently
   // suppressed by browser FedCM settings or dismissal cooldowns, so it's unfit as the primary path).
-  // We poll briefly for window.google because the GIS script loads async.
+  // We poll briefly for window.google because the GIS script loads async. Depends only on
+  // GOOGLE_CLIENT_ID so it runs once — the credential handler comes from the ref above.
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
 
@@ -214,24 +235,16 @@ export default function AuthPage() {
 
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
-        callback: async (response) => {
-          setError('');
-          try {
-            const userObj = await googleLogin(response.credential);
-            if (!userObj.needProfileSetup) {
-              navigate(getDashboardRoute(userObj.role));
-            }
-          } catch (err) {
-            // The backend returns a user-safe message (never internal details).
-            setError(err.message || 'Google sign-in failed. Please try again.');
-          }
-        }
+        callback: (response) => handleGoogleCredentialRef.current?.(response),
       });
 
       const target = document.getElementById('google-signin-button');
       if (target) {
         window.google.accounts.id.renderButton(target, {
-          theme: theme === 'dark' ? 'filled_black' : 'outline',
+          // Google's button sits at opacity:0 behind our themed overlay, so its own
+          // theme is never seen — hardcode it (and keep `theme` out of this effect's
+          // deps) so a light/dark toggle no longer re-initializes GIS.
+          theme: 'outline',
           size: 'large',
           width: target.offsetWidth || 320,
           text: 'continue_with',
@@ -248,7 +261,7 @@ export default function AuthPage() {
         window.google.accounts.id.cancel();
       }
     };
-  }, [GOOGLE_CLIENT_ID, googleLogin, navigate, theme]);
+  }, [GOOGLE_CLIENT_ID]);
 
   // Playful role-selector tile: chunky outlined block that presses into its shadow when active.
   const roleTile = (active, accentVar) => ({

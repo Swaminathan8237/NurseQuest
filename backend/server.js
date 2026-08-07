@@ -70,6 +70,13 @@ app.use(helmet({
     },
   },
   crossOriginEmbedderPolicy: false, // don't require COEP — external <img>/media have no CORP header
+  // Sign in with Google opens a cross-origin popup/tab and returns the credential via
+  // window.opener → postMessage. Helmet's default COOP `same-origin` severs that link
+  // (opener becomes null, so the popup can't hand the token back — sign-in silently does
+  // nothing / goes blank, especially on mobile where GIS opens a new tab).
+  // `same-origin-allow-popups` still isolates THIS page from any opener while letting the
+  // popups we open keep the relationship — the setting Google recommends for GIS.
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
 }));
 app.use(cookieParser());
 app.use(cors({

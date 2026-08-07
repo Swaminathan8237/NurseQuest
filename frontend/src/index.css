@@ -467,6 +467,19 @@ select.input {
   padding-right: 40px;
 }
 
+/* The Tailwind Play CDN (index.html) injects @tailwindcss/forms' base reset at runtime, which forces
+   background-color:#fff on [type=...]/textarea/select at (0,1,0) specificity — the same as .input — so in
+   the hosted build (where the CDN loads AFTER our stylesheet) it wins the tie and makes dark-mode inputs
+   white-on-white (invisible near-white text on a forced-white field). This element+class selector is
+   (0,1,1), so it beats the reset regardless of load order and keeps --bg-input in both dev and prod.
+   Use `background-color` (NOT the `background` shorthand) so select.input keeps its dropdown-arrow image. */
+input.input,
+textarea.input,
+select.input {
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+}
+
 textarea.input {
   resize: vertical;
   min-height: 100px;

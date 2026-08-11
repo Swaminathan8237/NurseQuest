@@ -65,6 +65,9 @@ async function uploadObject(objectPath, buffer, opts = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw new Error('uploadObject: a non-empty Buffer is required.');
   }
+  if (objectPath.includes('..')) {
+    throw new Error('Invalid object path.');
+  }
   const { error } = await getClient().storage
     .from(BUCKET)
     .upload(objectPath, buffer, {

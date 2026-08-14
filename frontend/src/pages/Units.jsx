@@ -4,35 +4,48 @@ import { quizAPI } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import SectionSideCanvas from '../components/SectionSideCanvas';
+import LevelPath from '../components/LevelPath';
+import { dedupeUnitQuizzes } from '../utils/unitQuizzes';
 import { PASS_PERCENT } from '../constants';
 
-const UNIT_ICONS = {
-  1: 'health_and_safety',
-  2: 'masks',
-  3: 'clean_hands',
-  4: 'sanitizer',
-  5: 'science',
-  6: 'delete_outline',
-  7: 'medication',
-  8: 'bar_chart',
-  9: 'star',
-  10: 'rule',
-  11: 'badge',
+// ── Mobile climb-scene tuning ────────────────────────────────────────────────
+// The phone hero pins just under the floating navbar (fixed top-0 + mt-2 + py-2.5
+// around a 36px logo ≈ 64px tall), so 80px clears it with a little breathing room.
+const MOBILE_PIN_TOP = 80;
+// The frames are 720×405 (16:9) with the nurse climbing left→right; measured against
+// the assets she occupies x-fraction 0.52→1.0 of the frame. SectionSideCanvas does a
+// right-anchored contain-fit, so the visible slice is boxW / (boxH × 16/9) — meaning
+// the BOX ASPECT RATIO alone decides how much of her is on screen. 0.94 reveals the
+// rightmost ~53% (matches the approved preview and comfortably covers 0.52→1.0);
+// a tall `h-full` box would drop to ~29% and crop her out entirely.
+const MOBILE_CANVAS_ASPECT = 0.94;
+// The stage stays pinned for the WHOLE level list (it rides along with the reader,
+// like the desktop fixed panel), so it has to be compact enough that the cards still
+// own most of the screen. The canvas fills the stage edge to edge — there is no
+// separate caption band, so no reserved empty space.
+const MOBILE_BOX_H = 'clamp(180px, 27vh, 240px)';
+const MOBILE_BOX_W = `min(84vw, calc(${MOBILE_BOX_H} * ${MOBILE_CANVAS_ASPECT}))`;
+// The caption sits on the frame's own sky, but on the last few frames she tops out
+// and her raised arm reaches it. A white scrim over the art would keep the text
+// readable at the cost of bleaching her head, so the contrast lives on the glyphs
+// instead: a white halo per letter, which leaves every pixel of the art untouched.
+const CAPTION_HALO = {
+  textShadow:
+    '0 0 5px rgba(255,255,255,0.98), 0 0 10px rgba(255,255,255,0.95), 0 0 18px rgba(255,255,255,0.85)',
 };
-
-const UNIT_COLORS = {
-  1: '#7C3AED',
-  2: '#0284C7',
-  3: '#059669',
-  4: '#D97706',
-  5: '#DC2626',
-  6: '#4F46E5',
-  7: '#0D9488',
-  8: '#C026D3',
-  9: '#E11D48',
-  10: '#2563EB',
-  11: '#7C3AED',
-};
+// Lite-48: sample 48 of the 142 WebP frames (~3× less data than desktop) and map
+// each onto its real file. Defined at module scope so its identity is stable —
+// SectionSideCanvas keys its preload effect on getFramePath, and an inline arrow
+// would re-trigger a full 48-image reload on every render.
+// The trail is roughly half as tall as the card timeline it replaced, so the climb
+// now plays out over half the scroll distance. 96 keeps the frame-to-frame delta
+// where it was at 48 over the old, longer page (~450KB at ~4.7KB/frame, still well
+// under the desktop panel's full 142).
+const MOBILE_FRAMES = 96;
+const mobileFramePath = (index) =>
+  `/section_frames/frame_${String(
+    Math.round((index / (MOBILE_FRAMES - 1)) * 141) + 1
+  ).padStart(4, '0')}.webp`;
 
 export default function Units() {
   const { user } = useAuth();
@@ -40,31 +53,31 @@ export default function Units() {
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const sectionRef = useRef(null);
+  // Scroll runway for the mobile pinned climb-scene; drives scene-scoped progress.
+  const sceneRef = useRef(null);
+
+  // Mount exactly one canvas per viewport: the desktop side panel above `lg`,
+  // the climb-scene below it. 1024px matches the panel's own `lg` cutoff.
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   useEffect(() => {
     quizAPI.getAll()
       .then((data) => {
-        // Keep unit-based quizzes (unit 1 to 15). A unit must appear exactly
-        // once in the learning path, so if the API returns more than one quiz
-        // for the same unit (e.g. a real assessment plus leftover demo data),
-        // collapse to a single quiz per unit — preferring the one with more
-        // questions, then the one that has attempt history.
-        const scoreOf = (q) =>
-          (q.totalQuestions || q.question_count || 0) * 1000 +
-          (q.lastAttempt ? 1 : 0);
-
-        const byUnit = new Map();
-        for (const q of data) {
-          if (!(q.unit >= 1 && q.unit <= 15)) continue;
-          const existing = byUnit.get(q.unit);
-          if (!existing || scoreOf(q) > scoreOf(existing)) {
-            byUnit.set(q.unit, q);
-          }
-        }
-
-        const unitQuizzes = Array.from(byUnit.values())
-          .sort((a, b) => a.unit - b.unit);
-        setQuizzes(unitQuizzes);
+        // Collapse to one quiz per unit — shared with the dashboard so both
+        // pages agree on the path (see utils/unitQuizzes).
+        setQuizzes(dedupeUnitQuizzes(data));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -88,7 +101,11 @@ export default function Units() {
   const progressPercent = totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0;
 
   return (
-    <div className="min-h-screen pb-24 font-body relative overflow-x-hidden bg-[#f2f2f2] text-slate-900">
+    // overflow-x-*clip* (not hidden): `hidden` computes overflow-y to `auto`, which
+    // turns this div into a scroll container and silently breaks `position: sticky`
+    // for the mobile climb-scene below. `clip` suppresses horizontal overflow the
+    // same way while leaving overflow-y `visible`, so sticky keeps working.
+    <div className="min-h-screen pb-24 font-body relative overflow-x-clip bg-[#f2f2f2] text-slate-900">
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-6 flex flex-col gap-8 pb-12 animate-slideUp relative z-10" style={{ paddingTop: '100px' }}>
@@ -132,213 +149,130 @@ export default function Units() {
           </div>
         </section>
 
-        {/* Units Timeline / Grid */}
-        <section ref={sectionRef} className="space-y-6">
-          <h2 className="text-2xl font-headline font-black text-slate-900 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-3xl">view_timeline</span> Learning Levels
-          </h2>
-
-          {quizzes.length === 0 ? (
-            <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center text-slate-500 shadow-sm">
-              <span className="material-symbols-outlined text-5xl mb-3 opacity-40">inventory_2</span>
-              <p className="text-lg font-semibold">No level quizzes imported yet. Please contact your instructor.</p>
+        {/* ── Mobile climb-scene (below lg only) ──────────────────────────────
+            Mirrors what the desktop fixed panel does: the hero rides ALONG with the
+            reader for the whole level list. The stage pins under the navbar as the
+            header scrolls away and stays pinned all the way down the list, the nurse
+            climbing frame-by-frame with each level you pass, topping out on the last
+            card. The canvas fills the stage edge to edge and the caption is overlaid
+            on the frame's own empty sky, so no band of dead space is ever reserved. */}
+        {isMobile && prefersReducedMotion && (
+          // Reduce-motion: one static hero in normal flow — nothing pinned, nothing
+          // redrawn on scroll.
+          <div
+            className="relative rounded-[28px] overflow-hidden border border-primary/15 shadow-lg bg-white flex items-end justify-center"
+            style={{
+              height: MOBILE_BOX_H,
+              backgroundImage: 'radial-gradient(120% 128% at 50% 122%, rgba(124,58,237,0.16), rgba(0,229,255,0.09) 44%, rgba(255,255,255,0.92) 76%)',
+            }}
+          >
+            <div className="absolute inset-x-0 top-3.5 text-center px-4 z-10 pointer-events-none">
+              <p className="font-headline font-black text-[13px] text-slate-900" style={CAPTION_HALO}>Your climb to graduation</p>
+              <p className="font-headline text-[10.5px] font-extrabold uppercase tracking-wider text-slate-600 mt-0.5" style={CAPTION_HALO}>
+                {completedUnits} / {totalUnits} Levels cleared
+              </p>
             </div>
-          ) : (
-            <div className="flex flex-col lg:flex-row gap-8 items-start relative">
-              {/* Left Column (Timeline) */}
-              <div className="flex-1 w-full lg:max-w-[660px] xl:max-w-[760px] py-4 px-2 relative">
-                
-                {/* START NODE */}
-                <div className="flex gap-6 md:gap-8 items-stretch">
-                  <div className="flex flex-col items-center">
-                    <div className="w-12 h-12 rounded-full bg-white shadow-lg border-2 border-primary flex items-center justify-center text-primary flex-shrink-0">
-                      <span className="material-symbols-outlined text-xl font-black">flag</span>
-                    </div>
-                    <div className="w-[4px] flex-1 my-2 bg-gradient-to-b from-primary to-primary rounded-full min-h-[40px]" />
-                  </div>
-                  <div className="flex-1 pb-8 animate-slideUp">
-                    <div className="bg-white border border-slate-200 shadow-md rounded-2xl p-5 max-w-md">
-                      <h3 className="font-headline font-black text-lg text-slate-900">Path Start</h3>
-                      <p className="text-xs text-slate-600 font-medium mt-1 whitespace-normal">Begin your clinical journey here.</p>
-                    </div>
-                  </div>
-                </div>
+            <div style={{ width: MOBILE_BOX_W, height: MOBILE_BOX_H }}>
+              <SectionSideCanvas totalFrames={MOBILE_FRAMES} getFramePath={mobileFramePath} />
+            </div>
+          </div>
+        )}
 
-                {/* QUIZZES */}
-                {quizzes.map((quiz, i) => {
-                  const icon = UNIT_ICONS[quiz.unit] || 'school';
-                  const color = UNIT_COLORS[quiz.unit] || '#7C3AED';
-                  const lastAttempt = quiz.lastAttempt;
-                  
-                  // Calculate scorePercent using bestScorePercent (which is out of 100)
-                  const scorePercent = quiz.bestScorePercent !== undefined ? Math.round(quiz.bestScorePercent) : null;
-                  
-                  // Lock/Unlock Logic: Teacher bypasses, the first available unit is always unlocked, Unit N is unlocked if N-1 bestScorePercent >= PASS_PERCENT
-                  let isUnlocked = false;
-                  if (user?.role === 'teacher') {
-                    isUnlocked = true;
-                  } else if (i === 0) {
-                    isUnlocked = true;
-                  } else {
-                    const prevQuiz = quizzes[i - 1];
-                    if (prevQuiz && prevQuiz.bestScorePercent >= PASS_PERCENT) {
-                      isUnlocked = true;
-                    }
-                  }
+        {/* The scene spans the hero AND the level list, so the pinned stage travels
+            with the list and the climb maps onto it. On desktop this is an inert
+            wrapper — the section inside is unchanged. */}
+        <div ref={sceneRef} className="relative">
+          {isMobile && !prefersReducedMotion && (
+            // The pinned wrapper is a full-bleed band in the page colour (-mx-6 px-6),
+            // so cards scrolling up disappear into it a little before they reach the
+            // hero's rounded edge instead of being sliced mid-glyph against it.
+            // top 64 + pt-4 puts the hero's own top at MOBILE_PIN_TOP (80).
+            <div className="sticky z-30 -mx-6 px-6 pt-4 pb-4 mb-4 bg-[#f2f2f2]" style={{ top: '64px' }}>
+            <div
+              className="relative rounded-[28px] overflow-hidden border border-primary/15 shadow-[0_18px_42px_rgba(2,6,23,0.12)] bg-white flex items-end justify-center"
+              style={{
+                height: MOBILE_BOX_H,
+                backgroundImage:
+                  'radial-gradient(120% 128% at 50% 122%, rgba(124,58,237,0.16), rgba(0,229,255,0.09) 44%, rgba(255,255,255,0.92) 76%)',
+              }}
+            >
+              {/* Caption overlays the empty upper part of the frame — it costs no height.
+                  Contrast comes from a per-glyph white halo (CAPTION_HALO) rather than a
+                  scrim, so when she tops out into this band she stays fully drawn. */}
+              <div className="absolute inset-x-0 top-3.5 text-center px-4 z-10 pointer-events-none">
+                <p className="font-headline font-black text-[13px] text-slate-900" style={CAPTION_HALO}>Your climb to graduation</p>
+                <p className="font-headline text-[10.5px] font-extrabold uppercase tracking-wider text-slate-600 mt-0.5" style={CAPTION_HALO}>
+                  {completedUnits} / {totalUnits} Levels cleared
+                </p>
+              </div>
 
-                  let status = 'NOT_STARTED'; // 'LOCKED', 'NOT_STARTED', 'IN_PROGRESS', 'PASSED'
-                  if (!isUnlocked) {
-                    status = 'LOCKED';
-                  } else if (scorePercent >= PASS_PERCENT) {
-                    status = 'PASSED';
-                  } else if (lastAttempt) {
-                    status = 'IN_PROGRESS';
-                  } else {
-                    status = 'NOT_STARTED';
-                  }
+              {/* Soft floor line so she reads as standing on something */}
+              <div
+                className="absolute left-6 right-6 bottom-3 h-[2px] rounded-full pointer-events-none"
+                style={{ background: 'linear-gradient(90deg, rgba(124,58,237,0), rgba(124,58,237,0.28) 50%, rgba(124,58,237,0))' }}
+              />
 
-                  // Check if the next unit is unlocked to color the connector
-                  const nextQuiz = quizzes[i + 1];
-                  let nextUnlocked = false;
-                  if (nextQuiz) {
-                    if (user?.role === 'teacher') {
-                      nextUnlocked = true;
-                    } else {
-                      if (quiz.bestScorePercent >= PASS_PERCENT) {
-                        nextUnlocked = true;
-                      }
-                    }
-                  }
-
-                  return (
-                    <div key={quiz.id} className="flex gap-6 md:gap-8 items-stretch group">
-                      {/* Left Column (Timeline Track) */}
-                      <div className="flex flex-col items-center">
-                        {/* Node Circle */}
-                        <div 
-                          className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 bg-white border-2 ${
-                            status === 'LOCKED'
-                              ? 'text-slate-400 border-slate-300 shadow-sm'
-                              : 'text-primary shadow-md border-primary group-hover:scale-110'
-                          }`}
-                          style={status !== 'LOCKED' ? { borderColor: color, color: color } : {}}
-                        >
-                          {status === 'LOCKED' ? (
-                            <span className="material-symbols-outlined text-sm">lock</span>
-                          ) : (
-                            <span className="font-mono text-sm font-black">{quiz.unit}</span>
-                          )}
-                        </div>
-
-                        {/* Connector Line */}
-                        <div className={`w-[4px] flex-1 my-2 rounded-full transition-all duration-300 ${
-                          nextUnlocked
-                            ? 'bg-gradient-to-b from-primary to-emerald-400'
-                            : 'bg-slate-200 border-l border-dashed border-slate-300'
-                        }`} style={{ minHeight: '60px' }} />
-                      </div>
-
-                      {/* Right Column (Card) */}
-                      <div className="flex-1 pb-8 animate-slideUp" style={{ animationDelay: `${i * 0.05}s` }}>
-                        <div className={`bg-white border-2 rounded-3xl p-6 md:p-8 transition-all duration-300 relative overflow-hidden ${
-                          status === 'LOCKED'
-                            ? 'bg-slate-50 border-slate-200 opacity-75 shadow-sm'
-                            : 'border-slate-200/90 shadow-lg hover:border-primary/50 hover:shadow-2xl'
-                        }`}>
-                          
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="flex items-start gap-4">
-                              <div 
-                                className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 border ${
-                                  status === 'LOCKED' ? 'bg-slate-200 border-slate-300 text-slate-500' : 'bg-slate-100 border-slate-200 text-primary'
-                                }`}
-                                style={status !== 'LOCKED' ? { color: color } : {}}
-                              >
-                                <span className="material-symbols-outlined text-2xl">{icon}</span>
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-xs font-headline font-black uppercase tracking-wider text-slate-500">
-                                    Level {String(quiz.unit).padStart(2, '0')}
-                                  </span>
-                                  <span className="text-slate-300">•</span>
-                                  <span className="text-xs font-body font-semibold text-slate-500">
-                                    {quiz.totalQuestions || 15} Questions
-                                  </span>
-                                </div>
-                                <h3 className="font-headline font-extrabold text-xl md:text-2xl text-slate-900 leading-tight">
-                                  {quiz.title}
-                                </h3>
-                                <p className="font-body text-slate-600 text-sm font-medium mt-1 leading-relaxed max-w-xl">
-                                  {quiz.description || `15-question assessment covering ${quiz.title}`}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Action Button & Status */}
-                            <div className="flex flex-col sm:flex-row md:flex-col items-start md:items-end justify-between gap-3 shrink-0 pt-4 md:pt-0 border-t md:border-t-0 border-slate-100">
-                              {status === 'LOCKED' ? (
-                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-200 text-slate-500 text-xs font-bold font-headline">
-                                  <span className="material-symbols-outlined text-sm">lock</span>
-                                  <span>Locked</span>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => navigate(`/quiz/${quiz.id}`)}
-                                  className="w-full sm:w-auto bg-gradient-to-r from-[#7C3AED] to-[#00E5FF] hover:from-[#6D28D9] hover:to-[#00B4D8] text-white font-headline font-black px-6 py-2.5 rounded-xl shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-wider"
-                                >
-                                  <span>{status === 'PASSED' ? 'Retry Level' : status === 'IN_PROGRESS' ? 'Continue' : 'Start Level'}</span>
-                                  <span className="material-symbols-outlined text-base">play_arrow</span>
-                                </button>
-                              )}
-
-                              {scorePercent !== null && (
-                                <div className={`text-xs font-bold font-headline px-3 py-1 rounded-lg ${
-                                  scorePercent >= PASS_PERCENT ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
-                                }`}>
-                                  Best Score: {scorePercent}% {scorePercent >= PASS_PERCENT ? '✓' : ''}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-              {/* END NODE */}
-              <div className="flex gap-6 md:gap-8 items-stretch">
-                <div className="flex flex-col items-center">
-                  <div className={`w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center flex-shrink-0 ${
-                    quizzes[quizzes.length - 1]?.bestScorePercent >= PASS_PERCENT
-                      ? 'text-amber-500 border-2 border-amber-400'
-                      : 'text-slate-400 border-2 border-slate-300'
-                  }`}>
-                    <span className="material-symbols-outlined text-xl font-black">emoji_events</span>
-                  </div>
-                </div>
-                  <div className="flex-1 animate-slideUp" style={{ animationDelay: `${quizzes.length * 0.05}s` }}>
-                    <div className={`bg-white border border-slate-200 shadow-md rounded-2xl p-5 max-w-md ${
-                      quizzes[quizzes.length - 1]?.bestScorePercent >= PASS_PERCENT
-                        ? 'opacity-100'
-                        : 'opacity-60'
-                    }`}>
-                      <h3 className="font-headline font-black text-lg text-slate-900">Path Complete</h3>
-                      <p className="text-xs text-slate-600 font-medium mt-1 whitespace-normal">Graduate from clinical training!</p>
-                    </div>
-                  </div>
-                </div>
+              {/* Centering box: the frames are right-anchored, so this centered box
+                  lands the nurse in the middle of the stage. Its ratio (not its
+                  height) is what keeps her in frame — see MOBILE_CANVAS_ASPECT. */}
+              <div style={{ width: MOBILE_BOX_W, height: MOBILE_BOX_H }}>
+                <SectionSideCanvas
+                  sceneRef={sceneRef}
+                  pinTop={MOBILE_PIN_TOP}
+                  totalFrames={MOBILE_FRAMES}
+                  getFramePath={mobileFramePath}
+                />
               </div>
             </div>
+            </div>
           )}
-        </section>
+
+          {/* ── Learning Levels ─────────────────────────────────────────────
+              The level list is a climbing trail: one stepping stone per level,
+              alternating either side of a centre line and joined by a dotted
+              track, echoing the nurse's climb in the animation beside it. Tapping
+              a stone opens its detail sheet (description, best score, action).
+              Same trail at every width — see LevelPath. */}
+          <section ref={sectionRef} className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-2xl font-headline font-black text-slate-900 flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-3xl">stairs</span> Learning Levels
+              </h2>
+              <p className="font-headline text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                Tap a stone to open the level
+              </p>
+            </div>
+
+            {quizzes.length === 0 ? (
+              <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center text-slate-500 shadow-sm">
+                <span className="material-symbols-outlined text-5xl mb-3 opacity-40">inventory_2</span>
+                <p className="text-lg font-semibold">No level quizzes imported yet. Please contact your instructor.</p>
+              </div>
+            ) : (
+              // Kept inside the same left-hand column the timeline used, so on
+              // desktop the trail never runs under the fixed nurse panel.
+              <div className="w-full lg:max-w-[660px] xl:max-w-[760px] px-2 pt-6 pb-2">
+                <LevelPath
+                  quizzes={quizzes}
+                  isTeacher={user?.role === 'teacher'}
+                  compact={isMobile}
+                  reducedMotion={prefersReducedMotion}
+                  onOpenQuiz={(id) => navigate(`/quiz/${id}`)}
+                />
+              </div>
+            )}
+          </section>
+        </div>
       </main>
 
       {/* Fixed Position Animation Canvas — stays locked in fixed position on screen throughout scroll */}
-      <div className="hidden lg:block fixed top-28 right-6 xl:right-[max(1.5rem,calc((100vw-1280px)/2+1.5rem))] w-[380px] xl:w-[440px] h-[550px] pointer-events-none z-20">
-        <SectionSideCanvas sectionRef={sectionRef} totalFrames={142} />
-      </div>
+      {/* Gated on !isMobile so phones don't preload 142 frames for a panel `hidden lg:block`
+          already hides; on desktop this renders exactly as before. */}
+      {!isMobile && (
+        <div className="hidden lg:block fixed top-28 right-6 xl:right-[max(1.5rem,calc((100vw-1280px)/2+1.5rem))] w-[380px] xl:w-[440px] h-[550px] pointer-events-none z-20">
+          <SectionSideCanvas sectionRef={sectionRef} totalFrames={142} />
+        </div>
+      )}
     </div>
   );
 }

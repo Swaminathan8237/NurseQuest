@@ -530,8 +530,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
       }
     }
 
-    // Enforce lock validation for students on Unit-Based learning path
-    if (req.user.role === 'student' && quiz.unit && quiz.unit > 1 && quiz.unit <= 11) {
+    // Enforce lock validation for students on Unit-Based learning path (Level 1 and Level 2 are open to all)
+    if (req.user.role === 'student' && quiz.unit && quiz.unit > 2 && quiz.unit <= 11) {
       const prevQuizzes = await sql`
         SELECT id, unit FROM quizzes WHERE unit < ${quiz.unit} AND is_published = 1 ORDER BY unit DESC LIMIT 1
       `;

@@ -27,6 +27,10 @@
   --primary-light: #A78BFA;
   --primary-dark: #5B21B6;
   --primary-glow: rgba(124, 58, 237, 0.30);
+  /* Purple for small accent TEXT sitting on a card surface. --primary itself is tuned
+     as a fill and only reaches 3.9:1 on the dark card, so links like "View all" need a
+     lighter purple there. Identical to --primary in light; overridden in the dark block. */
+  --primary-on-surface: #7C3AED;
 
   /* Secondary = gold */
   --secondary: #FFD43B;
@@ -44,6 +48,14 @@
   --accent-sky-shadow: #2B7CC4;
   --accent-violet: #7C3AED;
   --accent-violet-shadow: #4A1D96;
+  /* Text-safe versions of the accents above. The accent colours are tuned as FILLS —
+     as small text on a card they land at 1.8-2.6:1. These are the same hues darkened
+     to clear 4.5:1 on a light surface, for pass/fail percentages and XP figures.
+     The dark theme overrides them back to the bright originals, which already pass
+     against the dark surface. */
+  --accent-green-text: #067647;
+  --accent-gold-text: #8A6A00;
+  --accent-coral-text: #B4322D;
   /* Legacy aliases (kept so existing pages don't break) */
   --accent-indigo: #6366F1;
   --accent-emerald: #12B76A;
@@ -69,9 +81,28 @@
   --bg-hover: #F4ECFF;
   --bg-input: #FFFFFF;
 
+  /* The panel the dashboard nurse stands on. It has to stay light whatever the
+     theme, because she is dark line art composited with mix-blend-multiply —
+     multiply against a dark backdrop renders her solid black. On white cards it
+     is invisible; the dark override below is what stops it reading as a pasted
+     white sticker. */
+  --climb-plate: #F6F3FF;
+  --climb-plate-wash:
+    radial-gradient(120% 128% at 50% 122%, rgba(124, 58, 237, 0.16), rgba(0, 229, 255, 0.09) 44%, rgba(255, 255, 255, 0.96) 76%);
+
+  /* Practice-streak calendar. --streak-band is the pale pill drawn behind a run of
+     consecutive practised days; --streak-band-text is the numeral sitting on it.
+     The band is deliberately quiet against the card (~1.28:1) — it is a grouping
+     device, not a data point — while the numeral on it clears AA at 4.8:1. */
+  --streak-band: #FFDCCF;
+  --streak-band-text: #B4322D;
+
   --text-primary: #1A1626;
   --text-secondary: #5A5470;
-  --text-muted: #8B84A3;
+  /* Was #8B84A3, which is 3.5:1 on white — under AA for the 10-12px eyebrows and
+     axis labels this token is mostly used for. #6F6889 is 5.2:1 and still reads a
+     clear step lighter than --text-secondary (7.2:1). */
+  --text-muted: #6F6889;
   --text-inverse: #FFFFFF;
 
   /* Borders */
@@ -143,6 +174,14 @@ html.dark,
 html[data-theme="dark"] {
   --primary: #8B5CF6;
   --primary-dark: #6D28D9;
+  /* 6.0:1 on --bg-surface, vs 3.9:1 for --primary */
+  --primary-on-surface: #A78BFA;
+
+  /* On the dark surface the bright accents already clear AA, so the text-safe
+     variants revert to them — darkened greens/golds would be the unreadable ones here. */
+  --accent-green-text: #32D583;
+  --accent-gold-text: #FFD43B;
+  --accent-coral-text: #FF8A8A;
 
   --ink: #0B0912;
   --bg-base: #151221;
@@ -152,9 +191,25 @@ html[data-theme="dark"] {
   --bg-hover: #372E5C;
   --bg-input: #1B1730;
 
+  /* Still light — multiply demands it — but dropped from 14.9:1 against the card
+     to roughly 5:1, and the wash keeps its violet without bleaching back to
+     white. Paired with the mask on the panel itself, it reads as a lit alcove
+     rather than a white rectangle. */
+  --climb-plate: #948BB8;
+  --climb-plate-wash:
+    radial-gradient(120% 128% at 50% 122%, rgba(167, 139, 250, 0.30), rgba(0, 229, 255, 0.10) 46%, rgba(255, 255, 255, 0.10) 78%);
+
+  /* A deep, desaturated coral: reads as a band on the #211C36 card without
+     glowing the way the light theme's peach would. The numeral reverts to the
+     bright coral, which clears AA against it. */
+  --streak-band: #4A2E3A;
+  --streak-band-text: #FF8A8A;
+
   --text-primary: #F3EEFF;
   --text-secondary: #B9B2D0;
-  --text-muted: #7E77A0;
+  /* Was #7E77A0 (3.9:1 on --bg-surface); #948DB0 is 5.2:1 and stays a step below
+     --text-secondary, mirroring the light-theme adjustment. */
+  --text-muted: #948DB0;
   --text-inverse: #151221;
 
   --border: rgba(255, 255, 255, 0.10);
@@ -506,7 +561,11 @@ textarea.input {
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.02em;
-  color: var(--ink);
+  /* --text-primary, not --ink: both are #1A1626 in light (so light is unchanged),
+     but in dark --ink stays near-black while --bg-surface goes dark too, which
+     rendered badge labels at 1.2:1 — effectively invisible. The coloured variants
+     below set their own fg on their own fill, so they are unaffected. */
+  color: var(--text-primary);
   background: var(--bg-surface);
 }
 

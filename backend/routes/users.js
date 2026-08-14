@@ -5,6 +5,21 @@ const { getLevelInfo, PASS_PERCENT } = require('../utils/scoring');
 
 const router = express.Router();
 
+// A Postgres DATE -> a plain 'YYYY-MM-DD' string, read in the server's own timezone.
+// Never hand the client a raw Date: it would be re-parsed as UTC midnight and could slide
+// a day backwards for anyone west of Greenwich, which for a streak calendar means lighting
+// the wrong square. Returns null for anything unparseable so callers can drop it.
+function toDateString(value) {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
 // Get all students (teacher only)
 router.get('/students', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
@@ -156,7 +171,24 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
 
       res.json(stats);
     } else {
-      const users = await db`SELECT * FROM users WHERE id = ${req.user.id}`;
+      // streak_alive answers "is the daily play streak still running?" — the last play was
+      // today or yesterday. Yesterday still counts, because the student has the rest of today
+      // to continue it; anything older means a whole day was missed and the run is over.
+      // This has to be decided here on READ: current_streak is only ever written on quiz
+      // submit (routes/scores.js), so nothing at all runs while a student is away, and the
+      // column sits frozen at its last value. Compared in SQL against CURRENT_DATE, matching
+      // that same bookkeeping — doing it in Node would use the Node process timezone instead
+      // of the database's. Emitted as 1/0 rather than a boolean, matching the integer flags
+      // this file already reads (is_published = 1) and sidestepping how the driver happens to
+      // marshal bools. NULL (never played) fails the comparison and falls to ELSE 0, so a
+      // brand-new student reads as not alive; the 2-day floor below then keeps them out of
+      // the "you broke your streak" prompt, so they are never mourned a streak they never had.
+      const users = await db`
+        SELECT *,
+               CASE WHEN last_played_date >= CURRENT_DATE - 1 THEN 1 ELSE 0 END AS streak_alive
+        FROM users
+        WHERE id = ${req.user.id}
+      `;
       const user = users[0];
 
       const quizzesTakenResult = await db`
@@ -212,6 +244,33 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
         ORDER BY user_achievements.earned_at DESC
       `;
 
+      // Distinct days this student actually practised, for the streak calendar.
+      // Cast to ::date (server-local) so it lines up with the current_streak
+      // bookkeeping in routes/scores.js, which compares against CURRENT_DATE.
+      // Bounded to roughly four months so the payload stays small.
+      const practiceDaysResult = await db`
+        SELECT DISTINCT completed_at::date AS day
+        FROM quiz_attempts
+        WHERE user_id = ${req.user.id}
+          AND completed_at >= CURRENT_DATE - INTERVAL '120 days'
+        ORDER BY day
+      `;
+
+      // Emit as plain YYYY-MM-DD strings (see toDateString above).
+      const practiceDays = practiceDaysResult
+        .map((r) => toDateString(r.day))
+        .filter(Boolean);
+
+      // The daily streak as the student should actually see it. Alive -> the stored count;
+      // dead -> 0, which is what "a gap resets the streak" means from their side, without
+      // touching the write path (after a gap, the next submit correctly counts as day one).
+      const streakAlive = parseInt(user.streak_alive || 0, 10) === 1;
+      const storedStreak = parseInt(user.current_streak || 0, 10);
+      const dailyStreak = streakAlive ? storedStreak : 0;
+      // The run that just died, for the copy in the entry prompt — 0 while the streak lives.
+      const lostStreak = streakAlive ? 0 : storedStreak;
+      const lastPlayedDate = toDateString(user.last_played_date);
+
       const stats = {
         xp: parseInt(user.xp || 0, 10),
         level: parseInt(user.level || 1, 10),
@@ -224,11 +283,22 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
         // Average seconds per attempt (Average Time card)
         avgTime: parseFloat(avgTimeResult[0].avg || 0),
         // Duolingo-style consecutive-days-played streak. Distinct from `streak`/`bestStreak`
-        // above, which are consecutive-correct-ANSWER streaks.
-        dailyStreak: parseInt(user.current_streak || 0, 10),
+        // above, which are consecutive-correct-ANSWER streaks. Reads 0 once a day has been
+        // missed, so an abandoned run is never displayed as if it were still burning.
+        dailyStreak,
         longestStreak: parseInt(user.longest_streak || 0, 10),
+        // The streak that was lost, and whether it is worth interrupting the student for.
+        // Floor of 2: a single isolated day is not a run worth mourning, and it keeps the
+        // prompt away from students whose last_played_date is NULL (never played).
+        lostStreak,
+        streakBroken: lostStreak >= 2,
+        // Which break this is, so the client can show the prompt once per break rather than
+        // once per visit. Null until the student has played at all.
+        lastPlayedDate,
         // Real count of units the student has passed (0..number of published units).
         unitsPassed: parseInt(unitsPassedResult[0].units_passed || 0, 10),
+        // YYYY-MM-DD days with at least one completed attempt (streak calendar).
+        practiceDays,
         recentAttempts,
         achievements
       };

@@ -265,7 +265,11 @@ router.post('/submit', authenticateToken, async (req, res) => {
       //   no previous play      -> 1
       //   already played today  -> unchanged
       //   played yesterday      -> +1  (continued)
-      //   gap of 2+ days        -> 1   (reset)
+      //   gap of 2+ days        -> 1   (reset — i.e. one or more whole days were missed)
+      // The reset lands on 1 rather than 0 because THIS submission is day one of the new run;
+      // starting at 0 would leave the count trailing a day behind forever. The 0 a student
+      // sees after a lapse is produced on READ instead (streak_alive in routes/users.js) —
+      // nothing runs here while nobody is playing, so the column cannot zero itself.
       await tx`
         UPDATE users
         SET xp = ${masteryXp},

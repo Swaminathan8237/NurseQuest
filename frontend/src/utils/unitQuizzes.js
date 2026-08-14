@@ -58,8 +58,8 @@ export function levelStates(unitQuizzes = [], { isTeacher = false } = {}) {
 
     const unlocked =
       isTeacher ||
+      quiz.is_override_unlocked ||
       i === 0 ||
-      quiz.unit === 2 ||
       (unitQuizzes[i - 1] && unitQuizzes[i - 1].bestScorePercent >= PASS_PERCENT) ||
       false;
 

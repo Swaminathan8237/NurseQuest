@@ -309,6 +309,100 @@ router.get('/unit-quizzes', authenticateToken, requireAdmin, async (req, res) =>
   }
 });
 
+// Admin: Get access override rules for all units
+router.get('/units/access', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const sql = getDB();
+    const rows = await sql`
+      SELECT uo.id, uo.unit, uo.user_id, uo.created_at,
+             u.name AS student_name, u.email AS student_email
+      FROM unit_unlock_overrides uo
+      LEFT JOIN users u ON uo.user_id = u.id
+      ORDER BY uo.unit ASC, u.name ASC
+    `;
+
+    const accessMap = {};
+    for (let i = 1; i <= 15; i++) {
+      accessMap[i] = {
+        unit: i,
+        mode: 'default',
+        unlockedForAll: false,
+        students: []
+      };
+    }
+
+    rows.forEach(r => {
+      const uNum = parseInt(r.unit, 10);
+      if (!accessMap[uNum]) return;
+      if (r.user_id === null) {
+        accessMap[uNum].mode = 'all';
+        accessMap[uNum].unlockedForAll = true;
+      } else {
+        accessMap[uNum].mode = 'selective';
+        accessMap[uNum].students.push({
+          id: r.user_id,
+          name: r.student_name || 'Unknown Student',
+          email: r.student_email || ''
+        });
+      }
+    });
+
+    res.json(Object.values(accessMap));
+  } catch (err) {
+    console.error('Admin get unit access error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Admin: Update access override rules for a specific unit
+router.post('/units/:unit/access', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const unitVal = parseInt(req.params.unit, 10);
+    if (!Number.isInteger(unitVal) || unitVal < 1 || unitVal > 15) {
+      return res.status(400).json({ error: 'Unit must be an integer between 1 and 15' });
+    }
+
+    const { mode, studentIds } = req.body;
+    if (!['default', 'all', 'selective'].includes(mode)) {
+      return res.status(400).json({ error: "Mode must be 'default', 'all', or 'selective'" });
+    }
+
+    if (mode === 'selective') {
+      if (!Array.isArray(studentIds) || studentIds.length === 0) {
+        return res.status(400).json({ error: 'studentIds must be a non-empty array of student IDs' });
+      }
+    }
+
+    const sql = getDB();
+    await sql.begin(async (tx) => {
+      // Delete existing overrides for this unit
+      await tx`DELETE FROM unit_unlock_overrides WHERE unit = ${unitVal}`;
+
+      if (mode === 'all') {
+        await tx`
+          INSERT INTO unit_unlock_overrides (id, unit, user_id, created_by)
+          VALUES (${uuidv4()}, ${unitVal}, NULL, ${req.user.id})
+        `;
+      } else if (mode === 'selective') {
+        for (const sId of studentIds) {
+          if (typeof sId === 'string' && sId.trim()) {
+            await tx`
+              INSERT INTO unit_unlock_overrides (id, unit, user_id, created_by)
+              VALUES (${uuidv4()}, ${unitVal}, ${sId.trim()}, ${req.user.id})
+              ON CONFLICT DO NOTHING
+            `;
+          }
+        }
+      }
+    });
+
+    res.json({ message: `Access for Unit ${unitVal} updated successfully`, unit: unitVal, mode });
+  } catch (err) {
+    console.error('Admin update unit access error:', err);
+    res.status(500).json({ error: 'Failed to update unit access' });
+  }
+});
+
 
 /* ==========================================================================
    4. DEVELOPMENTS & ANALYTICS (Admin Only)

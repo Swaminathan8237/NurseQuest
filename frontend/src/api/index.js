@@ -163,8 +163,10 @@ export const adminAPI = {
   // retention, Knowledge Score + classification, and badges. `expectedMinutes` optionally
   // overrides the per-unit time budget used by the Speed Score.
   getStudentReport: (id, expectedMinutes) => request(`/admin/students/${id}/report${expectedMinutes ? `?expectedMinutes=${expectedMinutes}` : ''}`),
-  // Unit quiz management
+  // Unit quiz & access management
   getUnitQuizzes: () => request('/admin/unit-quizzes'),
+  getUnitAccess: () => request('/admin/units/access'),
+  updateUnitAccess: (unit, data) => request(`/admin/units/${unit}/access`, { method: 'POST', body: JSON.stringify(data) }),
 };
 
 export default { authAPI, quizAPI, scoreAPI, userAPI, adminAPI };

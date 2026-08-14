@@ -478,9 +478,19 @@ router.get('/', authenticateToken, async (req, res) => {
       question_count: parseInt(q.question_count || 0, 10)
     }));
 
-    // Add attempt info for students
+    // Add attempt info and unlock overrides for students
     if (req.user.role === 'student') {
+      const unlockedOverrides = await sql`
+        SELECT DISTINCT unit FROM unit_unlock_overrides
+        WHERE user_id = ${req.user.id} OR user_id IS NULL
+      `;
+      const unlockedUnitSet = new Set(unlockedOverrides.map(r => parseInt(r.unit, 10)));
+
       for (const quiz of quizzes) {
+        if (quiz.unit && unlockedUnitSet.has(quiz.unit)) {
+          quiz.is_override_unlocked = true;
+        }
+
         const attemptResult = await sql`
           SELECT score, total_points, correct_count, total_questions, completed_at
           FROM quiz_attempts WHERE quiz_id = ${quiz.id} AND user_id = ${req.user.id}
@@ -530,22 +540,32 @@ router.get('/:id', authenticateToken, async (req, res) => {
       }
     }
 
-    // Enforce lock validation for students on Unit-Based learning path (Level 1 and Level 2 are open to all)
-    if (req.user.role === 'student' && quiz.unit && quiz.unit > 2 && quiz.unit <= 11) {
-      const prevQuizzes = await sql`
-        SELECT id, unit FROM quizzes WHERE unit < ${quiz.unit} AND is_published = 1 ORDER BY unit DESC LIMIT 1
+    // Enforce lock validation for students on Unit-Based learning path (Level 1 is open to all by default)
+    if (req.user.role === 'student' && quiz.unit && quiz.unit > 1 && quiz.unit <= 11) {
+      // Check if this unit is override-unlocked for this student or globally
+      const overrides = await sql`
+        SELECT 1 FROM unit_unlock_overrides
+        WHERE unit = ${quiz.unit} AND (user_id = ${req.user.id} OR user_id IS NULL)
+        LIMIT 1
       `;
-      const prevQuiz = prevQuizzes[0];
-      if (prevQuiz) {
-        // Marks basis (score / total_points), matching bestScorePercent in the list endpoint
-        // and u.bestScorePercent in the admin report, so all three agree on who has passed.
-        const bestAttempts = await sql`
-          SELECT MAX(score * 100.0 / NULLIF(total_points, 0)) AS max_score_pct
-          FROM quiz_attempts WHERE quiz_id = ${prevQuiz.id} AND user_id = ${req.user.id}
+      const isOverrideUnlocked = overrides.length > 0;
+
+      if (!isOverrideUnlocked) {
+        const prevQuizzes = await sql`
+          SELECT id, unit FROM quizzes WHERE unit < ${quiz.unit} AND is_published = 1 ORDER BY unit DESC LIMIT 1
         `;
-        const scorePct = bestAttempts[0] ? parseFloat(bestAttempts[0].max_score_pct || 0) : 0;
-        if (scorePct < PASS_PERCENT) {
-          return res.status(403).json({ error: `Unit ${quiz.unit} is locked. You must score at least ${PASS_PERCENT}% on Unit ${prevQuiz.unit} to unlock.` });
+        const prevQuiz = prevQuizzes[0];
+        if (prevQuiz) {
+          // Marks basis (score / total_points), matching bestScorePercent in the list endpoint
+          // and u.bestScorePercent in the admin report, so all three agree on who has passed.
+          const bestAttempts = await sql`
+            SELECT MAX(score * 100.0 / NULLIF(total_points, 0)) AS max_score_pct
+            FROM quiz_attempts WHERE quiz_id = ${prevQuiz.id} AND user_id = ${req.user.id}
+          `;
+          const scorePct = bestAttempts[0] ? parseFloat(bestAttempts[0].max_score_pct || 0) : 0;
+          if (scorePct < PASS_PERCENT) {
+            return res.status(403).json({ error: `Unit ${quiz.unit} is locked. You must score at least ${PASS_PERCENT}% on Unit ${prevQuiz.unit} to unlock.` });
+          }
         }
       }
     }

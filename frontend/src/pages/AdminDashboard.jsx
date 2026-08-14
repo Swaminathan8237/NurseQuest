@@ -99,6 +99,14 @@ export default function AdminDashboard() {
   const [adminNotes, setAdminNotes] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('none');
 
+  // Unit Access Control state
+  const [unitAccessList, setUnitAccessList] = useState([]);
+  const [accessModal, setAccessModal] = useState(null); // { unit, mode, students }
+  const [modalMode, setModalMode] = useState('default'); // 'default' | 'all' | 'selective'
+  const [modalStudentIds, setModalStudentIds] = useState(new Set());
+  const [studentSearch, setStudentSearch] = useState('');
+  const [savingAccess, setSavingAccess] = useState(false);
+
   // Student Analytics state
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentUnits, setStudentUnits] = useState([]);
@@ -231,11 +239,12 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [s, u, r, uq] = await Promise.allSettled([
+      const [s, u, r, uq, ua] = await Promise.allSettled([
         adminAPI.getStats(),
         adminAPI.getUsers(),
         adminAPI.getAllQuizRequests(),
-        adminAPI.getUnitQuizzes()
+        adminAPI.getUnitQuizzes(),
+        adminAPI.getUnitAccess()
       ]);
       if (s.status === 'fulfilled') setStats(s.value);
       else console.error('Failed to load stats:', s.reason);
@@ -245,6 +254,8 @@ export default function AdminDashboard() {
       else console.error('Failed to load requests:', r.reason);
       if (uq.status === 'fulfilled') setUnitQuizzes(uq.value);
       else console.error('Failed to load unit quizzes:', uq.reason);
+      if (ua.status === 'fulfilled') setUnitAccessList(ua.value || []);
+      else console.error('Failed to load unit access:', ua.reason);
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
@@ -255,6 +266,61 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Actions: Unit Access & Locking
+  const handleOpenAccessModal = (unit) => {
+    const existing = (unitAccessList || []).find(a => a.unit === unit) || { unit, mode: 'default', students: [] };
+    setAccessModal(existing);
+    setModalMode(existing.mode || 'default');
+    setModalStudentIds(new Set((existing.students || []).map(s => s.id)));
+    setStudentSearch('');
+  };
+
+  const handleToggleStudentSelection = (studentId) => {
+    setModalStudentIds(prev => {
+      const next = new Set(prev);
+      if (next.has(studentId)) next.delete(studentId);
+      else next.add(studentId);
+      return next;
+    });
+  };
+
+  const handleSelectAllStudents = (filteredStudents) => {
+    setModalStudentIds(prev => {
+      const allSelected = filteredStudents.every(s => prev.has(s.id));
+      const next = new Set(prev);
+      if (allSelected) {
+        filteredStudents.forEach(s => next.delete(s.id));
+      } else {
+        filteredStudents.forEach(s => next.add(s.id));
+      }
+      return next;
+    });
+  };
+
+  const handleSaveAccess = async () => {
+    if (!accessModal) return;
+    try {
+      setSavingAccess(true);
+      const studentIds = Array.from(modalStudentIds);
+      if (modalMode === 'selective' && studentIds.length === 0) {
+        alert(t('Please select at least one student for selective unlock.'));
+        setSavingAccess(false);
+        return;
+      }
+      await adminAPI.updateUnitAccess(accessModal.unit, {
+        mode: modalMode,
+        studentIds: modalMode === 'selective' ? studentIds : []
+      });
+      const updated = await adminAPI.getUnitAccess();
+      setUnitAccessList(updated || []);
+      setAccessModal(null);
+    } catch (err) {
+      alert(err.message || t('Failed to update unit access'));
+    } finally {
+      setSavingAccess(false);
+    }
+  };
 
   // Actions: User Management
   const handleUpdateRole = async (userId, newRole) => {
@@ -1270,12 +1336,13 @@ export default function AdminDashboard() {
                   const color = UNIT_COLORS[quiz.unit] || '#94a3b8';
                   const icon = UNIT_ICONS[quiz.unit] || 'menu_book';
                   const published = !!quiz.is_published;
+                  const accessRule = (unitAccessList || []).find(a => a.unit === quiz.unit) || { mode: 'default', students: [] };
                   return (
                     <div
                       key={quiz.id}
-                      className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 flex flex-col gap-4 hover:border-white/10 transition-all"
+                      className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 flex flex-col gap-4 hover:border-white/10 transition-all shadow-md relative overflow-hidden"
                     >
-                      {/* Header: unit badge + status pill */}
+                      {/* Header: unit badge + status pill & access badge */}
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                           <div
@@ -1291,12 +1358,27 @@ export default function AdminDashboard() {
                             </p>
                           </div>
                         </div>
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${published
-                            ? 'bg-[var(--success-light)] text-success'
-                            : 'bg-[var(--warning-light)] text-warning'
-                          }`}>
-                          {published ? t('Published') : t('Draft')}
-                        </span>
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${published
+                              ? 'bg-[var(--success-light)] text-success'
+                              : 'bg-[var(--warning-light)] text-warning'
+                            }`}>
+                            {published ? t('Published') : t('Draft')}
+                          </span>
+                          {accessRule.mode === 'all' ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[12px]">lock_open</span> {t('Unlocked (All)')}
+                            </span>
+                          ) : accessRule.mode === 'selective' ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[12px]">group</span> {accessRule.students?.length || 0} {t('Students')}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-500/20 text-slate-400 border border-slate-500/30 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[12px]">lock</span> {t('Default Gated')}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Meta counts */}
@@ -1311,7 +1393,18 @@ export default function AdminDashboard() {
                         </span>
                       </div>
 
-                      {/* Actions */}
+                      {/* Action: Manage Access & Lock Button */}
+                      <button
+                        className="w-full py-2.5 px-3 bg-gradient-to-r from-primary/20 to-secondary/20 hover:from-primary/30 hover:to-secondary/30 border border-primary/40 text-on-surface text-xs font-bold font-headline rounded-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                        onClick={() => handleOpenAccessModal(quiz.unit)}
+                      >
+                        <span className="material-symbols-outlined text-sm text-secondary">
+                          {accessRule.mode === 'all' ? 'lock_open' : accessRule.mode === 'selective' ? 'how_to_reg' : 'vpn_key'}
+                        </span>
+                        {t('Manage Unit Unlock / Lock')}
+                      </button>
+
+                      {/* Actions Grid */}
                       <div className="grid grid-cols-2 gap-2 mt-auto pt-1">
                         <button
                           className="px-3 py-2 bg-secondary/10 hover:bg-secondary/20 border border-secondary/30 text-secondary text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5"
@@ -1351,6 +1444,239 @@ export default function AdminDashboard() {
         )}
 
       </main>
+
+      {/* Unit Access & Lock Management Modal */}
+      {accessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setAccessModal(null)}></div>
+          <div className="bg-surface-container-low border border-white/10 p-6 md:p-7 rounded-2xl w-full max-w-lg relative z-10 space-y-6 shadow-2xl animate-fadeInScale max-h-[90vh] flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                  style={{
+                    backgroundColor: `${UNIT_COLORS[accessModal.unit] || '#7C3AED'}22`,
+                    color: UNIT_COLORS[accessModal.unit] || '#7C3AED'
+                  }}
+                >
+                  <span className="material-symbols-outlined text-2xl">
+                    {UNIT_ICONS[accessModal.unit] || 'menu_book'}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold font-headline">
+                    {t('Unit')} {accessModal.unit} {t('Access & Unlock Control')}
+                  </h3>
+                  <p className="text-xs text-[var(--text-muted)] font-medium">
+                    {t('Control whether this level is gated by previous scores or open to students.')}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAccessModal(null)}
+                className="p-1 rounded-lg text-[var(--text-muted)] hover:text-on-surface hover:bg-white/5 transition-all"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Mode Selection Radios */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                {t('Choose Unlock Rule')}
+              </label>
+
+              {/* Mode 1: Default Progression */}
+              <label
+                className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  modalMode === 'default'
+                    ? 'bg-secondary/10 border-secondary ring-1 ring-secondary/50'
+                    : 'bg-surface-container-high/40 border-white/5 hover:border-white/10'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="accessMode"
+                  value="default"
+                  checked={modalMode === 'default'}
+                  onChange={() => setModalMode('default')}
+                  className="mt-1 accent-secondary"
+                />
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm text-slate-400">lock</span>
+                    <p className="text-sm font-bold text-on-surface">{t('Standard Progression (Default)')}</p>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {t('Locked until the student scores ≥60% on the preceding level.')}
+                  </p>
+                </div>
+              </label>
+
+              {/* Mode 2: Unlock for All */}
+              <label
+                className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  modalMode === 'all'
+                    ? 'bg-emerald-500/10 border-emerald-500 ring-1 ring-emerald-500/50'
+                    : 'bg-surface-container-high/40 border-white/5 hover:border-white/10'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="accessMode"
+                  value="all"
+                  checked={modalMode === 'all'}
+                  onChange={() => setModalMode('all')}
+                  className="mt-1 accent-emerald-500"
+                />
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm text-emerald-400">lock_open</span>
+                    <p className="text-sm font-bold text-on-surface">{t('Unlock for All Students')}</p>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {t('Every student can play this unit directly, bypassing all previous level requirements.')}
+                  </p>
+                </div>
+              </label>
+
+              {/* Mode 3: Selective Students */}
+              <label
+                className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  modalMode === 'selective'
+                    ? 'bg-sky-500/10 border-sky-500 ring-1 ring-sky-500/50'
+                    : 'bg-surface-container-high/40 border-white/5 hover:border-white/10'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="accessMode"
+                  value="selective"
+                  checked={modalMode === 'selective'}
+                  onChange={() => setModalMode('selective')}
+                  className="mt-1 accent-sky-500"
+                />
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm text-sky-400">group</span>
+                    <p className="text-sm font-bold text-on-surface">{t('Unlock for Selective Students')}</p>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {t('Unlock only for specific chosen students; remain locked for everyone else.')}
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Student Picker (Visible only when Mode === 'selective') */}
+            {modalMode === 'selective' && (
+              <div className="space-y-3 flex-1 min-h-0 flex flex-col pt-2 border-t border-white/5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                    {t('Select Students')} ({modalStudentIds.size} {t('selected')})
+                  </span>
+                  {users.filter(u => u.role === 'student').length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllStudents(
+                        users.filter(u => u.role === 'student').filter(s =>
+                          (s.name || '').toLowerCase().includes(studentSearch.toLowerCase()) ||
+                          (s.email || '').toLowerCase().includes(studentSearch.toLowerCase())
+                        )
+                      )}
+                      className="text-xs font-bold text-secondary hover:underline"
+                    >
+                      {users.filter(u => u.role === 'student').filter(s =>
+                        (s.name || '').toLowerCase().includes(studentSearch.toLowerCase()) ||
+                        (s.email || '').toLowerCase().includes(studentSearch.toLowerCase())
+                      ).every(s => modalStudentIds.has(s.id))
+                        ? t('Deselect All')
+                        : t('Select All')}
+                    </button>
+                  )}
+                </div>
+
+                {/* Search box */}
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-sm text-[var(--text-muted)]">search</span>
+                  <input
+                    type="text"
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    placeholder={t('Search student by name or email...')}
+                    className="w-full pl-9 pr-3 py-2 bg-surface-container-high border border-white/10 rounded-xl text-xs text-on-surface placeholder:text-[var(--text-muted)] focus:outline-none focus:border-secondary"
+                  />
+                </div>
+
+                {/* Scrollable list */}
+                <div className="overflow-y-auto max-h-48 border border-white/5 rounded-xl divide-y divide-white/5 bg-surface-container-high/20 pr-1">
+                  {users.filter(u => u.role === 'student').filter(s =>
+                    (s.name || '').toLowerCase().includes(studentSearch.toLowerCase()) ||
+                    (s.email || '').toLowerCase().includes(studentSearch.toLowerCase())
+                  ).length === 0 ? (
+                    <div className="p-4 text-center text-xs text-[var(--text-muted)]">
+                      {t('No matching students found.')}
+                    </div>
+                  ) : (
+                    users.filter(u => u.role === 'student').filter(s =>
+                      (s.name || '').toLowerCase().includes(studentSearch.toLowerCase()) ||
+                      (s.email || '').toLowerCase().includes(studentSearch.toLowerCase())
+                    ).map(student => {
+                      const isChecked = modalStudentIds.has(student.id);
+                      return (
+                        <label
+                          key={student.id}
+                          className={`flex items-center justify-between p-2.5 hover:bg-white/5 cursor-pointer transition-all ${
+                            isChecked ? 'bg-secondary/10' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Avatar config={student.avatar_config} size={28} showBg={false} />
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-on-surface truncate">{student.name}</p>
+                              <p className="text-[10px] text-[var(--text-muted)] truncate">{student.email}</p>
+                            </div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleStudentSelection(student.id)}
+                            className="accent-secondary w-4 h-4 rounded cursor-pointer"
+                          />
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex gap-3 pt-2 border-t border-white/5">
+              <button
+                type="button"
+                className="flex-1 py-3 bg-surface-variant/40 hover:bg-surface-variant text-on-surface font-headline font-bold text-xs uppercase rounded-xl transition-all"
+                onClick={() => setAccessModal(null)}
+                disabled={savingAccess}
+              >
+                {t('Cancel')}
+              </button>
+              <button
+                type="button"
+                className="flex-1 py-3 font-headline font-bold text-xs uppercase rounded-xl text-white bg-gradient-to-r from-secondary to-primary hover:from-secondary/90 hover:to-primary/90 transition-all flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(183,109,255,0.3)] disabled:opacity-50"
+                onClick={handleSaveAccess}
+                disabled={savingAccess}
+              >
+                {savingAccess && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                {t('Save Access Rules')}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Action Dialog Modal (Quiz Request Approve/Reject) */}
       {requestActionModal && (

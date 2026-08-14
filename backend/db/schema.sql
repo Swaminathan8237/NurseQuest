@@ -181,6 +181,17 @@ CREATE TABLE IF NOT EXISTS quiz_requests (
   FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Unit Unlock Overrides (Admin unlock management)
+CREATE TABLE IF NOT EXISTS unit_unlock_overrides (
+  id TEXT PRIMARY KEY,
+  unit INTEGER NOT NULL CHECK(unit BETWEEN 1 AND 15),
+  user_id TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_by TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON quiz_attempts(user_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_quiz ON quiz_attempts(quiz_id);
@@ -190,6 +201,9 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_quizzes_unit ON quizzes(unit);
 CREATE INDEX IF NOT EXISTS idx_quiz_requests_teacher ON quiz_requests(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_requests_status ON quiz_requests(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unit_unlocks_unit_user ON unit_unlock_overrides (unit, COALESCE(user_id, 'ALL'));
+CREATE INDEX IF NOT EXISTS idx_unit_unlocks_unit ON unit_unlock_overrides(unit);
+CREATE INDEX IF NOT EXISTS idx_unit_unlocks_user ON unit_unlock_overrides(user_id);
 
 -- ─── Supabase Auth Auto-Sync Trigger ───
 -- Automatically synchronizes newly registered users in auth.users to public.users table

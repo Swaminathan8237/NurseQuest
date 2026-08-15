@@ -75,7 +75,7 @@ function validateIdentifier(identifier, isTable = false) {
   }
 
   if (isTable) {
-    const tableName = parts[parts.length - 1];
+    const tableName = parts.at(-1);
     if (!ALLOWED_TABLES.has(tableName)) {
       throw new Error(`Security Violation: Access to table "${tableName}" is not allowed.`);
     }
@@ -302,9 +302,10 @@ class QueryBuilder {
       const insertParams = [];
 
       for (const row of rows) {
+        const rowMap = new Map(Object.entries(row));
         const rowPlaceholders = [];
         for (const k of keys) {
-          const val = row[k];
+          const val = rowMap.get(k);
           checkForSqlInjection(val);
           insertParams.push(val);
           rowPlaceholders.push(`$${insertParams.length}`);
@@ -322,12 +323,13 @@ class QueryBuilder {
         throw new Error('Update data object must contain at least one key.');
       }
 
+      const updateMap = new Map(Object.entries(this._updateData));
       const setClauses = [];
       const updateParams = [];
 
       for (const k of keys) {
         validateIdentifier(k);
-        const val = this._updateData[k];
+        const val = updateMap.get(k);
         checkForSqlInjection(val);
         updateParams.push(val);
         setClauses.push(`${k} = $${updateParams.length}`);

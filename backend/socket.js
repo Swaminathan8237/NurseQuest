@@ -44,7 +44,7 @@ function getRankings(session) {
 }
 
 function finalizeUnansweredForCurrentQuestion(session, finishedAt = Date.now()) {
-  const question = session.questions[session.currentQuestion];
+  const question = session.questions.at(session.currentQuestion);
   if (!question) return;
 
   const questionLimitMs = Math.max(1000, (session.timePerQuestion || 30) * 1000);
@@ -53,7 +53,7 @@ function finalizeUnansweredForCurrentQuestion(session, finishedAt = Date.now()) 
     : questionLimitMs;
 
   for (const participant of session.participants.values()) {
-    if (participant.answers[session.currentQuestion] !== undefined) continue;
+    if (participant.answers.at(session.currentQuestion) !== undefined) continue;
 
     participant.streak = 0;
     participant.totalResponseMs += elapsedAtFinalize;
@@ -80,22 +80,22 @@ function initializeSocket(io) {
     if (session.currentQuestion < 0) return;
     if (session.resultsEmittedForQuestion === session.currentQuestion) return;
 
-    const question = session.questions[session.currentQuestion];
+    const question = session.questions.at(session.currentQuestion);
     if (!question) return;
 
     finalizeUnansweredForCurrentQuestion(session);
     session.resultsEmittedForQuestion = session.currentQuestion;
 
     // Calculate answer distributions
-    const distribution = {};
+    const distributionMap = new Map();
     for (const p of session.participants.values()) {
-      const ansInfo = p.answers[session.currentQuestion];
+      const ansInfo = p.answers.at(session.currentQuestion);
       if (ansInfo && ansInfo.answer !== null) {
         let ansKey = ansInfo.answer;
         if (Array.isArray(ansKey)) ansKey = ansKey.join(',');
         else if (ansKey === undefined) ansKey = 'Timeout';
         ansKey = String(ansKey).toUpperCase();
-        distribution[ansKey] = (distribution[ansKey] || 0) + 1;
+        distributionMap.set(ansKey, (distributionMap.get(ansKey) || 0) + 1);
       }
     }
 
@@ -103,7 +103,7 @@ function initializeSocket(io) {
       questionIndex: session.currentQuestion,
       correctAnswer: question.correct_answer,
       explanation: question.explanation,
-      distribution,
+      distribution: Object.fromEntries(distributionMap),
       rankings: getRankings(session)
     });
   }
@@ -126,7 +126,7 @@ function initializeSocket(io) {
       return;
     }
 
-    const question = session.questions[session.currentQuestion];
+    const question = session.questions.at(session.currentQuestion);
 
     // Show Get Ready screen first
     io.to(session.id).emit('get-ready', {
@@ -384,8 +384,9 @@ function initializeSocket(io) {
         try {
           const correctSeq = JSON.parse(question.correct_answer);
           isCorrect = Array.isArray(data.answer)
+            && Array.isArray(correctSeq)
             && data.answer.length === correctSeq.length
-            && data.answer.every((item, idx) => item === correctSeq[idx]);
+            && data.answer.every((item, idx) => item === correctSeq.at(idx));
         } catch { isCorrect = false; }
       } else if (question.type === 'slider') {
         isCorrect = parseFloat(data.answer) === parseFloat(question.correct_answer);
@@ -394,10 +395,12 @@ function initializeSocket(io) {
           const userPairs = typeof data.answer === 'string' ? JSON.parse(data.answer) : data.answer;
           const correctPairs = typeof question.correct_answer === 'string' ? JSON.parse(question.correct_answer) : question.correct_answer;
           if (userPairs && correctPairs && typeof userPairs === 'object' && typeof correctPairs === 'object') {
-            const correctKeys = Object.keys(correctPairs);
-            isCorrect = correctKeys.length === Object.keys(userPairs).length &&
-              correctKeys.every(key => userPairs[key] !== undefined &&
-                String(userPairs[key]).trim().toUpperCase() === String(correctPairs[key]).trim().toUpperCase());
+            const userMap = new Map(Object.entries(userPairs));
+            const correctMap = new Map(Object.entries(correctPairs));
+            const correctKeys = Array.from(correctMap.keys());
+            isCorrect = correctKeys.length === userMap.size &&
+              correctKeys.every(key => userMap.has(key) &&
+                String(userMap.get(key)).trim().toUpperCase() === String(correctMap.get(key)).trim().toUpperCase());
           } else {
             isCorrect = false;
           }

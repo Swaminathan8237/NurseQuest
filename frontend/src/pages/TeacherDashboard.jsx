@@ -21,6 +21,7 @@ export default function TeacherDashboard() {
   const [showRequestModal, setShowRequestModal] = useState(null); // quiz object if open
   const [selectedUnit, setSelectedUnit] = useState(1);
   const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState(null);
 
   useEffect(() => {
     const handleGlobalClick = () => {
@@ -61,6 +62,25 @@ export default function TeacherDashboard() {
       await quizAPI.update(quiz.id, { ...quiz, isPublished: !quiz.is_published });
       setQuizzes(prev => prev.map(q => q.id === quiz.id ? { ...q, is_published: q.is_published ? 0 : 1 } : q));
     } catch (err) { console.error(err); }
+  };
+
+  const handleDeleteQuiz = (quiz) => {
+    setDeleteConfirmModal({
+      title: 'Delete Quiz',
+      description: `Are you sure you want to permanently delete "${quiz.title}"? All questions and student attempts will be erased.`,
+      targetName: quiz.title,
+      confirmButtonText: 'Delete Quiz',
+      onConfirm: async () => {
+        try {
+          await quizAPI.delete(quiz.id);
+          setQuizzes(prev => prev.filter(q => q.id !== quiz.id));
+          setDeleteConfirmModal(null);
+        } catch (err) {
+          console.error(err);
+          alert(err.message || 'Failed to delete quiz.');
+        }
+      }
+    });
   };
 
   if (loading) return (
@@ -201,9 +221,20 @@ export default function TeacherDashboard() {
                             </span>
                           )}
                         </div>
-                        <span className="text-xs font-bold text-slate-400 bg-brand-surface shadow-clay-sunken px-2 py-1 rounded-md">
-                          {quiz.question_count} Qs
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-slate-400 bg-brand-surface shadow-clay-sunken px-2 py-1 rounded-md">
+                            {quiz.question_count} Qs
+                          </span>
+                          {!isPending && (
+                            <button
+                              onClick={() => handleDeleteQuiz(quiz)}
+                              className="p-1 text-slate-500 hover:text-rose-400 transition-colors rounded"
+                              title="Delete Quiz"
+                            >
+                              <span className="material-symbols-outlined text-base">delete</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                       
                       <h3 className="text-lg font-headline font-bold text-on-surface mb-2 line-clamp-1">{quiz.title}</h3>
@@ -496,6 +527,61 @@ export default function TeacherDashboard() {
                 }}
               >
                 {submittingRequest ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Universal In-App Confirmation Alert Modal */}
+      {deleteConfirmModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/70 backdrop-blur-md animate-fadeIn" 
+            onClick={() => !deleteConfirmModal.loading && setDeleteConfirmModal(null)}
+          />
+          <div className="bg-brand-surface border border-brand-elevated/80 shadow-clay-outer p-6 md:p-8 rounded-3xl w-full max-w-lg relative z-10 space-y-6 animate-fadeInScale">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0 shadow-[0_0_20px_rgba(244,63,94,0.2)]">
+                <span className="material-symbols-outlined text-3xl">warning</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl font-headline font-black text-on-surface">
+                  {deleteConfirmModal.title}
+                </h3>
+                <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+                  {deleteConfirmModal.description}
+                </p>
+                {deleteConfirmModal.targetName && (
+                  <div className="mt-3 px-3 py-2 bg-brand-surface shadow-clay-sunken rounded-xl border border-brand-elevated/40 text-xs font-mono text-amber-400 font-bold truncate">
+                    🎯 {deleteConfirmModal.targetName}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-brand-elevated/40">
+              <button
+                type="button"
+                className="flex-1 py-3 px-4 bg-brand-surface shadow-clay-sunken hover:bg-brand-elevated text-slate-300 font-headline font-bold text-xs uppercase tracking-wider rounded-xl transition-all"
+                onClick={() => setDeleteConfirmModal(null)}
+                disabled={deleteConfirmModal.loading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-3 px-4 font-headline font-bold text-xs uppercase tracking-wider rounded-xl text-white transition-all flex items-center justify-center gap-2 ${deleteConfirmModal.confirmButtonClass || 'bg-rose-600 hover:bg-rose-500 shadow-[0_4px_15px_rgba(225,29,72,0.4)]'}`}
+                onClick={async () => {
+                  setDeleteConfirmModal(prev => ({ ...prev, loading: true }));
+                  await deleteConfirmModal.onConfirm();
+                }}
+                disabled={deleteConfirmModal.loading}
+              >
+                {deleteConfirmModal.loading && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                )}
+                {deleteConfirmModal.confirmButtonText || 'Confirm Delete'}
               </button>
             </div>
           </div>

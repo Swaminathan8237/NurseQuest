@@ -51,7 +51,8 @@ async function main() {
 
         for (const { indices, type } of EXPECTED_LAYOUT) {
           for (const idx of indices) {
-            const actual = rows[idx].type;
+            const rowItem = rows.at(idx);
+            const actual = rowItem ? rowItem.type : null;
             // Unit 1 is the reference and should already match; Units 2-11 will have mcq at 6/7/8
             if (unit === 1 && actual !== type) {
               throw new Error(`Unit 1 order_index ${idx} is ${actual}; expected ${type}. Aborting.`);
@@ -119,13 +120,13 @@ async function main() {
         // Parse numbered steps from question_text (strip any trailing "Correct Order:" first)
         const stepBlock = question_text.replace(/Correct Order:.*$/, '').trim();
         const stepMatches = [...stepBlock.matchAll(/(\d+)\.\s*([^\n]+)/g)];
-        const steps = {};
+        const steps = new Map();
         for (const [, num, text] of stepMatches) {
-          steps[Number(num)] = text.trim();
+          steps.set(Number(num), text.trim());
         }
 
         // Build ordered items
-        const itemsInCorrectOrder = orderNums.map(n => steps[n]);
+        const itemsInCorrectOrder = orderNums.map(n => steps.get(n));
 
         // Guards
         if (itemsInCorrectOrder.length !== orderNums.length) {
@@ -323,13 +324,13 @@ async function main() {
         }
 
         // Map answer letter A/B/C/D -> options[0/1/2/3]
-        const letterMap = { A: 0, B: 1, C: 2, D: 3 };
-        const idx = letterMap[ex.answerLetter];
+        const letterMap = new Map([['A', 0], ['B', 1], ['C', 2], ['D', 3]]);
+        const idx = letterMap.get(ex.answerLetter);
         if (idx === undefined || idx >= opts.length) {
           console.warn(`  ⚠️  Unit ${ex.unit} idx ${ex.orderIndex}: answer letter ${ex.answerLetter} out of range, skipping`);
           continue;
         }
-        const correctAnswer = opts[idx];
+        const correctAnswer = opts.at(idx);
         imageFixes.push({ id, unit: ex.unit, orderIndex: ex.orderIndex, correctAnswer, qText: ex.qText });
       }
 

@@ -467,6 +467,7 @@ router.get('/', authenticateToken, async (req, res) => {
         (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count
       FROM quizzes q JOIN users u ON q.created_by = u.id
       WHERE q.is_published = 1
+        AND (q.is_pending_deletion = 0 OR q.is_pending_deletion IS NULL)
         AND (${unitVal}::integer IS NULL OR q.unit = ${unitVal})
         AND (${catVal}::text IS NULL OR q.category = ${catVal})
         AND (${diffVal}::text IS NULL OR q.difficulty = ${diffVal})
@@ -858,16 +859,15 @@ router.delete('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res)
       }
     }
 
-    // Delete in FK-safe order inside a transaction. Neither live_sessions.quiz_id
-    // nor question_answers.question_id cascades from quizzes/questions, so removing
-    // their parents first would raise an FK violation on an attempted or hosted
-    // quiz. live_participants cascades from live_sessions, and question_answers
-    // cascades from quiz_attempts — so clearing those parents clears the children.
-    await sql.begin(async (sql) => {
-      await sql`DELETE FROM live_sessions WHERE quiz_id = ${req.params.id}`;
-      await sql`DELETE FROM quiz_attempts WHERE quiz_id = ${req.params.id}`;
-      await sql`DELETE FROM questions WHERE quiz_id = ${req.params.id}`;
-      await sql`DELETE FROM quizzes WHERE id = ${req.params.id}`;
+    // Delete in FK-safe order inside a transaction.
+    await sql.begin(async (tx) => {
+      await tx`DELETE FROM quiz_requests WHERE quiz_id = ${req.params.id}`;
+      await tx`DELETE FROM live_participants WHERE session_id IN (SELECT id FROM live_sessions WHERE quiz_id = ${req.params.id})`;
+      await tx`DELETE FROM live_sessions WHERE quiz_id = ${req.params.id}`;
+      await tx`DELETE FROM question_answers WHERE attempt_id IN (SELECT id FROM quiz_attempts WHERE quiz_id = ${req.params.id}) OR question_id IN (SELECT id FROM questions WHERE quiz_id = ${req.params.id})`;
+      await tx`DELETE FROM quiz_attempts WHERE quiz_id = ${req.params.id}`;
+      await tx`DELETE FROM questions WHERE quiz_id = ${req.params.id}`;
+      await tx`DELETE FROM quizzes WHERE id = ${req.params.id}`;
     });
 
     res.json({ success: true });

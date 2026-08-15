@@ -52,16 +52,19 @@ export function standaloneQuizzes(quizzes = []) {
  * Expects the deduped, unit-sorted list from dedupeUnitQuizzes.
  */
 export function levelStates(unitQuizzes = [], { isTeacher = false } = {}) {
-  return unitQuizzes.map((quiz, i) => {
+  const quizList = Array.isArray(unitQuizzes) ? unitQuizzes : [];
+  return quizList.map((quiz, i) => {
     const score =
       quiz.bestScorePercent !== undefined ? Math.round(quiz.bestScorePercent) : null;
 
+    const prevQuiz = i > 0 ? quizList.at(i - 1) : null;
+    const isPrevPassed = prevQuiz && typeof prevQuiz.bestScorePercent === 'number' && prevQuiz.bestScorePercent >= PASS_PERCENT;
+
     const unlocked =
       isTeacher ||
-      quiz.is_override_unlocked ||
+      Boolean(quiz.is_override_unlocked) ||
       i === 0 ||
-      (unitQuizzes[i - 1] && unitQuizzes[i - 1].bestScorePercent >= PASS_PERCENT) ||
-      false;
+      Boolean(isPrevPassed);
 
     let status;
     if (!unlocked) status = 'LOCKED';

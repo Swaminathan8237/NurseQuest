@@ -36,6 +36,7 @@ router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
         (SELECT COUNT(*) FROM quiz_attempts WHERE user_id = u.id) as quizzes_taken,
         (SELECT COUNT(*) FROM quizzes WHERE created_by = u.id) as quizzes_created
       FROM users u
+      WHERE (u.status IS NULL OR u.status != 'pending_deletion')
       ORDER BY u.role DESC, u.xp DESC, u.created_at DESC
     `;
 
@@ -111,22 +112,50 @@ router.delete('/users/:id', authenticateToken, requireAdmin, async (req, res) =>
     }
 
     // Perform delete cascade manually for references where database doesn't cascade automatically
-    await sql.begin(async (sql) => {
-      // Delete participant records, attempt answers, attempts, session logs, achievements, etc.
-      await sql`DELETE FROM live_participants WHERE user_id = ${id}`;
-      await sql`DELETE FROM live_sessions WHERE host_id = ${id}`;
-      await sql`DELETE FROM user_achievements WHERE user_id = ${id}`;
-      await sql`DELETE FROM question_answers WHERE attempt_id IN (SELECT id FROM quiz_attempts WHERE user_id = ${id})`;
-      await sql`DELETE FROM quiz_attempts WHERE user_id = ${id}`;
-      
-      // Delete the teacher's requests and authored quizzes/questions.
-      await sql`DELETE FROM quiz_requests WHERE teacher_id = ${id}`;
-      await sql`DELETE FROM questions WHERE quiz_id IN (SELECT id FROM quizzes WHERE created_by = ${id})`;
-      await sql`DELETE FROM quizzes WHERE created_by = ${id}`;
+    await sql.begin(async (tx) => {
+      // 1. Delete unit unlock overrides (as target student or as creator)
+      await tx`DELETE FROM unit_unlock_overrides WHERE user_id = ${id} OR created_by = ${id}`;
 
-      // Finally, delete the user
-      await sql`DELETE FROM users WHERE id = ${id}`;
+      // 2. Delete user's own participations & attempts
+      await tx`DELETE FROM live_participants WHERE user_id = ${id}`;
+      await tx`DELETE FROM user_achievements WHERE user_id = ${id}`;
+      await tx`DELETE FROM question_answers WHERE attempt_id IN (SELECT id FROM quiz_attempts WHERE user_id = ${id})`;
+      await tx`DELETE FROM quiz_attempts WHERE user_id = ${id}`;
+      
+      // 3. For official unit quizzes (unit >= 1), reassign created_by to permanent teacher/admin so core curriculum is never deleted
+      const fallbackAdmin = await tx`SELECT id FROM users WHERE (role = 'teacher' OR role = 'admin') AND id != ${id} ORDER BY (role = 'teacher') DESC, created_at ASC LIMIT 1`;
+      const fallbackId = fallbackAdmin.length > 0 ? fallbackAdmin[0].id : null;
+      if (fallbackId && fallbackId !== id) {
+        await tx`UPDATE quizzes SET created_by = ${fallbackId} WHERE created_by = ${id} AND unit IS NOT NULL`;
+      }
+
+      // 4. For non-unit standalone/draft quizzes authored by this user, delete all dependent records
+      const standaloneQuizzes = await tx`SELECT id FROM quizzes WHERE created_by = ${id} AND (unit IS NULL OR unit = 0)`;
+      if (standaloneQuizzes.length > 0) {
+        const sIds = standaloneQuizzes.map(q => q.id);
+        await tx`DELETE FROM quiz_requests WHERE quiz_id = ANY(${sIds}) OR teacher_id = ${id}`;
+        await tx`DELETE FROM live_participants WHERE session_id IN (SELECT id FROM live_sessions WHERE host_id = ${id} OR quiz_id = ANY(${sIds}))`;
+        await tx`DELETE FROM live_sessions WHERE host_id = ${id} OR quiz_id = ANY(${sIds})`;
+        await tx`DELETE FROM question_answers WHERE attempt_id IN (SELECT id FROM quiz_attempts WHERE quiz_id = ANY(${sIds})) OR question_id IN (SELECT id FROM questions WHERE quiz_id = ANY(${sIds}))`;
+        await tx`DELETE FROM quiz_attempts WHERE quiz_id = ANY(${sIds})`;
+        await tx`DELETE FROM questions WHERE quiz_id = ANY(${sIds})`;
+        await tx`DELETE FROM quizzes WHERE id = ANY(${sIds})`;
+      } else {
+        await tx`DELETE FROM quiz_requests WHERE teacher_id = ${id}`;
+        await tx`DELETE FROM live_participants WHERE session_id IN (SELECT id FROM live_sessions WHERE host_id = ${id})`;
+        await tx`DELETE FROM live_sessions WHERE host_id = ${id}`;
+      }
+
+      // 4. Delete the user from public.users
+      await tx`DELETE FROM users WHERE id = ${id}`;
     });
+
+    // Also attempt cleanup in auth.users if Supabase auth exists
+    try {
+      await sql`DELETE FROM auth.users WHERE id = ${id} OR email = ${users[0].email}`;
+    } catch (authErr) {
+      // auth.users may not exist or have limited permissions; ignore
+    }
 
     res.json({ success: true, message: 'User and all associated data deleted successfully.' });
   } catch (err) {
@@ -291,6 +320,7 @@ router.get('/unit-quizzes', authenticateToken, requireAdmin, async (req, res) =>
       FROM quizzes q
       JOIN users u ON q.created_by = u.id
       WHERE q.unit IS NOT NULL
+        AND (q.is_pending_deletion = 0 OR q.is_pending_deletion IS NULL)
       ORDER BY q.unit ASC, q.created_at DESC
     `;
 
@@ -321,25 +351,26 @@ router.get('/units/access', authenticateToken, requireAdmin, async (req, res) =>
       ORDER BY uo.unit ASC, u.name ASC
     `;
 
-    const accessMap = {};
+    const accessMap = new Map();
     for (let i = 1; i <= 15; i++) {
-      accessMap[i] = {
+      accessMap.set(i, {
         unit: i,
         mode: 'default',
         unlockedForAll: false,
         students: []
-      };
+      });
     }
 
     rows.forEach(r => {
       const uNum = parseInt(r.unit, 10);
-      if (!accessMap[uNum]) return;
+      if (!accessMap.has(uNum)) return;
+      const entry = accessMap.get(uNum);
       if (r.user_id === null) {
-        accessMap[uNum].mode = 'all';
-        accessMap[uNum].unlockedForAll = true;
+        entry.mode = 'all';
+        entry.unlockedForAll = true;
       } else {
-        accessMap[uNum].mode = 'selective';
-        accessMap[uNum].students.push({
+        entry.mode = 'selective';
+        entry.students.push({
           id: r.user_id,
           name: r.student_name || 'Unknown Student',
           email: r.student_email || ''
@@ -347,7 +378,7 @@ router.get('/units/access', authenticateToken, requireAdmin, async (req, res) =>
       }
     });
 
-    res.json(Object.values(accessMap));
+    res.json(Array.from(accessMap.values()));
   } catch (err) {
     console.error('Admin get unit access error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -929,12 +960,10 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
 
     // ---- Overall: summed counts, NOT averaged unit percentages, so a 40-question
     //      unit outweighs a 4-question one. ----
-    const sum = (key) => units.reduce((acc, u) => acc + (u[key] || 0), 0);
-
-    const totalQuestions = sum('totalQuestions');
-    const totalCorrect = sum('correct');
-    const totalTime = sum('completionTime');
-    const totalExpected = sum('expectedTime');
+    const totalQuestions = units.reduce((acc, u) => acc + (Number(u.totalQuestions) || 0), 0);
+    const totalCorrect = units.reduce((acc, u) => acc + (Number(u.correct) || 0), 0);
+    const totalTime = units.reduce((acc, u) => acc + (Number(u.completionTime) || 0), 0);
+    const totalExpected = units.reduce((acc, u) => acc + (Number(u.expectedTime) || 0), 0);
     const unitsCompleted = units.filter(u => u.completed).length;
 
     let firstTotal = 0, firstCorrect = 0;
@@ -1052,6 +1081,368 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
     });
   } catch (err) {
     console.error('Admin get student report error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ==========================================================================
+   6. PENDING DELETIONS & 5-SECOND UNDO LIFECYCLE (Admin Only)
+   ========================================================================== */
+
+// Helper to execute permanent deletion cascade within an open transaction
+async function executePermanentDeletion(tx, entityType, entityId) {
+  if (entityType === 'user') {
+    // 1. Delete unit unlock overrides
+    await tx`DELETE FROM unit_unlock_overrides WHERE user_id = ${entityId} OR created_by = ${entityId}`;
+
+    // 2. Delete user's own participations & attempts
+    await tx`DELETE FROM live_participants WHERE user_id = ${entityId}`;
+    await tx`DELETE FROM user_achievements WHERE user_id = ${entityId}`;
+    await tx`DELETE FROM question_answers WHERE attempt_id IN (SELECT id FROM quiz_attempts WHERE user_id = ${entityId})`;
+    await tx`DELETE FROM quiz_attempts WHERE user_id = ${entityId}`;
+
+    // 3. For official unit quizzes (unit >= 1), reassign created_by to permanent teacher/admin so core curriculum is never deleted
+    const fallbackAdmin = await tx`SELECT id FROM users WHERE (role = 'teacher' OR role = 'admin') AND id != ${entityId} ORDER BY (role = 'teacher') DESC, created_at ASC LIMIT 1`;
+    const fallbackId = fallbackAdmin.length > 0 ? fallbackAdmin[0].id : null;
+    if (fallbackId && fallbackId !== entityId) {
+      await tx`UPDATE quizzes SET created_by = ${fallbackId} WHERE created_by = ${entityId} AND unit IS NOT NULL`;
+    }
+
+    // 4. For non-unit standalone/draft quizzes authored by this user, delete all dependent records
+    const standaloneQuizzes = await tx`SELECT id FROM quizzes WHERE created_by = ${entityId} AND (unit IS NULL OR unit = 0)`;
+    if (standaloneQuizzes.length > 0) {
+      const sIds = standaloneQuizzes.map(q => q.id);
+      await tx`DELETE FROM quiz_requests WHERE quiz_id = ANY(${sIds}) OR teacher_id = ${entityId}`;
+      await tx`DELETE FROM live_participants WHERE session_id IN (SELECT id FROM live_sessions WHERE host_id = ${entityId} OR quiz_id = ANY(${sIds}))`;
+      await tx`DELETE FROM live_sessions WHERE host_id = ${entityId} OR quiz_id = ANY(${sIds})`;
+      await tx`DELETE FROM question_answers WHERE attempt_id IN (SELECT id FROM quiz_attempts WHERE quiz_id = ANY(${sIds})) OR question_id IN (SELECT id FROM questions WHERE quiz_id = ANY(${sIds}))`;
+      await tx`DELETE FROM quiz_attempts WHERE quiz_id = ANY(${sIds})`;
+      await tx`DELETE FROM questions WHERE quiz_id = ANY(${sIds})`;
+      await tx`DELETE FROM quizzes WHERE id = ANY(${sIds})`;
+    } else {
+      await tx`DELETE FROM quiz_requests WHERE teacher_id = ${entityId}`;
+      await tx`DELETE FROM live_participants WHERE session_id IN (SELECT id FROM live_sessions WHERE host_id = ${entityId})`;
+      await tx`DELETE FROM live_sessions WHERE host_id = ${entityId}`;
+    }
+
+    // 5. Delete the user from public.users
+    await tx`DELETE FROM users WHERE id = ${entityId}`;
+
+  } else if (entityType === 'quiz') {
+    await tx`DELETE FROM quiz_requests WHERE quiz_id = ${entityId}`;
+    await tx`DELETE FROM live_participants WHERE session_id IN (SELECT id FROM live_sessions WHERE quiz_id = ${entityId})`;
+    await tx`DELETE FROM live_sessions WHERE quiz_id = ${entityId}`;
+    await tx`DELETE FROM question_answers WHERE attempt_id IN (SELECT id FROM quiz_attempts WHERE quiz_id = ${entityId}) OR question_id IN (SELECT id FROM questions WHERE quiz_id = ${entityId})`;
+    await tx`DELETE FROM quiz_attempts WHERE quiz_id = ${entityId}`;
+    await tx`DELETE FROM questions WHERE quiz_id = ${entityId}`;
+    await tx`DELETE FROM quizzes WHERE id = ${entityId}`;
+  }
+}
+
+// Helper to execute entity restoration within an open transaction
+async function executeEntityRestoration(tx, entityType, entityId, metadata) {
+  if (entityType === 'user') {
+    await tx`UPDATE users SET status = 'active' WHERE id = ${entityId}`;
+  } else if (entityType === 'quiz') {
+    const prevPublished = (metadata && typeof metadata.previousIsPublished !== 'undefined') ? metadata.previousIsPublished : 1;
+    await tx`UPDATE quizzes SET is_pending_deletion = 0, is_published = ${prevPublished} WHERE id = ${entityId}`;
+  }
+}
+
+// Helper to sweep and commit expired pending deletions
+async function commitExpiredPendingDeletions(sql) {
+  try {
+    const expiredItems = await sql`
+      SELECT id, entity_type, entity_id
+      FROM admin_pending_deletions
+      WHERE status = 'pending' AND expires_at < CURRENT_TIMESTAMP
+    `;
+    for (const item of expiredItems) {
+      try {
+        await sql.begin(async (tx) => {
+          const rows = await tx`
+            SELECT id, entity_type, entity_id, status, expires_at
+            FROM admin_pending_deletions
+            WHERE id = ${item.id} AND status = 'pending' AND expires_at < CURRENT_TIMESTAMP
+            FOR UPDATE
+          `;
+          if (rows.length === 0) return;
+          await executePermanentDeletion(tx, rows[0].entity_type, rows[0].entity_id);
+          await tx`UPDATE admin_pending_deletions SET status = 'committed' WHERE id = ${item.id}`;
+        });
+      } catch (innerErr) {
+        console.error('Sweep commit failed for pending deletion:', item.id, innerErr.message);
+      }
+    }
+  } catch (err) {
+    console.error('commitExpiredPendingDeletions error:', err.message);
+  }
+}
+
+// ─── POST /api/admin/pending-deletions — Initiate 5s pending deletion ───
+router.post('/pending-deletions', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { entityType, entityId } = req.body;
+    const sql = getDB();
+
+    if (!['user', 'quiz'].includes(entityType)) {
+      return res.status(400).json({ error: 'Invalid entityType. Must be "user" or "quiz".' });
+    }
+    if (!entityId || typeof entityId !== 'string') {
+      return res.status(400).json({ error: 'entityId is required.' });
+    }
+
+    // Sweep expired records first
+    await commitExpiredPendingDeletions(sql);
+
+    let entityTitle = '';
+    let metadata = {};
+    const pendingId = uuidv4();
+    let resultPending;
+
+    await sql.begin(async (tx) => {
+      if (entityType === 'user') {
+        const users = await tx`SELECT id, email, name, role, status FROM users WHERE id = ${entityId} FOR UPDATE`;
+        if (users.length === 0) {
+          const notFoundErr = new Error('User not found');
+          notFoundErr.status = 404;
+          throw notFoundErr;
+        }
+        const user = users[0];
+        if (user.status === 'pending_deletion') {
+          const conflictErr = new Error('User is already pending deletion');
+          conflictErr.status = 409;
+          throw conflictErr;
+        }
+        if (user.role === 'admin') {
+          const adminCountResult = await tx`
+            SELECT COUNT(*) as count FROM users 
+            WHERE role = 'admin' AND (status != 'pending_deletion' OR status IS NULL)
+          `;
+          const adminCount = parseInt(adminCountResult[0].count, 10);
+          if (adminCount <= 1) {
+            const adminErr = new Error('Cannot delete the last administrator.');
+            adminErr.status = 400;
+            throw adminErr;
+          }
+        }
+        entityTitle = user.name || user.email || 'User';
+        metadata = { previousRole: user.role };
+        await tx`UPDATE users SET status = 'pending_deletion' WHERE id = ${entityId}`;
+
+      } else if (entityType === 'quiz') {
+        const quizzes = await tx`SELECT id, title, unit, is_published, is_pending_deletion FROM quizzes WHERE id = ${entityId} FOR UPDATE`;
+        if (quizzes.length === 0) {
+          const notFoundErr = new Error('Quiz not found');
+          notFoundErr.status = 404;
+          throw notFoundErr;
+        }
+        const quiz = quizzes[0];
+        if (quiz.is_pending_deletion === 1) {
+          const conflictErr = new Error('Quiz is already pending deletion');
+          conflictErr.status = 409;
+          throw conflictErr;
+        }
+        entityTitle = quiz.title || 'Quiz';
+        metadata = { previousIsPublished: quiz.is_published, previousUnit: quiz.unit };
+        await tx`UPDATE quizzes SET is_pending_deletion = 1, is_published = 0 WHERE id = ${entityId}`;
+      }
+
+      const inserted = await tx`
+        INSERT INTO admin_pending_deletions (
+          id, entity_type, entity_id, entity_title, admin_id, created_at, expires_at, status, metadata
+        ) VALUES (
+          ${pendingId}, ${entityType}, ${entityId}, ${entityTitle}, ${req.user.id},
+          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '5 seconds', 'pending', ${JSON.stringify(metadata)}::jsonb
+        )
+        RETURNING id, entity_type, entity_id, entity_title, expires_at, status
+      `;
+      resultPending = inserted[0];
+    });
+
+    res.status(201).json({
+      success: true,
+      pendingDeletion: {
+        id: resultPending.id,
+        entityType: resultPending.entity_type,
+        entityId: resultPending.entity_id,
+        entityTitle: resultPending.entity_title,
+        expiresAt: resultPending.expires_at,
+        durationMs: 5000
+      }
+    });
+  } catch (err) {
+    console.error('Initiate pending deletion error:', err);
+    const statusCode = err.status || 500;
+    res.status(statusCode).json({ error: err.message || 'Server error' });
+  }
+});
+
+// ─── POST /api/admin/pending-deletions/:id/undo — Undo deletion ───────────
+router.post('/pending-deletions/:id/undo', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sql = getDB();
+
+    let result = null;
+
+    await sql.begin(async (tx) => {
+      const rows = await tx`
+        SELECT id, entity_type, entity_id, entity_title, admin_id, status, expires_at, metadata
+        FROM admin_pending_deletions
+        WHERE id = ${id}
+        FOR UPDATE
+      `;
+
+      if (rows.length === 0) {
+        const notFoundErr = new Error('Pending deletion not found');
+        notFoundErr.status = 404;
+        throw notFoundErr;
+      }
+
+      const pending = rows[0];
+
+      // Check ownership
+      if (pending.admin_id !== req.user.id) {
+        const deniedErr = new Error('Access denied. You do not own this pending deletion.');
+        deniedErr.status = 403;
+        throw deniedErr;
+      }
+
+      if (pending.status === 'restored') {
+        result = { statusCode: 409, body: { error: 'Already restored', status: 'restored' } };
+        return;
+      }
+
+      if (pending.status === 'committed') {
+        result = { statusCode: 409, body: { error: 'Already committed', status: 'committed' } };
+        return;
+      }
+
+      // Check server-side expiration using DB time
+      const dbNowResult = await tx`SELECT CURRENT_TIMESTAMP as now`;
+      const now = new Date(dbNowResult[0].now);
+      const isExpired = new Date(pending.expires_at) < now;
+
+      if (isExpired) {
+        // Auto-commit expired deletion inside this transaction
+        await executePermanentDeletion(tx, pending.entity_type, pending.entity_id);
+        await tx`UPDATE admin_pending_deletions SET status = 'committed' WHERE id = ${id}`;
+        result = {
+          statusCode: 410,
+          body: { error: 'Undo window expired. Deletion committed.', status: 'committed' }
+        };
+      } else {
+        // Restore entity inside this transaction
+        await executeEntityRestoration(tx, pending.entity_type, pending.entity_id, pending.metadata);
+        await tx`UPDATE admin_pending_deletions SET status = 'restored' WHERE id = ${id}`;
+        result = {
+          statusCode: 200,
+          body: {
+            success: true,
+            message: 'Restored successfully',
+            status: 'restored',
+            entityType: pending.entity_type,
+            entityId: pending.entity_id
+          }
+        };
+      }
+    });
+
+    res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error('Undo pending deletion error:', err);
+    const statusCode = err.status || 500;
+    res.status(statusCode).json({ error: err.message || 'Server error' });
+  }
+});
+
+// ─── POST /api/admin/pending-deletions/:id/commit — Commit permanent deletion ──
+router.post('/pending-deletions/:id/commit', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sql = getDB();
+
+    let result = null;
+
+    await sql.begin(async (tx) => {
+      const rows = await tx`
+        SELECT id, entity_type, entity_id, entity_title, admin_id, status, expires_at
+        FROM admin_pending_deletions
+        WHERE id = ${id}
+        FOR UPDATE
+      `;
+
+      if (rows.length === 0) {
+        const notFoundErr = new Error('Pending deletion not found');
+        notFoundErr.status = 404;
+        throw notFoundErr;
+      }
+
+      const pending = rows[0];
+
+      // Check ownership
+      if (pending.admin_id !== req.user.id) {
+        const deniedErr = new Error('Access denied. You do not own this pending deletion.');
+        deniedErr.status = 403;
+        throw deniedErr;
+      }
+
+      if (pending.status === 'restored') {
+        result = { statusCode: 409, body: { error: 'Cannot commit already restored item', status: 'restored' } };
+        return;
+      }
+
+      if (pending.status === 'committed') {
+        result = { statusCode: 200, body: { success: true, message: 'Already committed', status: 'committed' } };
+        return;
+      }
+
+      // Execute permanent deletion inside this transaction
+      await executePermanentDeletion(tx, pending.entity_type, pending.entity_id);
+      await tx`UPDATE admin_pending_deletions SET status = 'committed' WHERE id = ${id}`;
+      result = {
+        statusCode: 200,
+        body: { success: true, message: 'Deletion permanently committed.', status: 'committed' }
+      };
+    });
+
+    res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error('Commit pending deletion error:', err);
+    const statusCode = err.status || 500;
+    res.status(statusCode).json({ error: err.message || 'Server error' });
+  }
+});
+
+// ─── GET /api/admin/pending-deletions — Active unexpired pending deletions ────
+router.get('/pending-deletions', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const sql = getDB();
+    await commitExpiredPendingDeletions(sql);
+
+    const rows = await sql`
+      SELECT id, entity_type, entity_id, entity_title, expires_at, status
+      FROM admin_pending_deletions
+      WHERE admin_id = ${req.user.id}
+        AND status = 'pending'
+        AND expires_at > CURRENT_TIMESTAMP
+      ORDER BY created_at DESC
+    `;
+
+    res.json({
+      success: true,
+      pendingDeletions: rows.map(r => ({
+        id: r.id,
+        entityType: r.entity_type,
+        entityId: r.entity_id,
+        entityTitle: r.entity_title,
+        expiresAt: r.expires_at,
+        status: r.status
+      }))
+    });
+  } catch (err) {
+    console.error('Get active pending deletions error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

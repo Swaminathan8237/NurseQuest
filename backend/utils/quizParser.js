@@ -105,8 +105,7 @@ function parseMCQBlock(lines, startLine, questionText) {
   let answerRaw = null;
   let explanation = '';
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (const line of lines) {
     const optMatch = line.match(FORMAT.OPTION);
     const ansMatch = line.match(FORMAT.ANSWER);
     const expMatch = line.match(FORMAT.EXPLANATION);
@@ -220,8 +219,7 @@ function parseMatchingBlock(lines, startLine, questionText) {
 
   const leftItems = pairs.map(p => p.left);
   const rightItems = pairs.map(p => p.right);
-  const correctObj = {};
-  pairs.forEach(p => { correctObj[p.left] = p.right; });
+  const correctMap = new Map(pairs.map(p => [p.left, p.right]));
 
   return {
     question: {
@@ -229,7 +227,7 @@ function parseMatchingBlock(lines, startLine, questionText) {
       questionText,
       mediaUrl: '',
       options: leftItems,
-      correctAnswer: JSON.stringify(correctObj),
+      correctAnswer: JSON.stringify(Object.fromEntries(correctMap)),
       explanation,
       points: 1,
       sliderMin: null, sliderMax: null, sliderStep: null, sliderUnit: null,
@@ -627,7 +625,7 @@ function quizToText(questions) {
   questions.forEach((q, idx) => {
     const num = idx + 1;
     // Normalize field names (handle both camelCase from frontend and snake_case from DB)
-    const type = q.type;
+    const type = q.type || 'mcq';
     const text = q.questionText || q.question_text || '';
     const options = typeof q.options === 'string' ? JSON.parse(q.options || '[]') : (q.options || []);
     const correctAnswer = q.correctAnswer || q.correct_answer || '';
@@ -644,11 +642,11 @@ function quizToText(questions) {
     // Detect True/False MCQ
     const isTrueFalse = type === 'mcq' && 
       options.length === 2 && 
-      normalize(options[0]) === 'TRUE' && 
-      normalize(options[1]) === 'FALSE';
+      normalize(options.at(0)) === 'TRUE' && 
+      normalize(options.at(1)) === 'FALSE';
 
     // Write type tag (if not default MCQ)
-    const exportTag = isTrueFalse ? 'TrueFalse' : FORMAT.EXPORT_TAG[type];
+    const exportTag = isTrueFalse ? 'TrueFalse' : (FORMAT.EXPORT_TAG ? FORMAT.EXPORT_TAG[type] : type.toUpperCase());
     if (exportTag) {
       lines.push(`[${exportTag}]`);
     }
@@ -665,11 +663,11 @@ function quizToText(questions) {
         } else {
           // MCQ: options + answer as letter
           options.forEach((opt, oi) => {
-            lines.push(`${LETTERS[oi]}) ${opt}`);
+            lines.push(`${LETTERS.at(oi) || 'A'}) ${opt}`);
           });
           // Find the letter for the correct answer
           const ansIdx = options.findIndex(o => normalize(o) === normalize(correctAnswer));
-          lines.push(`Answer: ${ansIdx >= 0 ? LETTERS[ansIdx] : correctAnswer}`);
+          lines.push(`Answer: ${ansIdx >= 0 ? (LETTERS.at(ansIdx) || correctAnswer) : correctAnswer}`);
         }
         break;
 
@@ -682,10 +680,10 @@ function quizToText(questions) {
           lines.push(`Media: ${filename}`);
         }
         options.forEach((opt, oi) => {
-          lines.push(`${LETTERS[oi]}) ${opt}`);
+          lines.push(`${LETTERS.at(oi) || 'A'}) ${opt}`);
         });
         const mediaAnsIdx = options.findIndex(o => normalize(o) === normalize(correctAnswer));
-        lines.push(`Answer: ${mediaAnsIdx >= 0 ? LETTERS[mediaAnsIdx] : correctAnswer}`);
+        lines.push(`Answer: ${mediaAnsIdx >= 0 ? (LETTERS.at(mediaAnsIdx) || correctAnswer) : correctAnswer}`);
         break;
 
       case 'matching':
@@ -699,12 +697,12 @@ function quizToText(questions) {
           } else {
             // Fallback: use options + matchingPairs arrays
             options.forEach((left, i) => {
-              lines.push(`${left} = ${matchingPairs[i] || ''}`);
+              lines.push(`${left} = ${matchingPairs.at(i) || ''}`);
             });
           }
         } catch {
           options.forEach((left, i) => {
-            lines.push(`${left} = ${matchingPairs[i] || ''}`);
+            lines.push(`${left} = ${matchingPairs.at(i) || ''}`);
           });
         }
         break;

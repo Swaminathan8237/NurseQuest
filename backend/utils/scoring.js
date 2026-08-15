@@ -117,13 +117,14 @@ function calculateLiveScoreKahootStyle(isCorrect, elapsedMs, totalMs, maxPoints 
  * Get level info for a given XP amount
  */
 function getLevelInfo(xp) {
-  let currentLevel = LEVELS[0];
-  let nextLevel = LEVELS[1];
+  let currentLevel = LEVELS.at(0);
+  let nextLevel = LEVELS.at(1);
 
   for (let i = LEVELS.length - 1; i >= 0; i--) {
-    if (xp >= LEVELS[i].minXP) {
-      currentLevel = LEVELS[i];
-      nextLevel = LEVELS[i + 1] || null;
+    const lvl = LEVELS.at(i);
+    if (lvl && xp >= lvl.minXP) {
+      currentLevel = lvl;
+      nextLevel = i + 1 < LEVELS.length ? LEVELS.at(i + 1) : null;
       break;
     }
   }

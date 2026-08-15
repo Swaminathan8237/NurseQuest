@@ -147,21 +147,22 @@ function parseMatchingBlock(lines) {
   const rightItems = [];
   const correctMapping = {};
 
+  const correctMap = new Map();
   for (const entry of pairEntries) {
     let parts = entry.text.split(/\s*[–\u2013]\s*/);
     if (parts.length < 2) {
       parts = entry.text.split(/\s+-\s+/);
     }
     if (parts.length >= 2) {
-      const left = parts[0].trim();
+      const left = parts.at(0).trim();
       const right = parts.slice(1).join(' – ').trim();
       leftItems.push(left);
       rightItems.push(right);
-      correctMapping[left] = right;
+      correctMap.set(left, right);
     } else {
       leftItems.push(entry.text);
       rightItems.push(entry.text);
-      correctMapping[entry.text] = entry.text;
+      correctMap.set(entry.text, entry.text);
     }
   }
 
@@ -170,7 +171,7 @@ function parseMatchingBlock(lines) {
     type: 'matching',
     options: leftItems,
     matchingPairs: rightItems,
-    correctAnswer: JSON.stringify(correctMapping),
+    correctAnswer: JSON.stringify(Object.fromEntries(correctMap)),
     explanation,
   };
 }
@@ -427,16 +428,16 @@ async function cleanAndImport() {
   // Seed quiz attempts for students to populate leaderboard
   console.log('🏆 Seeding quiz attempts for leaderboard...');
   for (let i = 0; i < studentIds.length; i++) {
-    const sid = studentIds[i];
+    const sid = studentIds.at(i);
     // Each student completes a few quizzes to build up score/leaderboard
     const completedQuizzes = importedQuizzes.slice(0, 4);
     for (let idx = 0; idx < completedQuizzes.length; idx++) {
-      const quiz = completedQuizzes[idx];
+      const quiz = completedQuizzes.at(idx);
       let correctCount;
       if (i === 0) {
         // Predictable scores: Unit 1, 2, 3 passed (>=75%), Unit 4 retry (<75%)
         const scores = [15, 13, 12, 8];
-        correctCount = scores[idx];
+        correctCount = scores.at(idx) || 10;
       } else {
         correctCount = 10 + Math.floor(Math.random() * 6); // 10 to 15 correct answers
       }

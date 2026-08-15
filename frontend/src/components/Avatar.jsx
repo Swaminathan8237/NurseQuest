@@ -47,12 +47,12 @@ const HAIRS = [
   (color) => `<path d="M35 82 Q35 25 100 20 Q165 25 165 82 L165 55 Q163 30 100 25 Q37 30 35 55Z" fill="${color}"/>`, // Buzz
 ];
 
-const ACCESSORIES = {
-  none: '',
-  cap: `<path d="M25 75 Q25 42 100 35 Q175 42 175 75 L180 78 Q180 80 175 80 L25 80 Q20 80 20 78 Z" fill="white" stroke="#ccc" stroke-width="0.5"/><text x="100" y="65" text-anchor="middle" font-size="12" fill="#FF6B6B" font-weight="bold" font-family="Arial">+</text><rect x="18" y="76" width="164" height="6" rx="2" fill="white" stroke="#ddd" stroke-width="0.5"/>`,
-  stethoscope: `<path d="M55 165 Q55 195 75 200 Q95 205 100 185 Q105 205 125 200 Q145 195 145 165" stroke="#888" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="100" cy="182" r="8" fill="#888" stroke="#666" stroke-width="1.5"/><circle cx="100" cy="182" r="3" fill="#aaa"/>`,
-  badge: `<rect x="125" y="145" width="30" height="38" rx="4" fill="white" stroke="#ddd"/><rect x="125" y="145" width="30" height="12" rx="4" fill="#6C5CE7"/><text x="140" y="154" text-anchor="middle" font-size="7" fill="white" font-weight="bold">NQ</text><circle cx="140" cy="170" r="5" fill="#00CEC9"/>`,
-};
+const ACCESSORIES_MAP = new Map([
+  ['none', ''],
+  ['cap', `<path d="M25 75 Q25 42 100 35 Q175 42 175 75 L180 78 Q180 80 175 80 L25 80 Q20 80 20 78 Z" fill="white" stroke="#ccc" stroke-width="0.5"/><text x="100" y="65" text-anchor="middle" font-size="12" fill="#FF6B6B" font-weight="bold" font-family="Arial">+</text><rect x="18" y="76" width="164" height="6" rx="2" fill="white" stroke="#ddd" stroke-width="0.5"/>`],
+  ['stethoscope', `<path d="M55 165 Q55 195 75 200 Q95 205 100 185 Q105 205 125 200 Q145 195 145 165" stroke="#888" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="100" cy="182" r="8" fill="#888" stroke="#666" stroke-width="1.5"/><circle cx="100" cy="182" r="3" fill="#aaa"/>`],
+  ['badge', `<rect x="125" y="145" width="30" height="38" rx="4" fill="white" stroke="#ddd"/><rect x="125" y="145" width="30" height="12" rx="4" fill="#6C5CE7"/><text x="140" y="154" text-anchor="middle" font-size="7" fill="white" font-weight="bold">NQ</text><circle cx="140" cy="170" r="5" fill="#00CEC9"/>`],
+]);
 
 export const DICEBEAR_STYLES = [
   { id: 'adventurer', name: 'Adventurer', icon: 'shield', desc: 'RPG Fantasy Characters' },
@@ -130,8 +130,8 @@ export default function Avatar({ config = {}, size = 200, className = '', onClic
     scrubsColor = '#6C5CE7',
   } = config;
 
-  const skinColor = SKIN_TONES[safeIndex(skin, SKIN_TONES.length)];
-  const hairCol = hairColor || HAIR_COLORS[0];
+  const skinColor = SKIN_TONES.at(safeIndex(skin, SKIN_TONES.length)) || SKIN_TONES[0];
+  const hairCol = hairColor || HAIR_COLORS.at(0) || '#1a1a2e';
   const faceIdx = safeIndex(face, FACES.length);
   const eyeIdx = safeIndex(eyes, EYES.length);
   const mouthIdx = safeIndex(mouth, MOUTHS.length);
@@ -140,11 +140,11 @@ export default function Avatar({ config = {}, size = 200, className = '', onClic
   const svgContent = useMemo(() => {
     const bg = showBg ? `<defs><linearGradient id="avBg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${scrubsColor}33"/><stop offset="100%" stop-color="${scrubsColor}11"/></linearGradient></defs><circle cx="100" cy="100" r="98" fill="url(#avBg)" stroke="${scrubsColor}44" stroke-width="2"/>` : '';
     const scrubs = `<path d="M55 155 Q55 148 65 145 Q80 140 100 138 Q120 140 135 145 Q145 148 145 155 L148 200 L52 200 Z" fill="${scrubsColor}"/><path d="M85 145 L90 160 L100 155 L110 160 L115 145" stroke="white" stroke-width="1.5" fill="none" opacity="0.5"/>`;
-    const faceEl = FACES[faceIdx](skinColor);
-    const hairEl = HAIRS[hairIdx](hairCol);
-    const eyeEl = EYES[eyeIdx];
-    const mouthEl = MOUTHS[mouthIdx];
-    const acc = ACCESSORIES[accessory] || '';
+    const faceEl = (FACES.at(faceIdx) || FACES[0])(skinColor);
+    const hairEl = (HAIRS.at(hairIdx) || HAIRS[0])(hairCol);
+    const eyeEl = EYES.at(eyeIdx) || EYES[0];
+    const mouthEl = MOUTHS.at(mouthIdx) || MOUTHS[0];
+    const acc = ACCESSORIES_MAP.get(accessory) || '';
     const ears = `<ellipse cx="28" cy="95" rx="10" ry="14" fill="${skinColor}"/><ellipse cx="172" cy="95" rx="10" ry="14" fill="${skinColor}"/>`;
     
     return `${bg}${scrubs}${ears}${faceEl}${hairEl}${eyeEl}${mouthEl}${acc}`;
@@ -163,4 +163,6 @@ export default function Avatar({ config = {}, size = 200, className = '', onClic
   );
 }
 
-export { SKIN_TONES, HAIR_COLORS, FACES, EYES, MOUTHS, HAIRS, ACCESSORIES };
+const ACCESSORIES = Object.fromEntries(ACCESSORIES_MAP);
+
+export { SKIN_TONES, HAIR_COLORS, FACES, EYES, MOUTHS, HAIRS, ACCESSORIES, ACCESSORIES_MAP };

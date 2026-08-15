@@ -5,6 +5,7 @@ import { adminAPI, quizAPI } from '../api';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import StreakFire from '../components/StreakFire';
+import TelegramUndoToastContainer from '../components/TelegramUndoToast';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement,
   PointElement, LineElement, Tooltip, Legend
@@ -50,24 +51,33 @@ const orDash = (value, suffix = '') =>
 //                                     submitted; labelled by what it WOULD have graded (Selected,C/NC)
 //   not_answered                   — the timer expired with nothing staged
 // Historical rows (status = NULL) are mapped to correct/incorrect upstream via is_correct.
-const STATUS_BADGE = {
-  correct:            { label: 'Correct',      icon: 'check',     cls: 'bg-success/15 text-success' },
-  incorrect:          { label: 'Incorrect',    icon: 'close',     cls: 'bg-danger/15 text-danger' },
-  selected_correct:   { label: 'Selected,C',   icon: 'timer_off', cls: 'bg-amber-500/15 text-amber-500' },
-  selected_incorrect: { label: 'Selected,NC',  icon: 'timer_off', cls: 'bg-amber-500/15 text-amber-500' },
-  not_answered:       { label: 'Not Answered', icon: 'remove',    cls: 'bg-white/10 text-[var(--text-muted)]' },
-};
+const STATUS_BADGE_MAP = new Map([
+  ['correct',            { label: 'Correct',      icon: 'check',     cls: 'bg-success/15 text-success' }],
+  ['incorrect',          { label: 'Incorrect',    icon: 'close',     cls: 'bg-danger/15 text-danger' }],
+  ['selected_correct',   { label: 'Selected,C',   icon: 'timer_off', cls: 'bg-amber-500/15 text-amber-500' }],
+  ['selected_incorrect', { label: 'Selected,NC',  icon: 'timer_off', cls: 'bg-amber-500/15 text-amber-500' }],
+  ['not_answered',       { label: 'Not Answered', icon: 'remove',    cls: 'bg-white/10 text-[var(--text-muted)]' }],
+]);
 
 // Unit icon + accent maps (mirrors Units.jsx)
-const UNIT_ICONS = {
-  1: 'health_and_safety', 2: 'masks', 3: 'clean_hands', 4: 'sanitizer',
-  5: 'science', 6: 'delete_outline', 7: 'medication', 8: 'bar_chart',
-  9: 'star', 10: 'rule', 11: 'badge',
-};
-const UNIT_COLORS = {
-  1: '#7C3AED', 2: '#0284C7', 3: '#059669', 4: '#D97706', 5: '#DC2626',
-  6: '#4F46E5', 7: '#0D9488', 8: '#C026D3', 9: '#E11D48', 10: '#2563EB',
-  11: '#7C3AED',
+const UNIT_ICONS_MAP = new Map([
+  [1, 'health_and_safety'], [2, 'masks'], [3, 'clean_hands'], [4, 'sanitizer'],
+  [5, 'science'], [6, 'delete_outline'], [7, 'medication'], [8, 'bar_chart'],
+  [9, 'star'], [10, 'rule'], [11, 'badge'],
+]);
+const UNIT_COLORS_MAP = new Map([
+  [1, '#7C3AED'], [2, '#0284C7'], [3, '#059669'], [4, '#D97706'], [5, '#DC2626'],
+  [6, '#4F46E5'], [7, '#0D9488'], [8, '#C026D3'], [9, '#E11D48'], [10, '#2563EB'],
+  [11, '#7C3AED'],
+]);
+
+const getUnitColor = (unit) => UNIT_COLORS_MAP.get(Number(unit)) || '#7C3AED';
+const getUnitIcon = (unit) => UNIT_ICONS_MAP.get(Number(unit)) || 'menu_book';
+const getStatusBadge = (status, isCorrect) => {
+  if (status && STATUS_BADGE_MAP.has(String(status))) {
+    return STATUS_BADGE_MAP.get(String(status));
+  }
+  return isCorrect ? STATUS_BADGE_MAP.get('correct') : STATUS_BADGE_MAP.get('incorrect');
 };
 
 // Compact date label for attempt chips, e.g. "Jul 28"
@@ -76,6 +86,26 @@ const formatDate = (d) => {
   const date = new Date(d);
   if (isNaN(date.getTime())) return '';
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+// Stable domain sorting helpers (avoids relying on fragile array indices)
+const sortUsersStably = (userList) => {
+  const rolePriority = { admin: 0, teacher: 1, student: 2 };
+  return [...userList].sort((a, b) => {
+    const pA = rolePriority[a.role] ?? 3;
+    const pB = rolePriority[b.role] ?? 3;
+    if (pA !== pB) return pA - pB;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+};
+
+const sortQuizzesStably = (quizList) => {
+  return [...quizList].sort((a, b) => {
+    const uA = Number(a.unit) || 0;
+    const uB = Number(b.unit) || 0;
+    if (uA !== uB) return uA - uB;
+    return (a.title || '').localeCompare(b.title || '');
+  });
 };
 
 export default function AdminDashboard() {
@@ -88,6 +118,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [requests, setRequests] = useState([]);
   const [unitQuizzes, setUnitQuizzes] = useState([]);
+  const [pendingDeletions, setPendingDeletions] = useState([]);
 
   // Loading & Action states
   const [loading, setLoading] = useState(true);
@@ -98,6 +129,7 @@ export default function AdminDashboard() {
   const [requestActionModal, setRequestActionModal] = useState(null); // { request, action: 'approve'|'reject' }
   const [adminNotes, setAdminNotes] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('none');
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState(null); // in-app confirmation modal
 
   // Unit Access Control state
   const [unitAccessList, setUnitAccessList] = useState([]);
@@ -239,23 +271,27 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [s, u, r, uq, ua] = await Promise.allSettled([
+      const [s, u, r, uq, ua, pd] = await Promise.allSettled([
         adminAPI.getStats(),
         adminAPI.getUsers(),
         adminAPI.getAllQuizRequests(),
         adminAPI.getUnitQuizzes(),
-        adminAPI.getUnitAccess()
+        adminAPI.getUnitAccess(),
+        adminAPI.getPendingDeletions()
       ]);
       if (s.status === 'fulfilled') setStats(s.value);
       else console.error('Failed to load stats:', s.reason);
-      if (u.status === 'fulfilled') setUsers(u.value);
+      if (u.status === 'fulfilled') setUsers(sortUsersStably(u.value || []));
       else console.error('Failed to load users:', u.reason);
       if (r.status === 'fulfilled') setRequests(r.value);
       else console.error('Failed to load requests:', r.reason);
-      if (uq.status === 'fulfilled') setUnitQuizzes(uq.value);
+      if (uq.status === 'fulfilled') setUnitQuizzes(sortQuizzesStably(uq.value || []));
       else console.error('Failed to load unit quizzes:', uq.reason);
       if (ua.status === 'fulfilled') setUnitAccessList(ua.value || []);
       else console.error('Failed to load unit access:', ua.reason);
+      if (pd.status === 'fulfilled' && pd.value && pd.value.pendingDeletions) {
+        setPendingDeletions(pd.value.pendingDeletions);
+      }
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
@@ -323,30 +359,56 @@ export default function AdminDashboard() {
   };
 
   // Actions: User Management
-  const handleUpdateRole = async (userId, newRole) => {
-    if (!window.confirm(t(`Are you sure you want to change this user's role to ${newRole}?`))) return;
-    try {
-      await adminAPI.updateUserRole(userId, newRole);
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-      // Refresh stats
-      const s = await adminAPI.getStats();
-      setStats(s);
-    } catch (err) {
-      alert(err.message || t('Failed to update user role'));
-    }
+  const handleUpdateRole = (userId, newRole, userName) => {
+    setDeleteConfirmModal({
+      title: t('Change User Role'),
+      description: t(`Are you sure you want to change the role of "${userName || 'this user'}" to ${newRole}?`),
+      targetName: userName || userId,
+      confirmButtonText: t('Change Role'),
+      confirmButtonClass: 'bg-primary hover:bg-primary/90 shadow-[0_4px_15px_rgba(108,92,231,0.4)]',
+      onConfirm: async () => {
+        try {
+          await adminAPI.updateUserRole(userId, newRole);
+          setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+          const s = await adminAPI.getStats();
+          setStats(s);
+          setDeleteConfirmModal(null);
+        } catch (err) {
+          alert(err.message || t('Failed to update user role'));
+        }
+      }
+    });
   };
 
-  const handleDeleteUser = async (userId, userName) => {
-    if (!window.confirm(t(`⚠️ WARNING: Deleting ${userName} will permanently delete their account and ALL associated quizzes, quiz attempts, and scores. This cannot be undone. Proceed?`))) return;
-    try {
-      await adminAPI.deleteUser(userId);
-      setUsers(prev => prev.filter(u => u.id !== userId));
-      // Refresh stats
-      const s = await adminAPI.getStats();
-      setStats(s);
-    } catch (err) {
-      alert(err.message || t('Failed to delete user'));
-    }
+  const handleDeleteUser = (userId, userName) => {
+    setDeleteConfirmModal({
+      title: t('Delete User Account'),
+      description: t(`Are you sure you want to delete "${userName}"? You can undo this action within 5 seconds.`),
+      targetName: userName,
+      confirmButtonText: t('Delete User'),
+      confirmButtonClass: 'bg-rose-600 hover:bg-rose-500 shadow-[0_4px_15px_rgba(225,29,72,0.4)]',
+      onConfirm: async () => {
+        const targetUser = users.find(u => u.id === userId);
+        // Optimistic removal from UI
+        setUsers(prev => prev.filter(u => u.id !== userId));
+        setDeleteConfirmModal(null);
+
+        try {
+          const res = await adminAPI.initiatePendingDeletion({ entityType: 'user', entityId: userId });
+          if (res && res.pendingDeletion) {
+            setPendingDeletions(prev => [res.pendingDeletion, ...prev.filter(p => p.id !== res.pendingDeletion.id)]);
+          }
+          const s = await adminAPI.getStats();
+          setStats(s);
+        } catch (err) {
+          // Rollback optimistic update on failure
+          if (targetUser) {
+            setUsers(prev => sortUsersStably([...prev, targetUser]));
+          }
+          alert(err.message || t('Failed to delete user'));
+        }
+      }
+    });
   };
 
   // Actions: Unit Quiz Management (mirrors teacher quiz actions; admin bypasses ownership)
@@ -361,16 +423,71 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteQuiz = async (quiz) => {
-    if (!window.confirm(t(`⚠️ Delete "${quiz.title}"? This permanently removes the quiz, its questions, and all attempts. This cannot be undone. Proceed?`))) return;
+  const handleDeleteQuiz = (quiz) => {
+    setDeleteConfirmModal({
+      title: t('Delete Unit Quiz'),
+      description: t(`Are you sure you want to delete "${quiz.title}"? You can undo this action within 5 seconds.`),
+      targetName: quiz.title,
+      confirmButtonText: t('Delete Quiz'),
+      confirmButtonClass: 'bg-rose-600 hover:bg-rose-500 shadow-[0_4px_15px_rgba(225,29,72,0.4)]',
+      onConfirm: async () => {
+        const targetQuiz = unitQuizzes.find(q => q.id === quiz.id);
+        // Optimistic removal from UI
+        setUnitQuizzes(prev => prev.filter(q => q.id !== quiz.id));
+        setDeleteConfirmModal(null);
+
+        try {
+          const res = await adminAPI.initiatePendingDeletion({ entityType: 'quiz', entityId: quiz.id });
+          if (res && res.pendingDeletion) {
+            setPendingDeletions(prev => [res.pendingDeletion, ...prev.filter(p => p.id !== res.pendingDeletion.id)]);
+          }
+          const s = await adminAPI.getStats();
+          setStats(s);
+        } catch (err) {
+          // Rollback optimistic update on failure
+          if (targetQuiz) {
+            setUnitQuizzes(prev => sortQuizzesStably([...prev, targetQuiz]));
+          }
+          alert(err.message || t('Failed to delete quiz'));
+        }
+      }
+    });
+  };
+
+  // Undo pending deletion
+  const handleUndoPendingDeletion = async (toast) => {
     try {
-      await quizAPI.delete(quiz.id);
-      setUnitQuizzes(prev => prev.filter(q => q.id !== quiz.id));
-      // Refresh stats
+      await adminAPI.undoPendingDeletion(toast.id);
+      setPendingDeletions(prev => prev.filter(p => p.id !== toast.id));
+
+      // Re-fetch affected list and sort stably
+      if (toast.entityType === 'user') {
+        const u = await adminAPI.getUsers();
+        setUsers(sortUsersStably(u || []));
+      } else if (toast.entityType === 'quiz') {
+        const uq = await adminAPI.getUnitQuizzes();
+        setUnitQuizzes(sortQuizzesStably(uq || []));
+      }
       const s = await adminAPI.getStats();
       setStats(s);
     } catch (err) {
-      alert(err.message || t('Failed to delete quiz'));
+      console.error('Failed to undo deletion:', err);
+      if (err.message && err.message.toLowerCase().includes('expired')) {
+        setPendingDeletions(prev => prev.filter(p => p.id !== toast.id));
+      }
+      alert(err.message || t('Failed to undo deletion'));
+    }
+  };
+
+  // Expire pending deletion (fire commit)
+  const handleExpirePendingDeletion = async (id) => {
+    setPendingDeletions(prev => prev.filter(p => p.id !== id));
+    try {
+      await adminAPI.commitPendingDeletion(id);
+      const s = await adminAPI.getStats();
+      setStats(s);
+    } catch (err) {
+      console.error('Failed to commit pending deletion:', err);
     }
   };
 
@@ -1032,8 +1149,8 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="space-y-4">
                     {studentUnits.map(u => {
-                      const color = UNIT_COLORS[u.unit] || '#7C3AED';
-                      const icon = UNIT_ICONS[u.unit] || 'school';
+                      const color = getUnitColor(u.unit);
+                      const icon = getUnitIcon(u.unit);
                       const isOpen = expandedUnit === u.unit;
                       return (
                         <div key={u.unit} className="bg-surface-container-high/40 rounded-2xl border border-white/5 overflow-hidden">
@@ -1190,8 +1307,7 @@ export default function AdminDashboard() {
                                                   </td>
                                                   <td className="p-3 text-center">
                                                     {(() => {
-                                                      const badge = STATUS_BADGE[q.status]
-                                                        || (q.is_correct ? STATUS_BADGE.correct : STATUS_BADGE.incorrect);
+                                                      const badge = getStatusBadge(q.status, q.is_correct);
                                                       return (
                                                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${badge.cls}`}>
                                                           <span className="material-symbols-outlined text-sm">{t(badge.icon)}</span>{t(badge.label)}
@@ -1333,8 +1449,8 @@ export default function AdminDashboard() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {unitQuizzes.map(quiz => {
-                  const color = UNIT_COLORS[quiz.unit] || '#94a3b8';
-                  const icon = UNIT_ICONS[quiz.unit] || 'menu_book';
+                  const color = getUnitColor(quiz.unit);
+                  const icon = getUnitIcon(quiz.unit);
                   const published = !!quiz.is_published;
                   const accessRule = (unitAccessList || []).find(a => a.unit === quiz.unit) || { mode: 'default', students: [] };
                   return (
@@ -1367,15 +1483,15 @@ export default function AdminDashboard() {
                           </span>
                           {accessRule.mode === 'all' ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                              <span className="material-symbols-outlined text-[12px]">lock_open</span> {t('Unlocked (All)')}
+                              <span className="material-symbols-outlined text-[12px]">{t('lock_open')}</span> {t('Unlocked (All)')}
                             </span>
                           ) : accessRule.mode === 'selective' ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center gap-1">
-                              <span className="material-symbols-outlined text-[12px]">group</span> {accessRule.students?.length || 0} {t('Students')}
+                              <span className="material-symbols-outlined text-[12px]">{t('group')}</span> {accessRule.students?.length || 0} {t('Students')}
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-500/20 text-slate-400 border border-slate-500/30 flex items-center gap-1">
-                              <span className="material-symbols-outlined text-[12px]">lock</span> {t('Default Gated')}
+                              <span className="material-symbols-outlined text-[12px]">{t('lock')}</span> {t('Default Gated')}
                             </span>
                           )}
                         </div>
@@ -1457,12 +1573,12 @@ export default function AdminDashboard() {
                 <div
                   className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
                   style={{
-                    backgroundColor: `${UNIT_COLORS[accessModal.unit] || '#7C3AED'}22`,
-                    color: UNIT_COLORS[accessModal.unit] || '#7C3AED'
+                    backgroundColor: `${getUnitColor(accessModal.unit)}22`,
+                    color: getUnitColor(accessModal.unit)
                   }}
                 >
                   <span className="material-symbols-outlined text-2xl">
-                    {UNIT_ICONS[accessModal.unit] || 'menu_book'}
+                    {getUnitIcon(accessModal.unit)}
                   </span>
                 </div>
                 <div>
@@ -1478,7 +1594,7 @@ export default function AdminDashboard() {
                 onClick={() => setAccessModal(null)}
                 className="p-1 rounded-lg text-[var(--text-muted)] hover:text-on-surface hover:bg-white/5 transition-all"
               >
-                <span className="material-symbols-outlined">close</span>
+                <span className="material-symbols-outlined">{t('close')}</span>
               </button>
             </div>
 
@@ -1506,7 +1622,7 @@ export default function AdminDashboard() {
                 />
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-slate-400">lock</span>
+                    <span className="material-symbols-outlined text-sm text-slate-400">{t('lock')}</span>
                     <p className="text-sm font-bold text-on-surface">{t('Standard Progression (Default)')}</p>
                   </div>
                   <p className="text-xs text-[var(--text-muted)]">
@@ -1533,7 +1649,7 @@ export default function AdminDashboard() {
                 />
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-emerald-400">lock_open</span>
+                    <span className="material-symbols-outlined text-sm text-emerald-400">{t('lock_open')}</span>
                     <p className="text-sm font-bold text-on-surface">{t('Unlock for All Students')}</p>
                   </div>
                   <p className="text-xs text-[var(--text-muted)]">
@@ -1560,7 +1676,7 @@ export default function AdminDashboard() {
                 />
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-sky-400">group</span>
+                    <span className="material-symbols-outlined text-sm text-sky-400">{t('group')}</span>
                     <p className="text-sm font-bold text-on-surface">{t('Unlock for Selective Students')}</p>
                   </div>
                   <p className="text-xs text-[var(--text-muted)]">
@@ -1600,7 +1716,7 @@ export default function AdminDashboard() {
 
                 {/* Search box */}
                 <div className="relative">
-                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-sm text-[var(--text-muted)]">search</span>
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-sm text-[var(--text-muted)]">{t('search')}</span>
                   <input
                     type="text"
                     value={studentSearch}
@@ -1747,6 +1863,68 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Universal In-App Confirmation Alert Modal */}
+      {deleteConfirmModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/70 backdrop-blur-md animate-fadeIn" 
+            onClick={() => !deleteConfirmModal.loading && setDeleteConfirmModal(null)}
+          />
+          <div className="bg-brand-surface border border-brand-elevated/80 shadow-clay-outer p-6 md:p-8 rounded-3xl w-full max-w-lg relative z-10 space-y-6 animate-fadeInScale">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0 shadow-[0_0_20px_rgba(244,63,94,0.2)]">
+                <span className="material-symbols-outlined text-3xl">{t('warning')}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl font-headline font-black text-on-surface">
+                  {deleteConfirmModal.title}
+                </h3>
+                <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+                  {deleteConfirmModal.description}
+                </p>
+                {deleteConfirmModal.targetName && (
+                  <div className="mt-3 px-3 py-2 bg-brand-surface shadow-clay-sunken rounded-xl border border-brand-elevated/40 text-xs font-mono text-amber-400 font-bold truncate">
+                    🎯 {deleteConfirmModal.targetName}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-brand-elevated/40">
+              <button
+                type="button"
+                className="flex-1 py-3 px-4 bg-brand-surface shadow-clay-sunken hover:bg-brand-elevated text-slate-300 font-headline font-bold text-xs uppercase tracking-wider rounded-xl transition-all"
+                onClick={() => setDeleteConfirmModal(null)}
+                disabled={deleteConfirmModal.loading}
+              >
+                {t('Cancel')}
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-3 px-4 font-headline font-bold text-xs uppercase tracking-wider rounded-xl text-white transition-all flex items-center justify-center gap-2 ${deleteConfirmModal.confirmButtonClass || 'bg-rose-600 hover:bg-rose-500 shadow-[0_4px_15px_rgba(225,29,72,0.4)]'}`}
+                onClick={async () => {
+                  setDeleteConfirmModal(prev => ({ ...prev, loading: true }));
+                  await deleteConfirmModal.onConfirm();
+                }}
+                disabled={deleteConfirmModal.loading}
+              >
+                {deleteConfirmModal.loading && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                )}
+                {deleteConfirmModal.confirmButtonText || t('Confirm Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Telegram-style 5s Undo Toast container */}
+      <TelegramUndoToastContainer
+        toasts={pendingDeletions}
+        onUndo={handleUndoPendingDeletion}
+        onExpire={handleExpirePendingDeletion}
+      />
 
     </div>
   );

@@ -31,6 +31,8 @@ function getDB() {
       ssl: isLocal ? false : { rejectUnauthorized: false }, // Disable SSL for local connections
       max: 10, // Connection pool limit
       idle_timeout: 20, // Close idle connections after 20s
+      connect_timeout: 30, // 30s connection timeout
+      max_lifetime: 60 * 15, // 15 min max lifetime to prune stale sockets after sleep/wake
     });
   }
   return sqlInstance;

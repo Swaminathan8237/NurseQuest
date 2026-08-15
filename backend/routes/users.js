@@ -39,6 +39,7 @@ router.get('/students', authenticateToken, requireRole('teacher'), async (req, r
         (SELECT COALESCE(AVG(score * 100.0 / NULLIF(total_points, 0)), 0) FROM quiz_attempts WHERE user_id = users.id) AS avg_score
       FROM users
       WHERE users.role = ${'student'}
+        AND (users.status IS NULL OR users.status != 'pending_deletion')
       ORDER BY users.xp DESC
     `;
 

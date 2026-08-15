@@ -117,7 +117,7 @@ async function seed() {
 
       const qIds = [];
       for (let i = 0; i < u.questions.length; i++) {
-        const q = u.questions[i];
+        const q = u.questions.at(i);
         const qId = `${u.quizId}-q${i}`;
         qIds.push(qId);
         await sql`
@@ -144,14 +144,16 @@ async function seed() {
         `;
 
         for (let i = 0; i < u.questions.length; i++) {
-          const ok = plan.mask[i];
+          const ok = plan.mask.at(i);
           const pts = ok ? MARKS_PER_QUESTION : 0;
+          const currentQ = u.questions.at(i);
+          const answerText = ok ? (currentQ ? currentQ.answer : '') : 'wrong answer';
           await sql`
             INSERT INTO question_answers
               (id, attempt_id, question_id, user_answer, is_correct, points_earned, time_taken)
             VALUES
-              (${`${attemptId}-ans${i}`}, ${attemptId}, ${qIds[i]},
-               ${ok ? u.questions[i].answer : 'wrong answer'}, ${ok ? 1 : 0}, ${pts}, ${plan.secs[i]})
+              (${`${attemptId}-ans${i}`}, ${attemptId}, ${qIds.at(i)},
+               ${answerText}, ${ok ? 1 : 0}, ${pts}, ${plan.secs.at(i) || 0})
           `;
         }
       }

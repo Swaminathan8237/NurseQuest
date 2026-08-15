@@ -202,6 +202,7 @@ function parseMatchingBlock(lines) {
   const rightItems = [];
   const correctMapping = {};
 
+  const correctMap = new Map();
   for (const entry of pairEntries) {
     // Split by en-dash or regular hyphen surrounded by spaces
     let parts = entry.text.split(/\s*[–\u2013]\s*/);
@@ -209,15 +210,15 @@ function parseMatchingBlock(lines) {
       parts = entry.text.split(/\s+-\s+/);
     }
     if (parts.length >= 2) {
-      const left = parts[0].trim();
+      const left = parts.at(0).trim();
       const right = parts.slice(1).join(' – ').trim();
       leftItems.push(left);
       rightItems.push(right);
-      correctMapping[left] = right;
+      correctMap.set(left, right);
     } else {
       leftItems.push(entry.text);
       rightItems.push(entry.text);
-      correctMapping[entry.text] = entry.text;
+      correctMap.set(entry.text, entry.text);
     }
   }
 
@@ -226,7 +227,7 @@ function parseMatchingBlock(lines) {
     type: 'matching',
     options: leftItems,
     matchingPairs: rightItems,
-    correctAnswer: JSON.stringify(correctMapping),
+    correctAnswer: JSON.stringify(Object.fromEntries(correctMap)),
     explanation,
   };
 }

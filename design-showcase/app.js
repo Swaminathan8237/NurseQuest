@@ -91,13 +91,14 @@ class ParticleSystem {
     if (!this.canvas) return;
     const colors = ['#a855f7', '#2dd4bf', '#ec4899', '#10b981', '#f59e0b', '#3b82f6'];
     for (let i = 0; i < 80; i++) {
+      const colIdx = Math.floor(Math.random() * colors.length);
       this.particles.push({
         x: x,
         y: y,
         vx: (Math.random() - 0.5) * 15,
         vy: (Math.random() - 0.5) * 15 - 5,
         size: Math.random() * 8 + 4,
-        color: colors[Math.floor(Math.random() * colors.length)],
+        color: colors.at(colIdx) || '#a855f7',
         alpha: 1,
         decay: Math.random() * 0.02 + 0.015,
         rotation: Math.random() * Math.PI * 2,
@@ -116,7 +117,8 @@ class ParticleSystem {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     
     for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i];
+      const p = this.particles.at(i);
+      if (!p) continue;
       p.x += p.vx;
       p.y += p.vy;
       p.vy += 0.25; // gravity

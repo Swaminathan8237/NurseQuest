@@ -233,3 +233,24 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ─── Admin Pending Deletions (Telegram-Style 5-Second Undo) ───
+CREATE TABLE IF NOT EXISTS admin_pending_deletions (
+  id TEXT PRIMARY KEY,
+  entity_type TEXT NOT NULL CHECK(entity_type IN ('user', 'quiz')),
+  entity_id TEXT NOT NULL,
+  entity_title TEXT NOT NULL,
+  admin_id TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'committed', 'restored')),
+  metadata JSONB DEFAULT '{}'::jsonb,
+  FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_deletions_status_expires ON admin_pending_deletions(status, expires_at);
+CREATE INDEX IF NOT EXISTS idx_pending_deletions_admin ON admin_pending_deletions(admin_id, status);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_pending_deletion INTEGER DEFAULT 0;
+

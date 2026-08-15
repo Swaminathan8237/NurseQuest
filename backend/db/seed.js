@@ -41,11 +41,13 @@ async function seed() {
     const xps = [4500, 3200, 5800, 2100, 6200];
 
     for (let i = 0; i < studentNames.length; i++) {
-      const name = studentNames[i];
+      const name = studentNames.at(i);
       const id = uuidv4();
       studentIds.push(id);
       const password = null;
-      await sql`INSERT INTO users (id, email, password, name, role, avatar_config, xp, level, streak) VALUES (${id}, ${`student${i + 1}@skillquest.io`}, ${password}, ${name}, 'student', ${avatarConfigs[i]}, ${xps[i]}, ${Math.floor(xps[i] / 1000) + 1}, ${Math.floor(Math.random() * 10)})`;
+      const avatarConfig = avatarConfigs.at(i) || '{}';
+      const xp = xps.at(i) || 0;
+      await sql`INSERT INTO users (id, email, password, name, role, avatar_config, xp, level, streak) VALUES (${id}, ${`student${i + 1}@skillquest.io`}, ${password}, ${name}, 'student', ${avatarConfig}, ${xp}, ${Math.floor(xp / 1000) + 1}, ${Math.floor(Math.random() * 10)})`;
     }
 
     // Create demo quizzes (grouped by unit)
@@ -179,7 +181,7 @@ async function seed() {
 
     // Create quiz attempts for leaderboard data
     for (let i = 0; i < studentIds.length; i++) {
-      const sid = studentIds[i];
+      const sid = studentIds.at(i);
       await sql`INSERT INTO quiz_attempts (id, quiz_id, user_id, score, total_points, correct_count, total_questions, streak_max, time_taken) VALUES (${uuidv4()}, ${quiz1Id}, ${sid}, ${3000 + (i * 500)}, 4000, ${3 + Math.min(i, 1)}, 4, ${2 + Math.min(i, 2)}, ${90 + i * 10})`;
       await sql`INSERT INTO quiz_attempts (id, quiz_id, user_id, score, total_points, correct_count, total_questions, streak_max, time_taken) VALUES (${uuidv4()}, ${quiz2Id}, ${sid}, ${2500 + (i * 400)}, 4000, ${2 + Math.min(i, 2)}, 4, ${1 + Math.min(i, 3)}, ${100 + i * 5})`;
     }

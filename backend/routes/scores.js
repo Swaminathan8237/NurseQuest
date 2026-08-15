@@ -27,7 +27,7 @@ function gradeAnswer(question, userAnswer) {
       // Count positions the student placed in the right spot (undefined-safe if shorter).
       let matched = 0;
       for (let idx = 0; idx < correctSeq.length; idx++) {
-        if (userSeq[idx] === correctSeq[idx]) matched++;
+        if (userSeq.at(idx) === correctSeq.at(idx)) matched++;
       }
       const fraction = matched / correctSeq.length;
       const isCorrect = userSeq.length === correctSeq.length && matched === correctSeq.length;
@@ -41,13 +41,17 @@ function gradeAnswer(question, userAnswer) {
       const userPairs = typeof userAnswer === 'string' ? JSON.parse(userAnswer) : userAnswer;
       const correctPairs = typeof question.correct_answer === 'string' ? JSON.parse(question.correct_answer) : question.correct_answer;
       if (userPairs && correctPairs && typeof userPairs === 'object' && typeof correctPairs === 'object') {
-        const correctKeys = Object.keys(correctPairs);
+        const userMap = new Map(Object.entries(userPairs));
+        const correctMap = new Map(Object.entries(correctPairs));
+        const correctKeys = Array.from(correctMap.keys());
         if (correctKeys.length === 0) return { isCorrect: false, fraction: 0 };
         // Count pairs matched correctly (same comparison as the strict check below).
-        const matched = correctKeys.filter(key => userPairs[key] !== undefined &&
-          String(userPairs[key]).trim().toUpperCase() === String(correctPairs[key]).trim().toUpperCase()).length;
+        const matched = correctKeys.filter(key => 
+          userMap.has(key) &&
+          String(userMap.get(key)).trim().toUpperCase() === String(correctMap.get(key)).trim().toUpperCase()
+        ).length;
         const fraction = matched / correctKeys.length;
-        const isCorrect = matched === correctKeys.length && Object.keys(userPairs).length === correctKeys.length;
+        const isCorrect = matched === correctKeys.length && userMap.size === correctKeys.length;
         return { isCorrect, fraction };
       }
       return { isCorrect: false, fraction: 0 };

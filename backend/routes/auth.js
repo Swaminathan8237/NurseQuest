@@ -689,8 +689,11 @@ router.put('/preferences', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'prefs must be an object' });
     }
     const clean = {};
-    for (const key of ALLOWED_PREF_KEYS) {
-      if (key in prefs) clean[key] = Boolean(prefs[key]);
+    if (Object.prototype.hasOwnProperty.call(prefs, 'soundEnabled')) {
+      clean.soundEnabled = Boolean(prefs.soundEnabled);
+    }
+    if (Object.prototype.hasOwnProperty.call(prefs, 'timerAlerts')) {
+      clean.timerAlerts = Boolean(prefs.timerAlerts);
     }
     const sql = getDB();
     await sql`UPDATE users SET preferences = ${JSON.stringify(clean)} WHERE id = ${req.user.id}`;

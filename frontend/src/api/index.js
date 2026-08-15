@@ -167,6 +167,11 @@ export const adminAPI = {
   getUnitQuizzes: () => request('/admin/unit-quizzes'),
   getUnitAccess: () => request('/admin/units/access'),
   updateUnitAccess: (unit, data) => request(`/admin/units/${unit}/access`, { method: 'POST', body: JSON.stringify(data) }),
+  // Telegram-style 5s pending deletion undo
+  initiatePendingDeletion: ({ entityType, entityId }) => request('/admin/pending-deletions', { method: 'POST', body: JSON.stringify({ entityType, entityId }) }),
+  undoPendingDeletion: (id) => request(`/admin/pending-deletions/${id}/undo`, { method: 'POST' }),
+  commitPendingDeletion: (id) => request(`/admin/pending-deletions/${id}/commit`, { method: 'POST' }),
+  getPendingDeletions: () => request('/admin/pending-deletions'),
 };
 
 export default { authAPI, quizAPI, scoreAPI, userAPI, adminAPI };

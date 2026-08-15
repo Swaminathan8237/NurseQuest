@@ -135,7 +135,7 @@ function knowledgeScore({ accuracy: acc, firstAttemptAccuracy, speed, retention:
  */
 function classify(score) {
   const s = num(score);
-  const band = KNOWLEDGE_BANDS.find(b => s >= b.min) || KNOWLEDGE_BANDS[KNOWLEDGE_BANDS.length - 1];
+  const band = KNOWLEDGE_BANDS.find(b => s >= b.min) || KNOWLEDGE_BANDS.at(-1);
   return { label: band.label, color: band.color };
 }
 

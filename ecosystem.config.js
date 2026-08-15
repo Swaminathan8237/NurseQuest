@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'skillquest-backend',
       script: 'backend/server.js',
-      cwd: '/var/www/skillquest',
+      cwd: __dirname,
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,

@@ -185,12 +185,15 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
       // brand-new student reads as not alive; the 2-day floor below then keeps them out of
       // the "you broke your streak" prompt, so they are never mourned a streak they never had.
       const users = await db`
-        SELECT *,
+        SELECT id, xp, level, streak, current_streak, longest_streak, last_played_date,
                CASE WHEN last_played_date >= CURRENT_DATE - 1 THEN 1 ELSE 0 END AS streak_alive
         FROM users
-        WHERE id = ${req.user.id}
+        WHERE id = ${req.user.id} AND (status IS NULL OR status != 'pending_deletion')
       `;
       const user = users[0];
+      if (!user) {
+        return res.status(404).json({ error: 'User not found or inactive' });
+      }
 
       const quizzesTakenResult = await db`
         SELECT COUNT(*) as count FROM quiz_attempts WHERE user_id = ${req.user.id}

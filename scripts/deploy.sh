@@ -5,7 +5,7 @@
 
 set -e # Exit immediately if a command exits with a non-zero status
 
-APP_DIR="/var/www/skillquest"
+APP_DIR="${APP_DIR:-/var/www/skillquest}"
 
 echo "🚀 Starting SkillQuest deployment process..."
 

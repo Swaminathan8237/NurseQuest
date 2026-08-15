@@ -38,16 +38,22 @@ async function authenticateToken(req, res, next) {
     const userId = decoded.sub || decoded.id;
     const email = decoded.email;
 
-    // Fetch user details (specifically the role) from the database
+    // Fetch user details (specifically the role and status) from the database
     const sql = getDB();
-    const users = await sql`SELECT role, name FROM users WHERE id = ${userId}`;
+    const users = await sql`SELECT id, role, name, status FROM users WHERE id = ${userId}`;
     const user = users[0];
+
+    // If user is explicitly in pending_deletion status, reject immediately
+    if (user && user.status === 'pending_deletion') {
+      return res.status(401).json({ error: 'User account is pending deletion' });
+    }
 
     req.user = {
       id: userId,
       email: email,
       role: user ? user.role : null,
       name: user ? user.name : null,
+      status: user ? user.status : null,
       tokenData: decoded
     };
 

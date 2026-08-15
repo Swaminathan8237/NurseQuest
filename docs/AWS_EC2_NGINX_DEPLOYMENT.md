@@ -50,9 +50,9 @@ ssh -i "skillquest-key.pem" ubuntu@<YOUR_EC2_PUBLIC_IP_OR_DNS>
 
 ---
 
-## Step 3: Install Node.js 20, Nginx & PM2
+## Step 3: Install Node.js 22 LTS, Nginx & PM2
 
-Once inside your EC2 terminal, update package lists and install Node.js 20 LTS, Nginx, and Git:
+Once inside your EC2 terminal, update package lists and install Node.js 22 LTS, Nginx, and Git:
 
 ```bash
 # Update system packages
@@ -61,17 +61,18 @@ sudo apt update && sudo apt upgrade -y
 # Install Git, Curl, and Nginx
 sudo apt install -y git curl nginx
 
-# Install Node.js 20 LTS via NodeSource
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+# Install Node.js 22 LTS via NodeSource
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 
 # Verify installations
-node -v   # Should output v20.x.x
-npm -v    # Should output 10.x.x
+node -v   # Should output v22.x.x
+npm -v    # Should output 10.x.x+
 nginx -v  # Should output nginx/1.x.x
 
-# Install PM2 globally for process management
+# Install / update PM2 globally for process management
 sudo npm install -g pm2
+pm2 update
 ```
 
 ---

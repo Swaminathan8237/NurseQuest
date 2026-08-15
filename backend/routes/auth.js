@@ -556,9 +556,10 @@ router.get('/me', authenticateToken, async (req, res) => {
           console.log(`🔄 Migrating user ${req.user.email} from old ID ${oldId} to Supabase Auth ID ${req.user.id}`);
           try {
             await sql.begin(async (tx) => {
-              // Ensure admin role for admin email
+              // Preserve existing role or assign role based on environment configuration
               let migratedRole = oldUser.role;
-              if (req.user.email === 'admin@skillquest.io') {
+              const adminEmail = (process.env.ADMIN_EMAIL || 'admin@skillquest.io').toLowerCase();
+              if (req.user.email && req.user.email.toLowerCase() === adminEmail) {
                 migratedRole = 'admin';
               }
 
@@ -609,7 +610,9 @@ router.get('/me', authenticateToken, async (req, res) => {
         // Create user from Supabase user_metadata
         const metadata = (req.user.tokenData && req.user.tokenData.user_metadata) || {};
         const name = metadata.name || req.user.email.split('@')[0];
-        const role = metadata.role || (req.user.email === 'admin@skillquest.io' ? 'admin' : (req.user.email === 'teacher@skillquest.io' ? 'teacher' : 'student'));
+        const adminEmail = (process.env.ADMIN_EMAIL || 'admin@skillquest.io').toLowerCase();
+        const teacherEmail = (process.env.TEACHER_EMAIL || 'teacher@skillquest.io').toLowerCase();
+        const role = metadata.role || (req.user.email?.toLowerCase() === adminEmail ? 'admin' : (req.user.email?.toLowerCase() === teacherEmail ? 'teacher' : 'student'));
         const avatarConfig = metadata.avatar_config || {};
 
         console.log(`🔑 Auth: Auto-creating user profile for ${req.user.email} in GET /me using token metadata`);

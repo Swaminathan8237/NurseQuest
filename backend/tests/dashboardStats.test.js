@@ -10,6 +10,19 @@ const { getLevelInfo } = require('../utils/scoring');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
+// ⚠️  THIS SUITE WRITES TO WHATEVER DATABASE_URL POINTS AT.
+//
+// It loads ../../.env above and calls getDB() below, then INSERTs and DELETEs real rows in
+// users / quizzes / quiz_attempts. Pointed at the production Supabase project it would create
+// and destroy live records. Run it against a local or staging DATABASE_URL only:
+//
+//   DATABASE_URL=postgresql://...localhost:5432/nursequest_test  node --test backend/tests/
+//
+// Dates here are IST, matching production: the streak day must roll over at IST midnight (see
+// THE IST DAY RULE in routes/users.js). The fixtures and the assertions must use the SAME
+// expression — mixing CURRENT_DATE into either side makes the boundary test flip during the
+// 18:30-23:59 UTC window, when the UTC and IST dates disagree.
+
 describe('Dashboard Stats & User Authentication Regression Test Suite', async () => {
   const sql = getDB();
 
@@ -34,7 +47,7 @@ describe('Dashboard Stats & User Authentication Regression Test Suite', async ()
     // 1. Student with streak & attempts
     await sql`
       INSERT INTO users (id, email, name, role, status, xp, level, streak, current_streak, longest_streak, last_played_date)
-      VALUES (${studentWithDataId}, ${`student_active_${studentWithDataId}@test.io`}, 'Active Student', 'student', 'active', 500, 2, 3, 3, 5, CURRENT_DATE)
+      VALUES (${studentWithDataId}, ${`student_active_${studentWithDataId}@test.io`}, 'Active Student', 'student', 'active', 500, 2, 3, 3, 5, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date)
       ON CONFLICT (id) DO NOTHING
     `;
 
@@ -86,7 +99,10 @@ describe('Dashboard Stats & User Authentication Regression Test Suite', async ()
   test('Test 1 — Active student with streak_alive data executes without TypeError', async () => {
     const users = await sql`
       SELECT id, xp, level, streak, current_streak, longest_streak, last_played_date,
-             CASE WHEN last_played_date >= CURRENT_DATE - 1 THEN 1 ELSE 0 END AS streak_alive
+             CASE
+               WHEN last_played_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date - 1
+               THEN 1 ELSE 0
+             END AS streak_alive
       FROM users
       WHERE id = ${studentWithDataId} AND (status IS NULL OR status != 'pending_deletion')
     `;
@@ -105,7 +121,10 @@ describe('Dashboard Stats & User Authentication Regression Test Suite', async ()
   test('Test 2 — Fresh student with NULL last_played_date executes safely without TypeError', async () => {
     const users = await sql`
       SELECT id, xp, level, streak, current_streak, longest_streak, last_played_date,
-             CASE WHEN last_played_date >= CURRENT_DATE - 1 THEN 1 ELSE 0 END AS streak_alive
+             CASE
+               WHEN last_played_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date - 1
+               THEN 1 ELSE 0
+             END AS streak_alive
       FROM users
       WHERE id = ${freshStudentId} AND (status IS NULL OR status != 'pending_deletion')
     `;
@@ -128,7 +147,10 @@ describe('Dashboard Stats & User Authentication Regression Test Suite', async ()
   test('Test 3 — Adversarial: Missing / Deleted user in dashboard-stats returns 404 instead of throwing TypeError', async () => {
     const users = await sql`
       SELECT id, xp, level, streak, current_streak, longest_streak, last_played_date,
-             CASE WHEN last_played_date >= CURRENT_DATE - 1 THEN 1 ELSE 0 END AS streak_alive
+             CASE
+               WHEN last_played_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date - 1
+               THEN 1 ELSE 0
+             END AS streak_alive
       FROM users
       WHERE id = ${deletedUserId} AND (status IS NULL OR status != 'pending_deletion')
     `;
@@ -163,7 +185,10 @@ describe('Dashboard Stats & User Authentication Regression Test Suite', async ()
     // 2. Query filter check
     const usersInQuery = await sql`
       SELECT id, xp, level, streak, current_streak, longest_streak, last_played_date,
-             CASE WHEN last_played_date >= CURRENT_DATE - 1 THEN 1 ELSE 0 END AS streak_alive
+             CASE
+               WHEN last_played_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date - 1
+               THEN 1 ELSE 0
+             END AS streak_alive
       FROM users
       WHERE id = ${pendingUserId} AND (status IS NULL OR status != 'pending_deletion')
     `;
@@ -175,24 +200,34 @@ describe('Dashboard Stats & User Authentication Regression Test Suite', async ()
   test('Test 5 — Streak window boundary logic (today, yesterday, 2+ days ago)', async () => {
     const testUserId = uuidv4();
 
-    // Played yesterday (valid continuation window)
+    // Played yesterday (valid continuation window).
+    // Written in IST, not CURRENT_DATE, so it agrees with the IST assertion below. Mixing the
+    // two would make this test flip between 18:30 and 23:59 UTC (00:00-05:29 IST next day):
+    // the fixture would store UTC_today - 1, which is IST_today - 2, and the assertion
+    // `>= IST_today - 1` would then correctly read 0 while this test demands 1.
     await sql`
       INSERT INTO users (id, email, name, role, status, current_streak, last_played_date)
-      VALUES (${testUserId}, ${`boundary_${testUserId}@test.io`}, 'Boundary User', 'student', 'active', 5, CURRENT_DATE - 1)
+      VALUES (${testUserId}, ${`boundary_${testUserId}@test.io`}, 'Boundary User', 'student', 'active', 5, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date - 1)
     `;
 
     let rows = await sql`
-      SELECT CASE WHEN last_played_date >= CURRENT_DATE - 1 THEN 1 ELSE 0 END AS streak_alive
+      SELECT CASE
+               WHEN last_played_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date - 1
+               THEN 1 ELSE 0
+             END AS streak_alive
       FROM users WHERE id = ${testUserId}
     `;
     assert.strictEqual(parseInt(rows[0].streak_alive, 10), 1, 'Played yesterday must count as streak_alive = 1');
 
-    // Played 2 days ago (streak broken)
+    // Played 2 days ago (streak broken) — again in IST, to match the assertion.
     await sql`
-      UPDATE users SET last_played_date = CURRENT_DATE - 2 WHERE id = ${testUserId}
+      UPDATE users SET last_played_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date - 2 WHERE id = ${testUserId}
     `;
     rows = await sql`
-      SELECT CASE WHEN last_played_date >= CURRENT_DATE - 1 THEN 1 ELSE 0 END AS streak_alive
+      SELECT CASE
+               WHEN last_played_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date - 1
+               THEN 1 ELSE 0
+             END AS streak_alive
       FROM users WHERE id = ${testUserId}
     `;
     assert.strictEqual(parseInt(rows[0].streak_alive, 10), 0, 'Played 2 days ago must count as streak_alive = 0');

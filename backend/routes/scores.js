@@ -264,35 +264,45 @@ router.post('/submit', authenticateToken, async (req, res) => {
       const levelInfo = getLevelInfo(masteryXp);
 
       // XP/level, the correct-answer streak, and the daily play streak, in one statement.
-      // Daily streak uses CURRENT_DATE so the day boundary is decided by the database rather
-      // than the client clock or the Node process timezone:
+      //
       //   no previous play      -> 1
       //   already played today  -> unchanged
       //   played yesterday      -> +1  (continued)
       //   gap of 2+ days        -> 1   (reset — i.e. one or more whole days were missed)
+      //
       // The reset lands on 1 rather than 0 because THIS submission is day one of the new run;
       // starting at 0 would leave the count trailing a day behind forever. The 0 a student
       // sees after a lapse is produced on READ instead (streak_alive in routes/users.js) —
       // nothing runs here while nobody is playing, so the column cannot zero itself.
+      //
+      // "Today" is IST, not the server's day. Every student is in India, and a bare
+      // CURRENT_DATE would return the UTC date, rolling the streak day over at 05:30 IST
+      // instead of midnight — so a 2am practice session would be filed under yesterday,
+      // denying a legitimate +1 and lighting the wrong square on the calendar.
+      // CURRENT_TIMESTAMP is a timestamptz (an absolute instant), so AT TIME ZONE
+      // 'Asia/Kolkata' gives the real IST date no matter what timezone this connection or
+      // this Node process happens to be in. Computed once in FROM so the five places that
+      // need it cannot drift apart. Keep this in step with routes/users.js.
       await tx`
         UPDATE users
         SET xp = ${masteryXp},
             level = ${levelInfo.level},
             streak = CASE WHEN streak < ${maxStreak} THEN ${maxStreak} ELSE streak END,
             current_streak = CASE
-              WHEN last_played_date = CURRENT_DATE     THEN COALESCE(current_streak, 0)
-              WHEN last_played_date = CURRENT_DATE - 1 THEN COALESCE(current_streak, 0) + 1
+              WHEN last_played_date = t.today     THEN COALESCE(current_streak, 0)
+              WHEN last_played_date = t.today - 1 THEN COALESCE(current_streak, 0) + 1
               ELSE 1
             END,
             longest_streak = GREATEST(
               COALESCE(longest_streak, 0),
               CASE
-                WHEN last_played_date = CURRENT_DATE     THEN COALESCE(current_streak, 0)
-                WHEN last_played_date = CURRENT_DATE - 1 THEN COALESCE(current_streak, 0) + 1
+                WHEN last_played_date = t.today     THEN COALESCE(current_streak, 0)
+                WHEN last_played_date = t.today - 1 THEN COALESCE(current_streak, 0) + 1
                 ELSE 1
               END
             ),
-            last_played_date = CURRENT_DATE
+            last_played_date = t.today
+        FROM (SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date AS today) t
         WHERE id = ${req.user.id}
       `;
 

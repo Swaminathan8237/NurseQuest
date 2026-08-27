@@ -27,6 +27,23 @@ function getDB() {
   if (!sqlInstance) {
     const dbUrl = getFormattedDbUrl();
     const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
+    // TIMEZONE INVARIANT — do not set a session timezone here.
+    //
+    // No `connection: { TimeZone: ... }` is passed, so the session runs in the server's
+    // default, UTC. Two things depend on that and would break silently if it changed:
+    //
+    //   1. The TIMESTAMP columns (completed_at, created_at, ...) carry no zone, so they hold
+    //      whatever wall-clock the session was in when they were written. Everything assumes
+    //      that is UTC — routes/users.js converts with `AT TIME ZONE 'UTC'` before bucketing
+    //      attempts into IST days, and that step would be wrong by the offset otherwise.
+    //   2. The driver parses those naive values with a bare `new Date(x)`, i.e. as local time
+    //      of THIS Node process. Render sets no TZ, so Node is UTC too, and stored-UTC read by
+    //      UTC-Node yields the correct absolute instant for the client to render in IST.
+    //
+    // Setting this to 'Asia/Kolkata' looks like the obvious way to make dates "Indian". It is
+    // not: it would store IST wall-clock into naive columns that a UTC Node process then reads
+    // as UTC, shifting every existing timestamp in the app by 5h30m. The IST day boundary is
+    // handled explicitly in SQL instead — see THE IST DAY RULE in routes/users.js.
     sqlInstance = postgres(dbUrl, {
       ssl: isLocal ? false : { rejectUnauthorized: false }, // Disable SSL for local connections
       max: 10, // Connection pool limit

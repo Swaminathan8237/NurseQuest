@@ -18,6 +18,7 @@ import {
   passedCount,
   questionCount,
 } from '../utils/unitQuizzes';
+import { climbPlateStyle } from '../utils/climbPlate';
 
 const LEVEL_NAMES = ['', 'Rookie', 'Learner', 'Explorer', 'Scholar', 'Expert', 'Master', 'Legend'];
 const LEVEL_ICONS = ['', '🌱', '📖', '🔭', '🎓', '⭐', '💎', '👑'];
@@ -54,12 +55,8 @@ function climbFrame(progress) {
   return `/section_frames/frame_${String(index).padStart(4, '0')}.webp`;
 }
 
-// Dissolves the light panel she stands on into the card. Anchored at 88%/104% —
-// bottom-right, where the art is anchored — and held fully opaque out to 66% of
-// the radius so nothing of her, head included, is ever faded. Only the left and
-// top edges, which are empty sky in every frame, fall away.
-const CLIMB_PLATE_MASK =
-  'radial-gradient(96% 132% at 88% 104%, #000 0%, #000 66%, rgba(0,0,0,0.45) 86%, rgba(0,0,0,0) 100%)';
+// Dissolves the light panel she stands on into the card. The plate itself, the mask, and
+// the reason the backdrop can never be dark all live in utils/climbPlate.js.
 
 
 // A lapsed streak is announced once per BREAK, not once per visit. The key embeds the
@@ -273,24 +270,15 @@ export default function StudentDashboard() {
               </p>
             </div>
 
-            {/* The nurse, on the step you've reached.
-                She has to sit on a light panel: the frames are dark line art on
-                white composited with mix-blend-multiply, so a dark backdrop would
-                render her black. Knocking the white out instead is not an option
-                either — the stair line art is black and would vanish on a dark
-                card. So the panel stays light and is instead (a) themed via
-                --climb-plate, and (b) masked, so its left and top edges dissolve
-                into the card rather than meeting it at a hard rectangle. The mask
-                is anchored bottom-right where she actually stands, and stays fully
-                opaque over her. */}
+            {/* The nurse, on the step you've reached. The panel under her must be light
+                and can never be dark — see THE INVARIANT in utils/climbPlate.js — and it
+                is feathered so its left and top edges dissolve into the card rather than
+                meeting it at a hard rectangle. */}
             <div
               className="pointer-events-none absolute right-0 bottom-0 w-[62%] max-w-[300px] aspect-[16/11] overflow-hidden"
               style={{
                 borderTopLeftRadius: '28px',
-                backgroundColor: 'var(--climb-plate)',
-                backgroundImage: 'var(--climb-plate-wash)',
-                maskImage: CLIMB_PLATE_MASK,
-                WebkitMaskImage: CLIMB_PLATE_MASK,
+                ...climbPlateStyle(),
               }}
             >
               <img

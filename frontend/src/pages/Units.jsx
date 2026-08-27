@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import SectionSideCanvas from '../components/SectionSideCanvas';
 import LevelPath from '../components/LevelPath';
 import { dedupeUnitQuizzes } from '../utils/unitQuizzes';
+import { CLIMB_PLATE_LIGHT } from '../utils/climbPlate';
 import { PASS_PERCENT } from '../constants';
 
 // ── Mobile climb-scene tuning ────────────────────────────────────────────────
@@ -160,11 +161,8 @@ export default function Units() {
           // Reduce-motion: one static hero in normal flow — nothing pinned, nothing
           // redrawn on scroll.
           <div
-            className="relative rounded-[28px] overflow-hidden border border-primary/15 shadow-lg bg-white flex items-end justify-center"
-            style={{
-              height: MOBILE_BOX_H,
-              backgroundImage: 'radial-gradient(120% 128% at 50% 122%, rgba(124,58,237,0.16), rgba(0,229,255,0.09) 44%, rgba(255,255,255,0.92) 76%)',
-            }}
+            className="relative rounded-[28px] overflow-hidden border border-primary/15 shadow-lg flex items-end justify-center"
+            style={{ height: MOBILE_BOX_H, ...CLIMB_PLATE_LIGHT }}
           >
             <div className="absolute inset-x-0 top-3.5 text-center px-4 z-10 pointer-events-none">
               <p className="font-headline font-black text-[13px] text-slate-900" style={CAPTION_HALO}>Your climb to graduation</p>
@@ -188,13 +186,13 @@ export default function Units() {
             // hero's rounded edge instead of being sliced mid-glyph against it.
             // top 64 + pt-4 puts the hero's own top at MOBILE_PIN_TOP (80).
             <div className="sticky z-30 -mx-6 px-6 pt-4 pb-4 mb-4 bg-[#f2f2f2]" style={{ top: '64px' }}>
+            {/* The plate she stands on is pinned LIGHT, not themed — this page hardcodes
+                its palette, so a themed plate would be the only element that darkened.
+                See THE INVARIANT in utils/climbPlate.js. No mask: this is a bordered card
+                already, and feathering would fight its own edge. */}
             <div
-              className="relative rounded-[28px] overflow-hidden border border-primary/15 shadow-[0_18px_42px_rgba(2,6,23,0.12)] bg-white flex items-end justify-center"
-              style={{
-                height: MOBILE_BOX_H,
-                backgroundImage:
-                  'radial-gradient(120% 128% at 50% 122%, rgba(124,58,237,0.16), rgba(0,229,255,0.09) 44%, rgba(255,255,255,0.92) 76%)',
-              }}
+              className="relative rounded-[28px] overflow-hidden border border-primary/15 shadow-[0_18px_42px_rgba(2,6,23,0.12)] flex items-end justify-center"
+              style={{ height: MOBILE_BOX_H, ...CLIMB_PLATE_LIGHT }}
             >
               {/* Caption overlays the empty upper part of the frame — it costs no height.
                   Contrast comes from a per-glyph white halo (CAPTION_HALO) rather than a

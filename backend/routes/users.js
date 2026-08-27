@@ -5,20 +5,41 @@ const { getLevelInfo, PASS_PERCENT } = require('../utils/scoring');
 
 const router = express.Router();
 
-// A Postgres DATE -> a plain 'YYYY-MM-DD' string, read in the server's own timezone.
+// A Postgres DATE -> a plain 'YYYY-MM-DD' string.
 // Never hand the client a raw Date: it would be re-parsed as UTC midnight and could slide
 // a day backwards for anyone west of Greenwich, which for a streak calendar means lighting
 // the wrong square. Returns null for anything unparseable so callers can drop it.
+//
+// Read with the UTC getters on purpose. The driver turns a DATE into midnight *UTC*
+// (node_modules/postgres parses OIDs 1082/1114/1184 with a bare `new Date(x)`), so the
+// calendar day is only intact in UTC — pulling it out with the local getters would shift
+// it a day earlier on any server west of Greenwich. UTC in, UTC out, correct everywhere.
 function toDateString(value) {
   if (!value) return null;
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
+    d.getUTCFullYear(),
+    String(d.getUTCMonth() + 1).padStart(2, '0'),
+    String(d.getUTCDate()).padStart(2, '0'),
   ].join('-');
 }
+
+// THE IST DAY RULE, used by both streak queries below.
+//
+// "Today" has to mean today as the student experiences it. Every student is in India, so the
+// streak day must roll over at IST midnight; a bare CURRENT_DATE returns the UTC date and
+// rolls over at 05:30 IST instead, filing a 2am practice session under yesterday.
+//
+//   today, in IST:          (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
+//   an attempt's IST day:   (completed_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date
+//
+// CURRENT_TIMESTAMP is a timestamptz (an absolute instant), so the first form resolves to the
+// true IST date no matter what timezone this connection or this Node process is in. completed_at
+// is a naive TIMESTAMP holding UTC wall-clock, so the second form must attach UTC before
+// converting. Written out at each site rather than shared through a constant: postgres.js would
+// parameterise an interpolated string as a literal, not splice it in as SQL. Keep these in step
+// with the same expression in routes/scores.js, which writes the column they read.
 
 // Get all students (teacher only)
 router.get('/students', authenticateToken, requireRole('teacher'), async (req, res) => {
@@ -177,16 +198,20 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
       // to continue it; anything older means a whole day was missed and the run is over.
       // This has to be decided here on READ: current_streak is only ever written on quiz
       // submit (routes/scores.js), so nothing at all runs while a student is away, and the
-      // column sits frozen at its last value. Compared in SQL against CURRENT_DATE, matching
-      // that same bookkeeping — doing it in Node would use the Node process timezone instead
-      // of the database's. Emitted as 1/0 rather than a boolean, matching the integer flags
-      // this file already reads (is_published = 1) and sidestepping how the driver happens to
-      // marshal bools. NULL (never played) fails the comparison and falls to ELSE 0, so a
-      // brand-new student reads as not alive; the 2-day floor below then keeps them out of
-      // the "you broke your streak" prompt, so they are never mourned a streak they never had.
+      // column sits frozen at its last value. Compared in SQL against the IST date (see THE
+      // IST DAY RULE above), matching that same bookkeeping — doing it in Node would use the
+      // Node process timezone instead. Emitted as 1/0 rather than a boolean, matching the
+      // integer flags this file already reads (is_published = 1) and sidestepping how the
+      // driver happens to marshal bools. NULL (never played) fails the comparison and falls
+      // to ELSE 0, so a brand-new student reads as not alive; the 2-day floor below then keeps
+      // them out of the "you broke your streak" prompt, so they are never mourned a streak
+      // they never had.
       const users = await db`
         SELECT id, xp, level, streak, current_streak, longest_streak, last_played_date,
-               CASE WHEN last_played_date >= CURRENT_DATE - 1 THEN 1 ELSE 0 END AS streak_alive
+               CASE
+                 WHEN last_played_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date - 1
+                 THEN 1 ELSE 0
+               END AS streak_alive
         FROM users
         WHERE id = ${req.user.id} AND (status IS NULL OR status != 'pending_deletion')
       `;
@@ -249,14 +274,23 @@ router.get('/dashboard-stats', authenticateToken, async (req, res) => {
       `;
 
       // Distinct days this student actually practised, for the streak calendar.
-      // Cast to ::date (server-local) so it lines up with the current_streak
-      // bookkeeping in routes/scores.js, which compares against CURRENT_DATE.
-      // Bounded to roughly four months so the payload stays small.
+      //
+      // Bucketed into IST days (see THE IST DAY RULE above) so the squares line up with the
+      // current_streak bookkeeping in routes/scores.js and with the day the student remembers
+      // practising. completed_at is a naive TIMESTAMP holding UTC wall-clock, hence the two
+      // AT TIME ZONE steps: attach UTC, then convert to IST. A plain ::date would just
+      // truncate the UTC wall-clock, so anything practised after 18:30 IST would land on the
+      // previous square.
+      //
+      // The WHERE bound deliberately compares completed_at RAW, against the same naive-UTC
+      // domain the column is stored in, so the (user_id, completed_at) index stays usable —
+      // wrapping the column in AT TIME ZONE here would make it unsargable for no gain.
+      // 121 days rather than 120 so the +05:30 shift can never clip the oldest day.
       const practiceDaysResult = await db`
-        SELECT DISTINCT completed_at::date AS day
+        SELECT DISTINCT (completed_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date AS day
         FROM quiz_attempts
         WHERE user_id = ${req.user.id}
-          AND completed_at >= CURRENT_DATE - INTERVAL '120 days'
+          AND completed_at >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '121 days'
         ORDER BY day
       `;
 

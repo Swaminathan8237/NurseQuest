@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vite *)",
+      "Bash(node scratch/check_analytics_data.js)",
+      "Bash(node --check db/init.js)",
+      "Bash(node --check tests/dashboardStats.test.js)"
+    ]
+  }
+}

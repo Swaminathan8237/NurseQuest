@@ -960,10 +960,11 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
 
     // ---- Overall: summed counts, NOT averaged unit percentages, so a 40-question
     //      unit outweighs a 4-question one. ----
-    const totalQuestions = units.reduce((acc, u) => acc + (Number(u.totalQuestions) || 0), 0);
-    const totalCorrect = units.reduce((acc, u) => acc + (Number(u.correct) || 0), 0);
-    const totalTime = units.reduce((acc, u) => acc + (Number(u.completionTime) || 0), 0);
-    const totalExpected = units.reduce((acc, u) => acc + (Number(u.expectedTime) || 0), 0);
+    const sum = (field) => units.reduce((acc, u) => acc + (Number(u[field]) || 0), 0);
+    const totalQuestions = sum('totalQuestions');
+    const totalCorrect = sum('correct');
+    const totalTime = sum('completionTime');
+    const totalExpected = sum('expectedTime');
     const unitsCompleted = units.filter(u => u.completed).length;
 
     let firstTotal = 0, firstCorrect = 0;

@@ -50,6 +50,15 @@ function round(value, places = 2) {
 }
 
 /**
+ * Sum a numeric field across report rows.
+ * Handles postgres.js numeric strings and missing/null values consistently.
+ */
+function sumField(rows, field) {
+  if (!Array.isArray(rows)) return 0;
+  return rows.reduce((total, row) => total + num(row?.[field]), 0);
+}
+
+/**
  * Accuracy = (correct / total) * 100
  */
 function accuracy(correct, total) {
@@ -149,6 +158,7 @@ function leaderboardScore({ accuracy: acc, speed, completion } = {}) {
 }
 
 module.exports = {
+  sumField,
   accuracy,
   speedScore,
   efficiency,

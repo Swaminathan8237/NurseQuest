@@ -960,11 +960,12 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
 
     // ---- Overall: summed counts, NOT averaged unit percentages, so a 40-question
     //      unit outweighs a 4-question one. ----
-    const sum = (field) => units.reduce((acc, u) => acc + (Number(u[field]) || 0), 0);
-    const totalQuestions = sum('totalQuestions');
-    const totalCorrect = sum('correct');
-    const totalTime = sum('completionTime');
-    const totalExpected = sum('expectedTime');
+    const totalQuestions = analytics.sumField(units, 'totalQuestions');
+    const totalCorrect = analytics.sumField(units, 'correct');
+    const totalTime = analytics.sumField(units, 'completionTime');
+    const totalExpected = analytics.sumField(units, 'expectedTime');
+    const totalPoints = analytics.sumField(units, 'totalPoints');
+    const totalAttempts = analytics.sumField(units, 'attempts');
     const unitsCompleted = units.filter(u => u.completed).length;
 
     let firstTotal = 0, firstCorrect = 0;
@@ -1001,8 +1002,8 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
     });
 
     const overall = {
-      totalPoints: sum('totalPoints'),
-      totalAttempts: sum('attempts'),
+      totalPoints,
+      totalAttempts,
       totalQuestions,
       correct: totalCorrect,
       incorrect: totalQuestions - totalCorrect,

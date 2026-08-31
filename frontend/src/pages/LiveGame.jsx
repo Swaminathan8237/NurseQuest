@@ -443,10 +443,10 @@ export default function LiveGame() {
     if (phase === 'playing' && timeLeft === 0 && !answered && !isHost) {
       if (question?.type === 'captcha' && captchaBox && captchaBox.w > 0.01 && captchaBox.h > 0.01) {
         submitAnswer(JSON.stringify({ x: +captchaBox.x.toFixed(4), y: +captchaBox.y.toFixed(4), w: +captchaBox.w.toFixed(4), h: +captchaBox.h.toFixed(4) }), { allowTimeoutSubmit: true });
-      } else if (selectedOption !== null && ['mcq', 'image'].includes(question?.type)) {
-        submitAnswer(selectedOption, { allowTimeoutSubmit: true });
+      } else if (selectedOption !== null && ['mcq', 'image', 'video', 'audio'].includes(question?.type)) {
+        submitAnswer(selectedOption, { allowTimeoutSubmit: true, committed: false });
       } else {
-        submitAnswer(null, { allowTimeoutSubmit: true });
+        submitAnswer(null, { allowTimeoutSubmit: true, committed: false });
       }
     }
   }, [timeLeft, phase, answered, isHost, captchaBox, question, selectedOption]);
@@ -513,7 +513,7 @@ export default function LiveGame() {
 
   const startGame = () => socket.emit('start-game');
   const showLeaderboard = () => socket.emit('show-leaderboard');
-  const submitAnswer = (answer, { allowTimeoutSubmit = false } = {}) => {
+  const submitAnswer = (answer, { allowTimeoutSubmit = false, committed = true } = {}) => {
     if (answered || !question) return;
 
     if (!isHost && timeLeft <= 0 && !allowTimeoutSubmit) {
@@ -524,7 +524,7 @@ export default function LiveGame() {
 
     setAnswered(true);
     setSelectedOption(null);
-    socket.emit('submit-answer', { answer });
+    socket.emit('submit-answer', { answer, committed: committed !== false });
   };
 
   // MCQ/image option click: first click selects (and emits selection-change), second click confirms
@@ -536,7 +536,7 @@ export default function LiveGame() {
     } else {
       // Select this option and emit selection-change for trail tracking
       setSelectedOption(opt);
-      if (socket && question?.index !== undefined && ['mcq', 'image'].includes(question.type)) {
+      if (socket && question?.index !== undefined && ['mcq', 'image', 'video', 'audio'].includes(question.type)) {
         socket.emit('selection-change', { value: opt, questionIndex: question.index });
       }
     }

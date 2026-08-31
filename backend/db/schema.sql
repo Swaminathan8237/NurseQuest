@@ -269,7 +269,7 @@ CREATE TABLE IF NOT EXISTS live_game_attempts (
   final_rank      INTEGER DEFAULT 0,
   completed_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (session_id) REFERENCES live_sessions(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   UNIQUE(session_id, user_id)
 );
 
@@ -290,7 +290,7 @@ CREATE TABLE IF NOT EXISTS live_game_answers (
 );
 
 -- Selection trail: each option click/change the student made before submitting.
--- Only populated for MCQ and image-based questions.
+-- Populated for MCQ, image, video, and audio (select-then-confirm UI).
 CREATE TABLE IF NOT EXISTS live_answer_selections (
   id              TEXT PRIMARY KEY,
   answer_id       TEXT NOT NULL,
@@ -308,4 +308,9 @@ CREATE INDEX IF NOT EXISTS idx_las_answer ON live_answer_selections(answer_id);
 
 ALTER TABLE live_game_answers ADD COLUMN IF NOT EXISTS status TEXT;
 ALTER TABLE live_answer_selections ADD COLUMN IF NOT EXISTS is_correct INTEGER DEFAULT 0;
+
+-- Ensure live_game_attempts.user_id cascades on user deletion (existing DBs).
+ALTER TABLE live_game_attempts DROP CONSTRAINT IF EXISTS live_game_attempts_user_id_fkey;
+ALTER TABLE live_game_attempts ADD CONSTRAINT live_game_attempts_user_id_fkey
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 

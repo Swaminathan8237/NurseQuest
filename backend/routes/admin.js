@@ -1604,6 +1604,7 @@ async function executePermanentDeletion(tx, entityType, entityId) {
     await tx`DELETE FROM user_achievements WHERE user_id = ${entityId}`;
     await tx`DELETE FROM question_answers WHERE attempt_id IN (SELECT id FROM quiz_attempts WHERE user_id = ${entityId})`;
     await tx`DELETE FROM quiz_attempts WHERE user_id = ${entityId}`;
+    await tx`DELETE FROM live_game_attempts WHERE user_id = ${entityId}`;
 
     // 3. For official unit quizzes (unit >= 1), reassign created_by to permanent teacher/admin so core curriculum is never deleted
     const fallbackAdmin = await tx`SELECT id FROM users WHERE (role = 'teacher' OR role = 'admin') AND id != ${entityId} ORDER BY (role = 'teacher') DESC, created_at ASC LIMIT 1`;

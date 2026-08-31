@@ -70,14 +70,32 @@ function finalizeUnansweredForCurrentQuestion(session, finishedAt = Date.now()) 
   }
 }
 
+const SELECT_CONFIRM_TYPES = new Set(['mcq', 'image', 'video', 'audio']);
+
 /**
  * Compute 5-state answer status for live game persistence (mirrors solo quiz semantics).
  */
-function computeLiveAnswerStatus(ansInfo) {
-  if (!ansInfo || ansInfo.answer === null || ansInfo.answer === undefined || ansInfo.answer === '') {
-    return 'not_answered';
+function computeLiveAnswerStatus(ansInfo, trail, correctNorm) {
+  if (!ansInfo) return 'not_answered';
+
+  const hasAnswer = ansInfo.answer !== null && ansInfo.answer !== undefined && ansInfo.answer !== '';
+  const committed = ansInfo.committed !== false;
+
+  if (hasAnswer && committed) {
+    return ansInfo.isCorrect ? 'correct' : 'incorrect';
   }
-  return ansInfo.isCorrect ? 'correct' : 'incorrect';
+  if (hasAnswer && !committed) {
+    return ansInfo.isCorrect ? 'selected_correct' : 'selected_incorrect';
+  }
+
+  // Host skip or server-side finalize: infer from the last staged selection.
+  if (trail && trail.length > 0) {
+    const lastSel = trail[trail.length - 1];
+    const selCorrect = String(lastSel.value).toUpperCase().trim() === correctNorm;
+    return selCorrect ? 'selected_correct' : 'selected_incorrect';
+  }
+
+  return 'not_answered';
 }
 
 /**
@@ -128,17 +146,17 @@ async function persistLiveGameResults(session, rankings) {
           const responseMs = ansInfo?.responseMs || 0;
           const isTimeout = ansInfo?.isTimeout ? 1 : 0;
           const isLate = ansInfo?.isLate ? 1 : 0;
-          const status = computeLiveAnswerStatus(ansInfo);
+          const trail = participant.selectionTrails?.[qIdx];
           const correctNorm = question.correct_answer?.toString().toUpperCase().trim() || '';
+          const status = computeLiveAnswerStatus(ansInfo, trail, correctNorm);
 
           await tx`
             INSERT INTO live_game_answers (id, attempt_id, question_id, question_index, final_answer, is_correct, points_earned, response_ms, is_timeout, is_late, status)
             VALUES (${answerId}, ${attemptId}, ${question.id}, ${qIdx}, ${finalAnswer}, ${isCorrect}, ${pointsEarned}, ${responseMs}, ${isTimeout}, ${isLate}, ${status})
           `;
 
-          // Persist selection trail for MCQ and image questions
-          const trail = participant.selectionTrails?.[qIdx];
-          if (trail && trail.length > 0 && (question.type === 'mcq' || question.type === 'image')) {
+          // Persist selection trail for select-then-confirm question types
+          if (trail && trail.length > 0 && SELECT_CONFIRM_TYPES.has(question.type)) {
             for (const sel of trail) {
               const selCorrect = String(sel.value).toUpperCase().trim() === correctNorm ? 1 : 0;
               await tx`
@@ -430,7 +448,8 @@ function initializeSocket(io) {
           isLate: true,
           responseMs: questionLimitMs,
           score: lateScore,
-          answeredAt: now
+          answeredAt: now,
+          committed: data.committed !== false
         };
 
         socket.emit('answer-result', {
@@ -516,7 +535,8 @@ function initializeSocket(io) {
         isCorrect,
         responseMs,
         score: scoreResult,
-        answeredAt: now
+        answeredAt: now,
+        committed: data.committed !== false
       };
 
       // Send personal result to student
@@ -549,7 +569,7 @@ function initializeSocket(io) {
       if (!participant) return;
       const qIdx = session.currentQuestion;
       const question = session.questions?.[qIdx];
-      if (!question || (question.type !== 'mcq' && question.type !== 'image')) return;
+      if (!question || !SELECT_CONFIRM_TYPES.has(question.type)) return;
       if (participant.answers[qIdx] !== undefined) return;
       // Only track while the question is active
       if (!session.questionStartedAt || session.resultsEmittedForQuestion === qIdx) return;

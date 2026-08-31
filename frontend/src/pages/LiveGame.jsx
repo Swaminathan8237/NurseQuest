@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useParams } from 'react-router';
 import { io } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
 import { quizAPI } from '../api';
-import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import { gsap } from 'gsap';
 import { Flip } from 'gsap/Flip';
@@ -48,7 +47,7 @@ const renderCorrectAnswer = (correctVal) => {
   if (typeof correctVal === 'string') {
     try {
       parsed = JSON.parse(correctVal);
-    } catch (e) {
+    } catch {
       parsed = correctVal;
     }
   }
@@ -227,13 +226,40 @@ const RankingsList = memo(({ rankings, variant = 'sidebar', currentUserId }) => 
   return null;
 });
 
+function shuffleArray(items) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function LiveGameTopBar({ onExit }) {
+  return (
+    <header className="flex justify-between items-center px-8 h-16 w-full bg-slate-950/60 backdrop-blur-md z-50 shrink-0">
+      <div className="font-headline font-black text-primary-fixed-dim tracking-tighter text-xl bg-clip-text text-transparent bg-gradient-to-br from-primary to-primary-container drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]">
+        CLINICAL PULSE ARENA
+      </div>
+      <div className="flex items-center gap-4 text-on-surface-variant">
+        <button onClick={onExit} className="hover:text-primary transition-colors flex items-center gap-2">
+          <span className="material-symbols-outlined font-[300]">logout</span>
+          <span className="text-sm font-headline tracking-widest uppercase font-bold">Exit</span>
+        </button>
+      </div>
+    </header>
+  );
+}
+
 export default function LiveGame() {
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { code } = useParams();
   const [phase, setPhase] = useState('menu'); // menu, waiting, countdown, playing, results
-  const [joinCode, setJoinCode] = useState('');
+  const urlJoinCode = code ? code.toUpperCase() : '';
+  const [joinCodeDraft, setJoinCodeDraft] = useState('');
+  const joinCode = joinCodeDraft || urlJoinCode;
   const [guestName, setGuestName] = useState(() => {
     const stored = localStorage.getItem('skillquest_guest_name');
     return stored || '';
@@ -309,6 +335,22 @@ export default function LiveGame() {
   const homePath = user?.role === 'admin' ? '/admin'
     : user?.role === 'teacher' ? '/teacher'
     : user ? '/student' : '/';
+  const isHostRef = useRef(isHost);
+  useEffect(() => { isHostRef.current = isHost; }, [isHost]);
+
+  const submitAnswer = useCallback((answer, { allowTimeoutSubmit = false, committed = true } = {}) => {
+    if (answered || !question) return;
+
+    if (!isHost && timeLeft <= 0 && !allowTimeoutSubmit) {
+      setAnswered(true);
+      setAnswerResult({ isCorrect: false, tooLate: true, message: 'Too late - time is up for this question.' });
+      return;
+    }
+
+    setAnswered(true);
+    setSelectedOption(null);
+    socket.emit('submit-answer', { answer, committed: committed !== false });
+  }, [answered, question, isHost, timeLeft]);
 
   useEffect(() => {
     socket = io('/', { transports: ['websocket', 'polling'] });
@@ -336,14 +378,14 @@ export default function LiveGame() {
       setPhase('playing');
     });
     socket.on('answer-count', (data) => {
-      if (isHost) setAnswerCount(data);
+      if (isHostRef.current) setAnswerCount(data);
     });
     socket.on('answer-result', (r) => setAnswerResult(r));
     socket.on('question-results', (r) => {
       // A student on a sequence question stays on the board for a moment so their cards can
       // animate into the correct order — every student animates their OWN arrangement at the
       // same instant. The host (no board) and every other type switch immediately, as before.
-      const isSequenceBoard = !isHost && questionRef.current?.type === 'jumbled_sequence';
+      const isSequenceBoard = !isHostRef.current && questionRef.current?.type === 'jumbled_sequence';
       if (isSequenceBoard) {
         pendingRevealRef.current = r;
         // Make sure the board has the key even if the student never answered (timeout), since
@@ -366,65 +408,52 @@ export default function LiveGame() {
     socket.on('error', (e) => setError(e.message));
     socket.on('session-ended', () => { setPhase('menu'); setError('Session ended'); });
 
-    if (isHost) quizAPI.getMyQuizzes().then(setQuizzes).catch(console.error);
+    if (isHostRef.current) quizAPI.getMyQuizzes().then(setQuizzes).catch(console.error);
 
     return () => { if (socket) socket.disconnect(); };
   }, []);
 
-  useEffect(() => {
-    if (code) {
-      setJoinCode(code.toUpperCase());
-    }
-  }, [code]);
-
-  useEffect(() => {
-    if (phase !== 'playing' || !question) return;
-
-    if (question.type === 'jumbled_letters') {
-      const letters = [...(question.options || [])];
-      for (let i = letters.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [letters[i], letters[j]] = [letters[j], letters[i]];
+  const playingQuestionKey = phase === 'playing' && question
+    ? `${question.id}-${question.index ?? 0}`
+    : null;
+  const [syncedPlayingKey, setSyncedPlayingKey] = useState(null);
+  if (playingQuestionKey !== syncedPlayingKey) {
+    setSyncedPlayingKey(playingQuestionKey);
+    if (playingQuestionKey && question) {
+      if (question.type === 'jumbled_letters') {
+        const letters = shuffleArray(question.options || []);
+        setJumbledLetters(letters.map((letter, idx) => ({ id: idx, letter, placed: false })));
+        setPlacedLetters([]);
+      } else {
+        setJumbledLetters([]);
+        setPlacedLetters([]);
       }
-      setJumbledLetters(letters.map((letter, idx) => ({ id: idx, letter, placed: false })));
-      setPlacedLetters([]);
-    } else {
-      setJumbledLetters([]);
-      setPlacedLetters([]);
-    }
 
-    // Sequence questions: ProcedureOrder owns its own shuffle and board state.
-
-    if (question.type === 'slider') {
-      const min = parseFloat(question.sliderMin ?? question.slider_min) || 0;
-      const max = parseFloat(question.sliderMax ?? question.slider_max) || 100;
-      setSliderValue((min + max) / 2);
-    }
-
-    if (question.type === 'matching') {
-      const rights = [...(question.matchingPairs || question.matching_pairs || [])];
-      for (let i = rights.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [rights[i], rights[j]] = [rights[j], rights[i]];
+      if (question.type === 'slider') {
+        const min = parseFloat(question.sliderMin ?? question.slider_min) || 0;
+        const max = parseFloat(question.sliderMax ?? question.slider_max) || 100;
+        setSliderValue((min + max) / 2);
       }
-      setShuffledRightItems(rights);
-      setMatchingSelections({});
-      setSelectedLeft(null);
-    } else {
-      setShuffledRightItems([]);
-      setMatchingSelections({});
-      setSelectedLeft(null);
-    }
 
-    // Captcha reset
-    if (question?.type === 'captcha') {
-      setCaptchaBox(null);
-      setCaptchaDrawing(false);
-      setCaptchaStartPt(null);
-      setCaptchaZoom(1);
-      setCaptchaPan({ x: 0, y: 0 });
+      if (question.type === 'matching') {
+        setShuffledRightItems(shuffleArray(question.matchingPairs || question.matching_pairs || []));
+        setMatchingSelections({});
+        setSelectedLeft(null);
+      } else {
+        setShuffledRightItems([]);
+        setMatchingSelections({});
+        setSelectedLeft(null);
+      }
+
+      if (question.type === 'captcha') {
+        setCaptchaBox(null);
+        setCaptchaDrawing(false);
+        setCaptchaStartPt(null);
+        setCaptchaZoom(1);
+        setCaptchaPan({ x: 0, y: 0 });
+      }
     }
-  }, [phase, question]);
+  }
 
   useEffect(() => {
     if (phase !== 'playing' || !question?.questionEndsAt) return;
@@ -439,15 +468,20 @@ export default function LiveGame() {
     return () => clearInterval(timerId);
   }, [phase, question]);
 
+  const submitAnswerRef = useRef(submitAnswer);
+  useEffect(() => { submitAnswerRef.current = submitAnswer; }, [submitAnswer]);
+
   useEffect(() => {
     if (phase === 'playing' && timeLeft === 0 && !answered && !isHost) {
-      if (question?.type === 'captcha' && captchaBox && captchaBox.w > 0.01 && captchaBox.h > 0.01) {
-        submitAnswer(JSON.stringify({ x: +captchaBox.x.toFixed(4), y: +captchaBox.y.toFixed(4), w: +captchaBox.w.toFixed(4), h: +captchaBox.h.toFixed(4) }), { allowTimeoutSubmit: true });
-      } else if (selectedOption !== null && ['mcq', 'image', 'video', 'audio'].includes(question?.type)) {
-        submitAnswer(selectedOption, { allowTimeoutSubmit: true, committed: false });
-      } else {
-        submitAnswer(null, { allowTimeoutSubmit: true, committed: false });
-      }
+      queueMicrotask(() => {
+        if (question?.type === 'captcha' && captchaBox && captchaBox.w > 0.01 && captchaBox.h > 0.01) {
+          submitAnswerRef.current(JSON.stringify({ x: +captchaBox.x.toFixed(4), y: +captchaBox.y.toFixed(4), w: +captchaBox.w.toFixed(4), h: +captchaBox.h.toFixed(4) }), { allowTimeoutSubmit: true });
+        } else if (selectedOption !== null && ['mcq', 'image', 'video', 'audio'].includes(question?.type)) {
+          submitAnswerRef.current(selectedOption, { allowTimeoutSubmit: true, committed: false });
+        } else {
+          submitAnswerRef.current(null, { allowTimeoutSubmit: true, committed: false });
+        }
+      });
     }
   }, [timeLeft, phase, answered, isHost, captchaBox, question, selectedOption]);
 
@@ -513,19 +547,6 @@ export default function LiveGame() {
 
   const startGame = () => socket.emit('start-game');
   const showLeaderboard = () => socket.emit('show-leaderboard');
-  const submitAnswer = (answer, { allowTimeoutSubmit = false, committed = true } = {}) => {
-    if (answered || !question) return;
-
-    if (!isHost && timeLeft <= 0 && !allowTimeoutSubmit) {
-      setAnswered(true);
-      setAnswerResult({ isCorrect: false, tooLate: true, message: 'Too late - time is up for this question.' });
-      return;
-    }
-
-    setAnswered(true);
-    setSelectedOption(null);
-    socket.emit('submit-answer', { answer, committed: committed !== false });
-  };
 
   // MCQ/image option click: first click selects (and emits selection-change), second click confirms
   const handleOptionClick = (opt) => {
@@ -563,23 +584,11 @@ export default function LiveGame() {
   };
 
 
-  const TopBar = () => (
-    <header className="flex justify-between items-center px-8 h-16 w-full bg-slate-950/60 backdrop-blur-md z-50 shrink-0">
-      <div className="font-headline font-black text-primary-fixed-dim tracking-tighter text-xl bg-clip-text text-transparent bg-gradient-to-br from-primary to-primary-container drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]">
-        CLINICAL PULSE ARENA
-      </div>
-      <div className="flex items-center gap-4 text-on-surface-variant">
-        <button onClick={() => navigate(homePath)} className="hover:text-primary transition-colors flex items-center gap-2">
-          <span className="material-symbols-outlined font-[300]">logout</span>
-          <span className="text-sm font-headline tracking-widest uppercase font-bold">Exit</span>
-        </button>
-      </div>
-    </header>
-  );
+  const exitToHome = useCallback(() => navigate(homePath), [navigate, homePath]);
 
   if (phase === 'menu') return (
     <div className="bg-surface-container-lowest text-on-surface font-body min-h-screen flex flex-col overflow-hidden">
-      <TopBar />
+      <LiveGameTopBar onExit={exitToHome} />
       <div className="flex-1 flex items-center justify-center p-6 relative">
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
           <div className="w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px]"></div>
@@ -619,7 +628,7 @@ export default function LiveGame() {
                 <input 
                   className="bg-surface-container border border-outline-variant/30 text-on-surface p-4 rounded-lg focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-center text-3xl font-mono tracking-[0.2em] uppercase placeholder-on-surface-variant/30"
                   value={joinCode} 
-                  onChange={e => setJoinCode(e.target.value.toUpperCase())} 
+                  onChange={e => setJoinCodeDraft(e.target.value.toUpperCase())} 
                   placeholder="XXXXXX" 
                   maxLength={6} 
                 />
@@ -668,7 +677,7 @@ export default function LiveGame() {
 
   if (phase === 'waiting') return (
     <div className="bg-surface-container-lowest text-on-surface font-body min-h-screen flex flex-col overflow-hidden">
-      <TopBar />
+      <LiveGameTopBar onExit={exitToHome} />
       <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 relative overflow-y-auto">
         <h1 className="text-3xl md:text-5xl font-display font-black text-primary drop-shadow-[0_0_10px_rgba(0,229,255,0.4)] mb-8 animate-pulse">Waiting for Players...</h1>
         
@@ -735,11 +744,11 @@ export default function LiveGame() {
     const expectedLetters = Array.isArray(question.options) ? question.options.length : 0;
     
     // Sort and limit rankings for sidebar if they exist in state, else show placeholder or current participants
-    const activeRankings = rankings.length > 0 ? rankings : participants.map((p, i) => ({ id: p.id, name: p.name, score: 0 }));
+    const activeRankings = rankings.length > 0 ? rankings : participants.map((p) => ({ id: p.id, name: p.name, score: 0 }));
 
     return (
       <div className="bg-surface-container-lowest text-on-surface font-body min-h-screen flex flex-col overflow-hidden">
-        <TopBar />
+        <LiveGameTopBar onExit={exitToHome} />
         <main className="flex-1 flex overflow-hidden">
           {/* Main Quiz Canvas (Left) */}
           <section className="flex-[7] flex flex-col p-6 lg:p-12 gap-8 overflow-y-auto relative z-10 w-full">
@@ -1099,7 +1108,7 @@ export default function LiveGame() {
                       <span className="material-symbols-outlined text-xs">compare_arrows</span> Matches
                     </h4>
                     {shuffledRightItems.map((rightItem, i) => {
-                      const matchedLeft = Object.entries(matchingSelections).find(([_, v]) => v === rightItem)?.[0];
+                      const matchedLeft = Object.entries(matchingSelections).find(([, v]) => v === rightItem)?.[0];
                       const isMatched = !!matchedLeft;
                       const matchIdx = isMatched ? (question.options || []).indexOf(matchedLeft) : -1;
                       const matchColor = isMatched ? ['bg-primary', 'bg-[#71d7cd]', 'bg-amber-400', 'bg-error', 'bg-[#f59e0b]', 'bg-[#818cf8]'][matchIdx % 6] : '';
@@ -1413,7 +1422,7 @@ export default function LiveGame() {
 
     return (
       <div className="bg-surface-container-lowest text-on-surface font-body min-h-screen flex flex-col overflow-hidden">
-        <TopBar />
+        <LiveGameTopBar onExit={exitToHome} />
         <main className="flex-1 flex overflow-hidden">
           {/* Main Answer Reveal (Left) */}
           <section className="flex-[7] flex flex-col p-6 lg:p-12 gap-8 overflow-y-auto relative z-10 w-full">
@@ -1545,7 +1554,7 @@ export default function LiveGame() {
   if (phase === 'interim-leaderboard') {
     return (
       <div className="bg-surface-container-lowest text-on-surface font-body min-h-screen flex flex-col overflow-hidden">
-        <TopBar />
+        <LiveGameTopBar onExit={exitToHome} />
         <div className="flex-1 flex flex-col items-center py-12 px-6 overflow-y-auto relative">
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
             <div className="w-[600px] h-[600px] bg-primary/20 rounded-full blur-[100px]"></div>
@@ -1571,7 +1580,7 @@ export default function LiveGame() {
 
   if (phase === 'results') return (
     <div className="bg-surface-container-lowest text-on-surface font-body min-h-screen flex flex-col overflow-hidden">
-      <TopBar />
+      <LiveGameTopBar onExit={exitToHome} />
       <div className="flex-1 flex flex-col items-center py-12 px-6 overflow-y-auto relative">
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
           <div className="w-[800px] h-[800px] bg-[#FFD700]/20 rounded-full blur-[150px]"></div>

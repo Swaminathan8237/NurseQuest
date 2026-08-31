@@ -960,6 +960,7 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
 
     // ---- Overall: summed counts, NOT averaged unit percentages, so a 40-question
     //      unit outweighs a 4-question one. ----
+    const sumField = (key) => units.reduce((acc, u) => acc + (Number(u[key]) || 0), 0);
     const totalQuestions = units.reduce((acc, u) => acc + (Number(u.totalQuestions) || 0), 0);
     const totalCorrect = units.reduce((acc, u) => acc + (Number(u.correct) || 0), 0);
     const totalTime = units.reduce((acc, u) => acc + (Number(u.completionTime) || 0), 0);
@@ -1000,8 +1001,8 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
     });
 
     const overall = {
-      totalPoints: sum('totalPoints'),
-      totalAttempts: sum('attempts'),
+      totalPoints: sumField('totalPoints'),
+      totalAttempts: sumField('attempts'),
       totalQuestions,
       correct: totalCorrect,
       incorrect: totalQuestions - totalCorrect,
@@ -1081,6 +1082,509 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
     });
   } catch (err) {
     console.error('Admin get student report error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ==========================================================================
+   5b. LIVE GAME ANALYTICS (Admin Only)
+   ========================================================================== */
+
+/**
+ * List all live game sessions a student participated in, with summary metrics.
+ */
+router.get('/students/:id/live-games', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sql = getDB();
+
+    const rows = await sql`
+      SELECT lga.id AS attempt_id, lga.session_id, lga.final_score, lga.total_points,
+        lga.correct_count, lga.total_questions, lga.max_streak, lga.total_time_ms,
+        lga.final_rank, lga.completed_at,
+        ls.join_code, ls.started_at, ls.ended_at,
+        q.title AS quiz_title,
+        host.name AS hosted_by,
+        (SELECT COUNT(*) FROM live_game_attempts WHERE session_id = lga.session_id) AS total_players
+      FROM live_game_attempts lga
+      JOIN live_sessions ls ON ls.id = lga.session_id
+      JOIN quizzes q ON q.id = ls.quiz_id
+      JOIN users host ON host.id = ls.host_id
+      WHERE lga.user_id = ${id}
+      ORDER BY lga.completed_at DESC
+    `;
+
+    const games = rows.map(r => ({
+      attemptId: r.attempt_id,
+      sessionId: r.session_id,
+      quizTitle: r.quiz_title,
+      joinCode: r.join_code,
+      hostedBy: r.hosted_by,
+      playedAt: r.completed_at || r.started_at,
+      rank: parseInt(r.final_rank || 0, 10),
+      totalPlayers: parseInt(r.total_players || 0, 10),
+      score: parseInt(r.final_score || 0, 10),
+      totalPoints: parseInt(r.total_points || 0, 10),
+      accuracy: analytics.accuracy(r.correct_count, r.total_questions),
+      correctCount: parseInt(r.correct_count || 0, 10),
+      totalQuestions: parseInt(r.total_questions || 0, 10),
+      maxStreak: parseInt(r.max_streak || 0, 10),
+      totalTimeMs: parseInt(r.total_time_ms || 0, 10),
+      avgResponseMs: parseInt(r.total_questions, 10) > 0
+        ? Math.round(parseInt(r.total_time_ms || 0, 10) / parseInt(r.total_questions, 10))
+        : 0
+    }));
+
+    res.json(games);
+  } catch (err) {
+    console.error('Admin get student live games error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * Full question-by-question breakdown for one live game attempt, including selection trail.
+ */
+router.get('/live-games/:attemptId/detail', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { attemptId } = req.params;
+    const sql = getDB();
+
+    // Attempt info
+    const attempts = await sql`
+      SELECT lga.*, ls.join_code, ls.started_at, ls.ended_at,
+        q.title AS quiz_title, q.time_per_question,
+        host.name AS hosted_by,
+        (SELECT COUNT(*) FROM live_game_attempts WHERE session_id = lga.session_id) AS total_players
+      FROM live_game_attempts lga
+      JOIN live_sessions ls ON ls.id = lga.session_id
+      JOIN quizzes q ON q.id = ls.quiz_id
+      JOIN users host ON host.id = ls.host_id
+      WHERE lga.id = ${attemptId}
+    `;
+    if (attempts.length === 0) return res.status(404).json({ error: 'Live game attempt not found' });
+    const attempt = attempts[0];
+
+    // Answers with question info
+    const answerRows = await sql`
+      SELECT lgans.id AS answer_id, lgans.question_index, lgans.final_answer, lgans.is_correct,
+        lgans.points_earned, lgans.response_ms, lgans.is_timeout, lgans.is_late, lgans.status,
+        qs.question_text, qs.type, qs.options, qs.correct_answer, qs.explanation,
+        qs.media_url, qs.points AS max_points,
+        qs.slider_min, qs.slider_max, qs.slider_step, qs.slider_unit, qs.matching_pairs
+      FROM live_game_answers lgans
+      JOIN questions qs ON qs.id = lgans.question_id
+      WHERE lgans.attempt_id = ${attemptId}
+      ORDER BY lgans.question_index
+    `;
+
+    // Selection trails for all answers in one query
+    const answerIds = answerRows.map(a => a.answer_id);
+    let selectionRows = [];
+    if (answerIds.length > 0) {
+      selectionRows = await sql`
+        SELECT answer_id, selection_order, selected_value, selected_at, elapsed_ms, is_correct
+        FROM live_answer_selections
+        WHERE answer_id = ANY(${answerIds})
+        ORDER BY answer_id, selection_order
+      `;
+    }
+
+    // Group selections by answer_id
+    const trailMap = new Map();
+    for (const sel of selectionRows) {
+      if (!trailMap.has(sel.answer_id)) trailMap.set(sel.answer_id, []);
+      trailMap.get(sel.answer_id).push({
+        order: sel.selection_order,
+        value: sel.selected_value,
+        selectedAt: Number(sel.selected_at),
+        elapsedMs: sel.elapsed_ms,
+        isCorrect: !!sel.is_correct
+      });
+    }
+
+    const questions = answerRows.map(a => {
+      const trail = trailMap.get(a.answer_id) || [];
+      const firstSelectionCorrect = trail.length > 0
+        ? trail[0].isCorrect
+        : !!a.is_correct;
+      const maxPts = a.max_points || 1;
+      const accuracy = a.is_correct ? 100 : 0;
+      return {
+        questionIndex: a.question_index,
+        questionText: a.question_text,
+        type: a.type,
+        options: typeof a.options === 'string' ? JSON.parse(a.options || '[]') : (a.options || []),
+        correctAnswer: a.correct_answer,
+        explanation: a.explanation,
+        mediaUrl: a.media_url,
+        maxPoints: maxPts,
+        finalAnswer: a.final_answer,
+        isCorrect: !!a.is_correct,
+        status: a.status || (a.is_correct ? 'correct' : 'incorrect'),
+        pointsEarned: a.points_earned || 0,
+        accuracy,
+        responseMs: a.response_ms || 0,
+        timeTaken: Math.round((a.response_ms || 0) / 10) / 100,
+        isTimeout: !!a.is_timeout,
+        isLate: !!a.is_late,
+        selectionTrail: trail,
+        firstSelectionCorrect,
+        sliderMin: a.slider_min, sliderMax: a.slider_max, sliderStep: a.slider_step, sliderUnit: a.slider_unit,
+        matchingPairs: typeof a.matching_pairs === 'string' ? JSON.parse(a.matching_pairs || '[]') : (a.matching_pairs || [])
+      };
+    });
+
+    res.json({
+      attempt: {
+        id: attempt.id,
+        finalScore: parseInt(attempt.final_score || 0, 10),
+        totalPoints: parseInt(attempt.total_points || 0, 10),
+        correctCount: parseInt(attempt.correct_count || 0, 10),
+        totalQuestions: parseInt(attempt.total_questions || 0, 10),
+        maxStreak: parseInt(attempt.max_streak || 0, 10),
+        totalTimeMs: parseInt(attempt.total_time_ms || 0, 10),
+        rank: parseInt(attempt.final_rank || 0, 10),
+        completedAt: attempt.completed_at
+      },
+      session: {
+        quizTitle: attempt.quiz_title,
+        joinCode: attempt.join_code,
+        hostedBy: attempt.hosted_by,
+        totalPlayers: parseInt(attempt.total_players || 0, 10),
+        timePerQuestion: attempt.time_per_question || 30,
+        startedAt: attempt.started_at,
+        endedAt: attempt.ended_at
+      },
+      questions
+    });
+  } catch (err) {
+    console.error('Admin get live game detail error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * Aggregated live game report for a student.
+ * Full metric parity with the unit report: accuracy, first-attempt accuracy,
+ * speed score, efficiency, retention, time utilization, Knowledge Score,
+ * classification, and badges.
+ *
+ * "First attempt accuracy" in live context = answered correctly on the first
+ * selection (selectionTrail[0] matches correct_answer for MCQ/image, or
+ * is_correct for other types where there is no trail).
+ *
+ * "Retention" = accuracy of latest game for a quiz / accuracy of earliest game
+ * for the same quiz (only when student has played the same quiz 2+ times).
+ */
+router.get('/students/:id/live-report', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sql = getDB();
+
+    let expectedMinutes = null;
+    if (req.query.expectedMinutes !== undefined && req.query.expectedMinutes !== '') {
+      const parsed = parseInt(req.query.expectedMinutes, 10);
+      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1440) {
+        return res.status(400).json({ error: 'expectedMinutes must be an integer between 1 and 1440.' });
+      }
+      expectedMinutes = parsed;
+    }
+
+    // Verify student exists
+    const students = await sql`SELECT id, name, email FROM users WHERE id = ${id}`;
+    if (students.length === 0) return res.status(404).json({ error: 'Student not found' });
+
+    // All live game attempts for this student
+    const attempts = await sql`
+      SELECT lga.id AS attempt_id, lga.session_id, lga.final_score, lga.total_points,
+        lga.correct_count, lga.total_questions, lga.max_streak, lga.total_time_ms,
+        lga.final_rank, lga.completed_at,
+        ls.quiz_id, ls.join_code, q.title AS quiz_title, q.time_per_question,
+        host.name AS hosted_by,
+        (SELECT COUNT(*) FROM live_game_attempts WHERE session_id = lga.session_id) AS total_players
+      FROM live_game_attempts lga
+      JOIN live_sessions ls ON ls.id = lga.session_id
+      JOIN quizzes q ON q.id = ls.quiz_id
+      JOIN users host ON host.id = ls.host_id
+      WHERE lga.user_id = ${id}
+      ORDER BY lga.completed_at ASC
+    `;
+
+    if (attempts.length === 0) {
+      return res.json({
+        overall: null,
+        sessions: [],
+        badges: [],
+        meta: { gamesPlayed: 0, gamesCompleted: 0, noData: true, expectedMinutes }
+      });
+    }
+
+    // Answer-level data for aggregate metrics
+    const allAttemptIds = attempts.map(a => a.attempt_id);
+    const answerRows = await sql`
+      SELECT lgans.attempt_id, lgans.is_correct, lgans.response_ms, lgans.points_earned,
+        lgans.question_id, lgans.is_timeout
+      FROM live_game_answers lgans
+      WHERE lgans.attempt_id = ANY(${allAttemptIds})
+    `;
+
+    // Per-attempt answer stats for session-level extremes and first-try
+    const answersByAttemptDetail = new Map();
+    for (const ans of answerRows) {
+      if (!answersByAttemptDetail.has(ans.attempt_id)) answersByAttemptDetail.set(ans.attempt_id, []);
+      answersByAttemptDetail.get(ans.attempt_id).push(ans);
+    }
+
+    // First-selection accuracy: check if the FIRST selection in the trail matches correct_answer
+    const firstSelectionRows = await sql`
+      SELECT las.answer_id, las.selected_value, lgans.attempt_id, q.correct_answer, q.type
+      FROM live_answer_selections las
+      JOIN live_game_answers lgans ON lgans.id = las.answer_id
+      JOIN questions q ON q.id = lgans.question_id
+      WHERE lgans.attempt_id = ANY(${allAttemptIds})
+        AND las.selection_order = 1
+    `;
+    const firstSelCorrectSet = new Set();
+    for (const row of firstSelectionRows) {
+      const isFirstCorrect = row.selected_value?.toString().toUpperCase().trim() === row.correct_answer?.toString().toUpperCase().trim();
+      if (isFirstCorrect) firstSelCorrectSet.add(row.answer_id);
+    }
+
+    // For questions without selection trail (non-MCQ/image), first attempt = final answer correctness
+    const answersWithoutTrail = new Set();
+    const answerIdSet = new Set(firstSelectionRows.map(r => r.answer_id));
+
+    // Build per-answer map for non-trail questions
+    const allAnswerRows = await sql`
+      SELECT lgans.id AS answer_id, lgans.attempt_id, lgans.is_correct, q.type
+      FROM live_game_answers lgans
+      JOIN questions q ON q.id = lgans.question_id
+      WHERE lgans.attempt_id = ANY(${allAttemptIds})
+    `;
+    let firstAttemptTotal = 0;
+    let firstAttemptCorrect = 0;
+    for (const row of allAnswerRows) {
+      firstAttemptTotal++;
+      if (answerIdSet.has(row.answer_id)) {
+        // Has trail — use first selection correctness
+        if (firstSelCorrectSet.has(row.answer_id)) firstAttemptCorrect++;
+      } else {
+        // No trail — use final answer correctness as proxy for first attempt
+        if (row.is_correct) firstAttemptCorrect++;
+      }
+    }
+
+    // Aggregate per-session metrics (answersByAttemptDetail used in sessions.map)
+    const sessions = attempts.map(a => {
+      const answersDetail = answersByAttemptDetail.get(a.attempt_id) || [];
+      const correct = parseInt(a.correct_count || 0, 10);
+      const total = parseInt(a.total_questions || 0, 10);
+      const totalTimeMs = parseInt(a.total_time_ms || 0, 10);
+      const timePerQ = a.time_per_question || 30;
+      const expectedTimeSec = expectedMinutes !== null
+        ? expectedMinutes * 60
+        : timePerQ * total;
+      const actualTimeSec = totalTimeMs / 1000;
+
+      const responseTimes = answersDetail.map(ans => ans.response_ms).filter(v => v > 0);
+      const fastestResponse = responseTimes.length ? Math.round(Math.min(...responseTimes) / 10) / 100 : 0;
+      const slowestResponse = responseTimes.length ? Math.round(Math.max(...responseTimes) / 10) / 100 : 0;
+      const avgResp = total > 0 ? Math.round((totalTimeMs / total) / 10) / 100 : 0;
+
+      const acc = analytics.accuracy(correct, total);
+      const speed = analytics.speedScore(expectedTimeSec, actualTimeSec);
+      const eff = analytics.efficiency(acc, avgResp);
+      const timeUtil = analytics.timeUtilization(actualTimeSec, expectedTimeSec);
+      const scorePercent = parseInt(a.total_points || 0, 10) > 0
+        ? Math.round((parseInt(a.final_score || 0, 10) / parseInt(a.total_points || 0, 10)) * 10000) / 100
+        : acc;
+
+      let sessionFirstTotal = 0;
+      let sessionFirstCorrect = 0;
+      for (const row of allAnswerRows) {
+        if (row.attempt_id !== a.attempt_id) continue;
+        sessionFirstTotal++;
+        if (answerIdSet.has(row.answer_id)) {
+          if (firstSelCorrectSet.has(row.answer_id)) sessionFirstCorrect++;
+        } else if (row.is_correct) {
+          sessionFirstCorrect++;
+        }
+      }
+      const firstAttemptAccuracy = analytics.accuracy(sessionFirstCorrect, sessionFirstTotal);
+      const firstAttemptMastered = sessionFirstTotal > 0 && sessionFirstCorrect === sessionFirstTotal;
+
+      return {
+        attemptId: a.attempt_id,
+        sessionId: a.session_id,
+        quizId: a.quiz_id,
+        quizTitle: a.quiz_title,
+        joinCode: a.join_code,
+        hostedBy: a.hosted_by,
+        totalPlayers: parseInt(a.total_players || 0, 10),
+        completedAt: a.completed_at,
+        rank: parseInt(a.final_rank || 0, 10),
+        score: parseInt(a.final_score || 0, 10),
+        totalPoints: parseInt(a.total_points || 0, 10),
+        scorePercent,
+        correctCount: correct,
+        correct: correct,
+        incorrect: total - correct,
+        totalQuestions: total,
+        maxStreak: parseInt(a.max_streak || 0, 10),
+        totalTimeMs,
+        completionTime: actualTimeSec,
+        accuracy: acc,
+        firstAttemptAccuracy,
+        firstAttemptMastered,
+        speedScore: speed,
+        avgResponseTime: avgResp,
+        fastestResponse,
+        slowestResponse,
+        efficiency: eff,
+        timeUtilization: timeUtil,
+        expectedTime: expectedTimeSec,
+        retention: null,
+        knowledgeScore: null,
+        retentionApplied: false,
+        knowledgeLevel: null,
+        completed: true
+      };
+    });
+
+    // Per-session retention + knowledge score (needs full session list)
+    const byQuiz = new Map();
+    for (const s of sessions) {
+      if (!byQuiz.has(s.quizId)) byQuiz.set(s.quizId, []);
+      byQuiz.get(s.quizId).push(s);
+    }
+    for (const s of sessions) {
+      const quizSessions = byQuiz.get(s.quizId) || [];
+      if (quizSessions.length >= 2) {
+        const sorted = [...quizSessions].sort((x, y) => new Date(x.completedAt) - new Date(y.completedAt));
+        s.retention = analytics.retention(sorted[sorted.length - 1].accuracy, sorted[0].accuracy);
+      }
+      const sessionKs = analytics.knowledgeScore({
+        accuracy: s.accuracy,
+        firstAttemptAccuracy: s.firstAttemptAccuracy,
+        speed: s.speedScore,
+        retention: s.retention
+      });
+      s.knowledgeScore = sessionKs.score;
+      s.retentionApplied = sessionKs.retentionApplied;
+      s.knowledgeLevel = analytics.classify(sessionKs.score);
+    }
+
+    const retentionValues = [];
+    for (const [, quizSessions] of byQuiz) {
+      if (quizSessions.length >= 2) {
+        const sorted = quizSessions.sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt));
+        const ret = analytics.retention(sorted[sorted.length - 1].accuracy, sorted[0].accuracy);
+        if (ret !== null) retentionValues.push(ret);
+      }
+    }
+    const overallRetention = retentionValues.length
+      ? Math.round((retentionValues.reduce((a, b) => a + b, 0) / retentionValues.length) * 100) / 100
+      : null;
+
+    // Overall aggregates
+    const totalCorrect = sessions.reduce((acc, s) => acc + s.correctCount, 0);
+    const totalQuestions = sessions.reduce((acc, s) => acc + s.totalQuestions, 0);
+    const totalTimeMs = sessions.reduce((acc, s) => acc + s.totalTimeMs, 0);
+    const totalExpectedSec = sessions.reduce((acc, s) => acc + (s.expectedTime || 0), 0);
+    const totalTimeSec = totalTimeMs / 1000;
+    const totalPoints = sessions.reduce((acc, s) => acc + s.score, 0);
+    const totalMaxPoints = sessions.reduce((acc, s) => acc + s.totalPoints, 0);
+
+    const overallAccuracy = analytics.accuracy(totalCorrect, totalQuestions);
+    const overallFirstAttempt = analytics.accuracy(firstAttemptCorrect, firstAttemptTotal);
+    const overallSpeed = analytics.speedScore(totalExpectedSec, totalTimeSec);
+    const avgResponseTime = totalQuestions > 0 ? Math.round((totalTimeMs / totalQuestions) / 10) / 100 : 0;
+    const overallEfficiency = analytics.efficiency(overallAccuracy, avgResponseTime);
+    const overallTimeUtil = analytics.timeUtilization(totalTimeSec, totalExpectedSec);
+
+    // Response time extremes
+    const responseTimes = answerRows.map(a => a.response_ms).filter(v => v > 0);
+    const fastestResponse = responseTimes.length ? Math.round(Math.min(...responseTimes) / 10) / 100 : 0;
+    const slowestResponse = responseTimes.length ? Math.round(Math.max(...responseTimes) / 10) / 100 : 0;
+
+    const overallKs = analytics.knowledgeScore({
+      accuracy: overallAccuracy,
+      firstAttemptAccuracy: overallFirstAttempt,
+      speed: overallSpeed,
+      retention: overallRetention
+    });
+
+    const bestRank = sessions.length > 0 ? Math.min(...sessions.map(s => s.rank).filter(r => r > 0)) : 0;
+    const avgRank = sessions.length > 0 ? Math.round(sessions.reduce((acc, s) => acc + s.rank, 0) / sessions.length * 10) / 10 : 0;
+
+    const gamesPlayed = attempts.length;
+    const gamesCompleted = sessions.filter(s => s.completed).length;
+    const completion = gamesPlayed > 0
+      ? Math.round((gamesCompleted / gamesPlayed) * 10000) / 100
+      : 0;
+
+    const overall = {
+      totalPoints,
+      totalMaxPoints,
+      totalAttempts: gamesPlayed,
+      totalQuestions,
+      correct: totalCorrect,
+      incorrect: totalQuestions - totalCorrect,
+      accuracy: overallAccuracy,
+      firstAttemptAccuracy: overallFirstAttempt,
+      avgResponseTime,
+      fastestResponse,
+      slowestResponse,
+      totalTime: totalTimeSec,
+      expectedTime: totalExpectedSec,
+      timeUtilization: overallTimeUtil,
+      speedScore: overallSpeed,
+      efficiency: overallEfficiency,
+      retention: overallRetention,
+      knowledgeScore: overallKs.score,
+      retentionApplied: overallKs.retentionApplied,
+      knowledgeLevel: analytics.classify(overallKs.score),
+      leaderboardScore: analytics.leaderboardScore({
+        accuracy: overallAccuracy,
+        speed: overallSpeed,
+        completion
+      }),
+      completion,
+      gamesPlayed,
+      gamesCompleted,
+      gamesAvailable: gamesPlayed,
+      unitsCompleted: gamesCompleted,
+      unitsAvailable: gamesPlayed,
+      bestRank,
+      avgRank
+    };
+
+    // Core badges (parity with unit report) + live-only extras
+    const maxStreak = sessions.length > 0 ? Math.max(...sessions.map(s => s.maxStreak)) : 0;
+    const perfectGames = sessions.filter(s => s.accuracy >= 100).length;
+    const consistentGames = sessions.filter(s => s.accuracy >= 80).length;
+    const masteredSessions = sessions.filter(s => s.firstAttemptMastered).length;
+
+    const badges = [
+      { id: 'accuracy', name: 'Accuracy', icon: 'target', earned: overallAccuracy > 90, detail: `${overallAccuracy}% overall accuracy (needs >90%)` },
+      { id: 'speed', name: 'Speed', icon: 'bolt', earned: overallSpeed >= 90, detail: `Speed score ${overallSpeed} (needs >=90)` },
+      { id: 'consistency', name: 'Consistency', icon: 'trending_up', earned: consistentGames >= 3, detail: `${consistentGames} game(s) with 80%+ accuracy (needs >=3)` },
+      { id: 'perfect', name: 'Perfect Score', icon: 'star', earned: perfectGames > 0, detail: perfectGames > 0 ? 'Scored 100% on a live game' : 'No 100% game yet' },
+      { id: 'mastery', name: 'Mastery', icon: 'workspace_premium', earned: masteredSessions > 0, detail: masteredSessions > 0 ? `${masteredSessions} game(s) fully correct on first selection` : 'No perfect first-selection game yet' },
+      { id: 'streak', name: 'Streak', icon: 'local_fire_department', earned: maxStreak >= 5, detail: `Best streak: ${maxStreak} (needs >=5)` },
+      { id: 'rank', name: 'Top Ranker', icon: 'emoji_events', earned: bestRank === 1, detail: bestRank === 1 ? 'Achieved 1st place in a live game!' : 'Has not placed 1st yet' },
+      { id: 'endurance', name: 'Endurance', icon: 'fitness_center', earned: gamesPlayed >= 10, detail: `${gamesPlayed} games played (needs >=10)` }
+    ];
+
+    res.json({
+      overall,
+      sessions,
+      badges,
+      meta: { gamesPlayed, gamesCompleted, noData: false, expectedMinutes }
+    });
+  } catch (err) {
+    console.error('Admin get student live report error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

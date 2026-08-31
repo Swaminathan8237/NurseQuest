@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { adminAPI, quizAPI } from '../api';
@@ -73,6 +73,20 @@ const UNIT_COLORS_MAP = new Map([
 
 const getUnitColor = (unit) => UNIT_COLORS_MAP.get(Number(unit)) || '#7C3AED';
 const getUnitIcon = (unit) => UNIT_ICONS_MAP.get(Number(unit)) || 'menu_book';
+
+// Live sessions have no fixed ordinal like units do, so the accent is derived from the
+// quiz id instead of a row index — the same quiz keeps its colour across sessions and
+// re-sorts, mirroring how "Unit 3" is always green.
+const LIVE_ICONS = ['sports_esports', 'stadium', 'swords', 'rocket_launch', 'bolt', 'trophy'];
+const LIVE_COLORS = ['#10B981', '#06B6D4', '#8B5CF6', '#F59E0B', '#EC4899', '#3B82F6'];
+const liveSlot = (key, len) => {
+  const str = String(key ?? '');
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  return hash % len;
+};
+const getLiveColor = (key) => LIVE_COLORS[liveSlot(key, LIVE_COLORS.length)];
+const getLiveIcon = (key) => LIVE_ICONS[liveSlot(key, LIVE_ICONS.length)];
 const getStatusBadge = (status, isCorrect) => {
   if (status && STATUS_BADGE_MAP.has(String(status))) {
     return STATUS_BADGE_MAP.get(String(status));
@@ -155,6 +169,14 @@ export default function AdminDashboard() {
   // Performance report (accuracy, knowledge score, badges, charts)
   const [report, setReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [analyticsMode, setAnalyticsMode] = useState('units'); // 'units' | 'live'
+  const [liveReport, setLiveReport] = useState(null);
+  const [liveGames, setLiveGames] = useState([]);
+  const [liveGamesLoading, setLiveGamesLoading] = useState(false);
+  const [expandedSession, setExpandedSession] = useState(null);
+  const [liveGameDetail, setLiveGameDetail] = useState(null);
+  const [liveDetailLoading, setLiveDetailLoading] = useState(false);
+  const liveDetailReqRef = useRef(null);
   const [expectedMinutes, setExpectedMinutes] = useState(() => {
     // Ignore anything a previous session left behind that isn't a valid minute count,
     // otherwise the report request would 400 on every load.
@@ -175,6 +197,11 @@ export default function AdminDashboard() {
     setSelectedAttempt(null);
     setAttemptQuestions([]);
     setReport(null);
+    setLiveReport(null);
+    setLiveGames([]);
+    setAnalyticsMode('units');
+    setExpandedSession(null);
+    setLiveGameDetail(null);
     setUnitsLoading(true);
     setReportLoading(true);
 
@@ -210,13 +237,67 @@ export default function AdminDashboard() {
     else localStorage.removeItem(EXPECTED_MINUTES_KEY);
     setReportLoading(true);
     try {
-      const data = await adminAPI.getStudentReport(selectedStudent.id, expectedMinutes || undefined);
-      setReport(data);
+      if (analyticsMode === 'live') {
+        const data = await adminAPI.getStudentLiveReport(selectedStudent.id, expectedMinutes || undefined);
+        setLiveReport(data);
+      } else {
+        const data = await adminAPI.getStudentReport(selectedStudent.id, expectedMinutes || undefined);
+        setReport(data);
+      }
     } catch (err) {
       console.error('Failed to recalculate report:', err);
       alert(err.message || t('Failed to recalculate report'));
     } finally {
       setReportLoading(false);
+    }
+  };
+
+  const switchAnalyticsMode = async (mode) => {
+    if (!selectedStudent || mode === analyticsMode) return;
+    setAnalyticsMode(mode);
+    setExpandedUnit(null);
+    setExpandedSession(null);
+    setUnitAttempts([]);
+    setSelectedAttempt(null);
+    setAttemptQuestions([]);
+    setLiveGameDetail(null);
+
+    if (mode === 'live' && !liveReport?.overall) {
+      setReportLoading(true);
+      setLiveGamesLoading(true);
+      const [reportRes, gamesRes] = await Promise.allSettled([
+        adminAPI.getStudentLiveReport(selectedStudent.id, expectedMinutes || undefined),
+        adminAPI.getStudentLiveGames(selectedStudent.id)
+      ]);
+      if (reportRes.status === 'fulfilled') setLiveReport(reportRes.value);
+      else console.error('Failed to load live report:', reportRes.reason);
+      if (gamesRes.status === 'fulfilled') setLiveGames(gamesRes.value || []);
+      else console.error('Failed to load live games:', gamesRes.reason);
+      setReportLoading(false);
+      setLiveGamesLoading(false);
+    }
+  };
+
+  const toggleSession = async (attemptId) => {
+    if (expandedSession === attemptId) {
+      setExpandedSession(null);
+      setLiveGameDetail(null);
+      liveDetailReqRef.current = null;
+      return;
+    }
+    setExpandedSession(attemptId);
+    setLiveGameDetail(null);
+    setLiveDetailLoading(true);
+    liveDetailReqRef.current = attemptId;
+    try {
+      const data = await adminAPI.getLiveGameDetail(attemptId);
+      // Expanding another session mid-flight must not paint this one's answers over it.
+      if (liveDetailReqRef.current !== attemptId) return;
+      setLiveGameDetail(data);
+    } catch (err) {
+      console.error('Failed to load live game detail:', err);
+    } finally {
+      if (liveDetailReqRef.current === attemptId) setLiveDetailLoading(false);
     }
   };
 
@@ -265,6 +346,11 @@ export default function AdminDashboard() {
     setSelectedAttempt(null);
     setAttemptQuestions([]);
     setReport(null);
+    setLiveReport(null);
+    setLiveGames([]);
+    setAnalyticsMode('units');
+    setExpandedSession(null);
+    setLiveGameDetail(null);
   };
 
   // Fetch dashboard data
@@ -959,12 +1045,55 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* Units | Live toggle */}
+                <div className="flex justify-center">
+                  <div className="inline-flex rounded-xl bg-surface-container-high/60 border border-white/10 p-1 gap-1">
+                    <button
+                      onClick={() => switchAnalyticsMode('units')}
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                        analyticsMode === 'units'
+                          ? 'bg-[#7C3AED] text-white shadow-lg'
+                          : 'text-[var(--text-muted)] hover:text-on-surface'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-lg">menu_book</span>
+                      {t('Units')}
+                    </button>
+                    <button
+                      onClick={() => switchAnalyticsMode('live')}
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                        analyticsMode === 'live'
+                          ? 'bg-[#10B981] text-white shadow-lg'
+                          : 'text-[var(--text-muted)] hover:text-on-surface'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-lg">sports_esports</span>
+                      {t('Live')}
+                    </button>
+                  </div>
+                </div>
+
                 {/* ── Performance report ─────────────────────────────────────────── */}
+                {(() => {
+                  const isLiveMode = analyticsMode === 'live';
+                  const activeReport = isLiveMode ? liveReport : report;
+                  const accentColor = isLiveMode ? '#10B981' : '#7C3AED';
+                  const chartEntities = isLiveMode ? (liveReport?.sessions || []) : (report?.units || []);
+                  const chartLabels = isLiveMode
+                    ? chartEntities.map((s, i) => s.quizTitle?.slice(0, 12) || `G${i + 1}`)
+                    : chartEntities.map(u => `U${u.unit}`);
+                  return (
+                <>
                 {reportLoading ? (
                   <div className="flex justify-center py-16">
                     <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
                   </div>
-                ) : report?.overall?.knowledgeLevel ? (
+                ) : isLiveMode && liveReport?.meta?.noData ? (
+                  <div className="text-center py-12 text-[var(--text-muted)]">
+                    <span className="material-symbols-outlined text-4xl mb-2 block">sports_esports</span>
+                    {t('No completed live games yet.')}
+                  </div>
+                ) : activeReport?.overall?.knowledgeLevel ? (
                   <div className="space-y-6">
                     {/* Knowledge Score card */}
                     <div className="bg-surface-container-high/40 rounded-2xl p-6 border border-white/5 flex flex-col md:flex-row items-center gap-8">
@@ -973,61 +1102,65 @@ export default function AdminDashboard() {
                           <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="12" />
                           <circle
                             cx="60" cy="60" r="52" fill="none"
-                            stroke={report.overall.knowledgeLevel.color} strokeWidth="12" strokeLinecap="round"
+                            stroke={activeReport.overall.knowledgeLevel.color} strokeWidth="12" strokeLinecap="round"
                             strokeDasharray={2 * Math.PI * 52}
-                            strokeDashoffset={2 * Math.PI * 52 * (1 - report.overall.knowledgeScore / 100)}
+                            strokeDashoffset={2 * Math.PI * 52 * (1 - activeReport.overall.knowledgeScore / 100)}
                             style={{ transition: 'stroke-dashoffset 0.6s ease' }}
                           />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span className="text-3xl font-bold" style={{ color: report.overall.knowledgeLevel.color }}>
-                            {report.overall.knowledgeScore}
+                          <span className="text-3xl font-bold" style={{ color: activeReport.overall.knowledgeLevel.color }}>
+                            {activeReport.overall.knowledgeScore}
                           </span>
                           <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">/ 100</span>
                         </div>
                       </div>
 
                       <div className="flex-1 text-center md:text-left w-full">
-                        <p className="text-sm font-bold uppercase tracking-widest" style={{ color: report.overall.knowledgeLevel.color }}>
-                          {report.overall.knowledgeLevel.label}
+                        <p className="text-sm font-bold uppercase tracking-widest" style={{ color: activeReport.overall.knowledgeLevel.color }}>
+                          {activeReport.overall.knowledgeLevel.label}
                         </p>
                         <p className="text-lg font-headline font-bold text-on-surface mt-1">{t('Knowledge Score')}</p>
                         <p className="text-xs text-[var(--text-muted)] mt-1">
                           {t('0.5·Accuracy + 0.2·First-try + 0.15·Speed + 0.15·Retention')}
-                          {!report.overall.retentionApplied && ` ${t('— retention excluded (fewer than 2 attempts)')}`}
+                          {!activeReport.overall.retentionApplied && ` ${t('— retention excluded (fewer than 2 attempts)')}`}
                         </p>
 
-                        {/* Stacked contribution bar */}
                         <div className="flex w-full h-3 rounded-full overflow-hidden mt-4 bg-white/5">
-                          <div className="h-full" style={{ width: `${report.overall.accuracy * 0.5}%`, background: '#10B981' }} />
-                          <div className="h-full" style={{ width: `${report.overall.firstAttemptAccuracy * 0.2}%`, background: '#22C55E' }} />
-                          <div className="h-full" style={{ width: `${report.overall.speedScore * 0.15}%`, background: '#F59E0B' }} />
-                          <div className="h-full" style={{ width: `${(report.overall.retention ?? 0) * 0.15}%`, background: '#7C3AED' }} />
+                          <div className="h-full" style={{ width: `${activeReport.overall.accuracy * 0.5}%`, background: '#10B981' }} />
+                          <div className="h-full" style={{ width: `${activeReport.overall.firstAttemptAccuracy * 0.2}%`, background: '#22C55E' }} />
+                          <div className="h-full" style={{ width: `${activeReport.overall.speedScore * 0.15}%`, background: '#F59E0B' }} />
+                          <div className="h-full" style={{ width: `${(activeReport.overall.retention ?? 0) * 0.15}%`, background: accentColor }} />
                         </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[10px] font-mono text-[var(--text-muted)]">
-                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#10B981] inline-block"></span>{t('Acc')} {report.overall.accuracy}%</span>
-                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#22C55E] inline-block"></span>{t('1st')} {report.overall.firstAttemptAccuracy}%</span>
-                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#F59E0B] inline-block"></span>{t('Speed')} {report.overall.speedScore}</span>
-                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#7C3AED] inline-block"></span>{t('Ret')} {report.overall.retention ?? t('N/A')}</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#10B981] inline-block"></span>{t('Acc')} {activeReport.overall.accuracy}%</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#22C55E] inline-block"></span>{t('1st')} {activeReport.overall.firstAttemptAccuracy}%</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#F59E0B] inline-block"></span>{t('Speed')} {activeReport.overall.speedScore}</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: accentColor }}></span>{t('Ret')} {activeReport.overall.retention ?? t('N/A')}</span>
                         </div>
+                        {isLiveMode && activeReport.overall.bestRank > 0 && (
+                          <div className="flex gap-2 mt-3 flex-wrap">
+                            <span className="px-2 py-1 rounded-lg bg-[#10B981]/15 text-[#10B981] text-xs font-bold">#{activeReport.overall.bestRank} {t('best rank')}</span>
+                            <span className="px-2 py-1 rounded-lg bg-[#06B6D4]/15 text-[#06B6D4] text-xs font-bold">{activeReport.overall.gamesPlayed} {t('games')}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex-shrink-0 text-center px-4 py-3 rounded-xl bg-white/5 border border-white/5">
-                        <p className="text-2xl font-bold text-on-surface">{report.overall.leaderboardScore}</p>
+                        <p className="text-2xl font-bold text-on-surface">{activeReport.overall.leaderboardScore}</p>
                         <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Leaderboard Score')}</p>
                         <p className="text-[9px] text-[var(--text-muted)] mt-1">{t('0.5 Acc + 0.3 Spd + 0.2 Comp')}</p>
                       </div>
                     </div>
 
-                    {/* Stat tiles */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                       {[
-                        { label: t('Accuracy'), value: `${report.overall.accuracy}%`, icon: 'check_circle', color: '#10B981' },
-                        { label: t('1st-Try Accuracy'), value: `${report.overall.firstAttemptAccuracy}%`, icon: 'flag', color: '#22C55E' },
-                        { label: t('Avg Response'), value: `${report.overall.avgResponseTime}s`, icon: 'timer', color: '#F59E0B' },
-                        { label: t('Efficiency'), value: orDash(report.overall.efficiency), icon: 'speed', color: '#38BDF8' },
-                        { label: t('Completion'), value: `${report.overall.completion}%`, icon: 'fact_check', color: '#7C3AED' },
-                        { label: t('Points'), value: (report.overall.totalPoints || 0).toLocaleString(), icon: 'trophy', color: '#F472B6' }
+                        { label: t('Accuracy'), value: `${activeReport.overall.accuracy}%`, icon: 'check_circle', color: '#10B981' },
+                        { label: t('1st-Try Accuracy'), value: `${activeReport.overall.firstAttemptAccuracy}%`, icon: 'flag', color: '#22C55E' },
+                        { label: t('Avg Response'), value: `${activeReport.overall.avgResponseTime}s`, icon: 'timer', color: '#F59E0B' },
+                        { label: t('Efficiency'), value: orDash(activeReport.overall.efficiency), icon: 'speed', color: '#38BDF8' },
+                        { label: t('Completion'), value: `${activeReport.overall.completion ?? 100}%`, icon: 'fact_check', color: accentColor },
+                        { label: t('Points'), value: (activeReport.overall.totalPoints || 0).toLocaleString(), icon: 'trophy', color: '#F472B6' }
                       ].map(tile => (
                         <div key={tile.label} className="bg-surface-container-high/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center text-center">
                           <span className="material-symbols-outlined mb-1" style={{ color: tile.color }}>{tile.icon}</span>
@@ -1037,21 +1170,20 @@ export default function AdminDashboard() {
                       ))}
                     </div>
 
-                    {/* Badges */}
                     <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5">
                       <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">{t('Badges')}</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                        {(report.badges || []).map(b => (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {(activeReport.badges || []).map(b => (
                           <div
                             key={b.id}
                             title={b.detail}
                             className={`rounded-2xl p-4 border flex flex-col items-center text-center transition-all ${
                               b.earned
-                                ? 'bg-primary/10 border-primary/30'
+                                ? (isLiveMode ? 'bg-[#10B981]/10 border-[#10B981]/30' : 'bg-primary/10 border-primary/30')
                                 : 'bg-white/[0.02] border-white/5 opacity-50 grayscale'
                             }`}
                           >
-                            <span className={`material-symbols-outlined text-3xl mb-2 ${b.earned ? 'text-primary' : 'text-[var(--text-muted)]'}`}>
+                            <span className={`material-symbols-outlined text-3xl mb-2 ${b.earned ? (isLiveMode ? 'text-[#10B981]' : 'text-primary') : 'text-[var(--text-muted)]'}`}>
                               {b.icon}
                             </span>
                             <p className="text-xs font-bold text-on-surface">{b.name}</p>
@@ -1061,19 +1193,20 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {/* Charts */}
-                    {(report.units?.length || 0) > 0 && (
+                    {chartEntities.length > 0 && (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5">
-                          <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">{t('Accuracy by Unit')}</p>
+                          <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">
+                            {isLiveMode ? t('Accuracy by Session') : t('Accuracy by Unit')}
+                          </p>
                           <div className="h-56">
                             <Bar
                               data={{
-                                labels: report.units.map(u => `U${u.unit}`),
+                                labels: chartLabels,
                                 datasets: [{
                                   label: t('Accuracy %'),
-                                  data: report.units.map(u => u.accuracy),
-                                  backgroundColor: report.units.map(u => u.knowledgeLevel?.color || '#7C3AED'),
+                                  data: chartEntities.map(e => e.accuracy),
+                                  backgroundColor: chartEntities.map((e, i) => e.knowledgeLevel?.color || (isLiveMode ? (i % 2 === 0 ? '#10B981' : '#06B6D4') : '#7C3AED')),
                                   borderRadius: 6
                                 }]
                               }}
@@ -1082,18 +1215,20 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5">
-                          <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">{t('Avg Response Time by Unit (s)')}</p>
+                          <p className="text-sm font-bold uppercase tracking-widest text-[var(--text-muted)] mb-4">
+                            {isLiveMode ? t('Avg Response Time by Session (s)') : t('Avg Response Time by Unit (s)')}
+                          </p>
                           <div className="h-56">
                             <Line
                               data={{
-                                labels: report.units.map(u => `U${u.unit}`),
+                                labels: chartLabels,
                                 datasets: [{
                                   label: t('Avg Response (s)'),
-                                  data: report.units.map(u => u.avgResponseTime),
-                                  borderColor: '#38BDF8',
-                                  backgroundColor: 'rgba(56,189,248,0.15)',
+                                  data: chartEntities.map(e => e.avgResponseTime),
+                                  borderColor: isLiveMode ? '#06B6D4' : '#38BDF8',
+                                  backgroundColor: isLiveMode ? 'rgba(6,182,212,0.15)' : 'rgba(56,189,248,0.15)',
                                   tension: 0.35,
-                                  pointBackgroundColor: '#38BDF8'
+                                  pointBackgroundColor: isLiveMode ? '#06B6D4' : '#38BDF8'
                                 }]
                               }}
                               options={CHART_OPTS}
@@ -1103,11 +1238,10 @@ export default function AdminDashboard() {
                       </div>
                     )}
 
-                    {/* Expected-time override + disclaimer */}
                     <div className="bg-surface-container-high/40 rounded-2xl p-5 border border-white/5 flex flex-col sm:flex-row items-center gap-4">
                       <div className="flex-1 flex flex-col sm:flex-row items-center gap-3">
                         <label htmlFor="expected-minutes" className="text-sm font-bold text-[var(--text-muted)] whitespace-nowrap">
-                          {t('Expected time per unit')}
+                          {isLiveMode ? t('Expected time per game') : t('Expected time per unit')}
                         </label>
                         <div className="flex items-center gap-2">
                           <input
@@ -1121,23 +1255,29 @@ export default function AdminDashboard() {
                           <span className="text-xs text-[var(--text-muted)]">{t('min')}</span>
                           <button
                             onClick={applyExpectedMinutes}
-                            className="ml-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/80 transition-colors"
+                            className="ml-2 px-4 py-2 rounded-lg text-white text-sm font-bold transition-colors"
+                            style={{ backgroundColor: accentColor }}
                           >
                             {t('Recalculate')}
                           </button>
                         </div>
                         <p className="text-[11px] text-[var(--text-muted)]">{t('blank = use quiz time_per_question')}</p>
                       </div>
-                      <p className="text-[11px] text-[var(--text-muted)] text-center sm:text-right flex items-center gap-1">
-                        <span className="material-symbols-outlined text-sm">{t('info')}</span>
-                        {t('Live-game sessions are not included.')}
-                      </p>
+                      {isLiveMode ? (
+                        <p className="text-[11px] text-[var(--text-muted)] text-center sm:text-right flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm">{t('info')}</span>
+                          {t('Solo unit quizzes are in Units view.')}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
+                </>
+                  );
+                })()}
 
                 {/* Units */}
-                {unitsLoading ? (
+                {analyticsMode === 'units' && (unitsLoading ? (
                   <div className="flex justify-center py-16">
                     <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
                   </div>
@@ -1341,7 +1481,216 @@ export default function AdminDashboard() {
                       );
                     })}
                   </div>
-                )}
+                ))}
+
+                {/* Live Sessions */}
+                {analyticsMode === 'live' && (liveGamesLoading ? (
+                  <div className="flex justify-center py-16">
+                    <div className="w-10 h-10 border-4 border-[#10B981]/30 border-t-[#10B981] rounded-full animate-spin"></div>
+                  </div>
+                ) : (liveReport?.sessions?.length || liveGames.length) === 0 ? (
+                  <div className="text-center py-16 text-[var(--text-muted)]">
+                    <span className="material-symbols-outlined text-4xl mb-2 block">sports_esports</span>
+                    {t('No completed live games yet.')}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {(liveReport?.sessions?.length ? liveReport.sessions : liveGames)
+                      .slice()
+                      .sort((a, b) => new Date(b.completedAt || b.playedAt) - new Date(a.completedAt || a.playedAt))
+                      .map((s) => {
+                      const attemptId = s.attemptId;
+                      const isOpen = expandedSession === attemptId;
+                      const sessionMetrics = liveReport?.sessions?.find(x => x.attemptId === attemptId) || s;
+                      const accentKey = sessionMetrics.quizId || s.quizId || sessionMetrics.quizTitle || attemptId;
+                      const color = getLiveColor(accentKey);
+                      const icon = getLiveIcon(accentKey);
+                      return (
+                        <div key={attemptId} className="bg-surface-container-high/40 rounded-2xl border border-white/5 overflow-hidden">
+                          <button
+                            onClick={() => toggleSession(attemptId)}
+                            className="w-full text-left p-5 flex items-center gap-4 hover:bg-white/[0.03] transition-colors"
+                          >
+                            <div
+                              className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: `${color}22`, color }}
+                            >
+                              <span className="material-symbols-outlined">{icon}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <p className="font-bold text-on-surface truncate">{sessionMetrics.quizTitle || s.quizTitle}</p>
+                                {(sessionMetrics.joinCode || s.joinCode) && (
+                                  <span
+                                    className="px-2 py-0.5 rounded-md text-xs font-mono font-bold"
+                                    style={{ backgroundColor: `${color}26`, color }}
+                                  >
+                                    {sessionMetrics.joinCode || s.joinCode}
+                                  </span>
+                                )}
+                                {sessionMetrics.maxStreak > 0 && <StreakFire streak={sessionMetrics.maxStreak} />}
+                              </div>
+                              <div className="mt-2 h-2 w-full rounded-full bg-white/5 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${sessionMetrics.accuracy || s.accuracy || 0}%`, background: `linear-gradient(90deg, ${color}, ${color}cc)`, transition: 'width 0.5s ease' }}
+                                />
+                              </div>
+                              <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                                {sessionMetrics.hostedBy || s.hostedBy} · {formatDate(sessionMetrics.completedAt || s.playedAt)}
+                              </p>
+                            </div>
+                            <div className="hidden sm:flex items-center gap-6 text-center flex-shrink-0">
+                              <div>
+                                <p className="text-lg font-bold" style={{ color: sessionMetrics.knowledgeLevel?.color || color }}>
+                                  {sessionMetrics.accuracy ?? s.accuracy}%
+                                </p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Accuracy')}</p>
+                              </div>
+                              <div>
+                                <p className="text-lg font-bold text-on-surface">{orDash(sessionMetrics.firstAttemptAccuracy, '%')}</p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('1st Try')}</p>
+                              </div>
+                              <div>
+                                <p className="text-lg font-bold text-on-surface">
+                                  {sessionMetrics.avgResponseTime != null
+                                    ? `${sessionMetrics.avgResponseTime}s`
+                                    : (s.avgResponseMs != null ? `${Math.round(s.avgResponseMs / 10) / 100}s` : '—')}
+                                </p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Avg Time')}</p>
+                              </div>
+                              <div>
+                                <p className="text-lg font-bold" style={{ color }}>#{sessionMetrics.rank || s.rank}/{sessionMetrics.totalPlayers || s.totalPlayers}</p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Rank')}</p>
+                              </div>
+                              <div>
+                                <p className="text-lg font-bold text-on-surface">{sessionMetrics.scorePercent ?? s.accuracy}%</p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Score')}</p>
+                              </div>
+                              <div>
+                                <p className="text-lg font-bold text-on-surface">
+                                  {(sessionMetrics.score ?? 0).toLocaleString()}
+                                  <span className="text-[var(--text-muted)]">/{(sessionMetrics.totalPoints ?? 0).toLocaleString()}</span>
+                                </p>
+                                <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{t('Points')}</p>
+                              </div>
+                            </div>
+                            <span className={`material-symbols-outlined text-[var(--text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`}>{t('expand_more')}</span>
+                          </button>
+
+                          {isOpen && (
+                            <div className="border-t border-white/5 p-5 space-y-4 bg-black/10">
+                              {(() => {
+                                const m = sessionMetrics;
+                                const cells = [
+                                  { label: t('Questions'), value: m.totalQuestions ?? s.totalQuestions },
+                                  { label: t('Correct'), value: m.correct ?? m.correctCount ?? s.correctCount },
+                                  { label: t('Incorrect'), value: m.incorrect ?? ((m.totalQuestions ?? s.totalQuestions) - (m.correctCount ?? s.correctCount)) },
+                                  { label: t('Accuracy'), value: `${m.accuracy ?? s.accuracy}%` },
+                                  { label: t('1st-Try'), value: `${m.firstAttemptAccuracy ?? '—'}%` },
+                                  { label: t('Fastest'), value: m.fastestResponse ? `${m.fastestResponse}s` : '—' },
+                                  { label: t('Slowest'), value: m.slowestResponse ? `${m.slowestResponse}s` : '—' },
+                                  { label: t('Session Time'), value: formatDuration(m.completionTime ?? (m.totalTimeMs ?? s.totalTimeMs) / 1000) },
+                                  { label: t('Time Util'), value: m.timeUtilization ? `${m.timeUtilization}x` : '—' },
+                                  { label: t('Efficiency'), value: orDash(m.efficiency) },
+                                  { label: t('Retention'), value: m.retention === null || m.retention === undefined ? t('N/A') : `${m.retention}%` },
+                                  { label: t('Knowledge'), value: m.knowledgeScore ?? '—', color: m.knowledgeLevel?.color }
+                                ];
+                                return (
+                                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3 pb-2">
+                                    {cells.map(c => (
+                                      <div key={c.label} className="bg-white/[0.03] rounded-xl px-3 py-2 text-center border border-white/5">
+                                        <p className="text-sm font-bold font-mono" style={c.color ? { color: c.color } : undefined}>{c.value}</p>
+                                        <p className="text-[9px] uppercase tracking-wider text-[var(--text-muted)]">{c.label}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+
+                              {liveDetailLoading ? (
+                                <div className="flex justify-center py-8">
+                                  <div
+                                    className="w-8 h-8 border-4 rounded-full animate-spin"
+                                    style={{ borderColor: `${color}4d`, borderTopColor: color }}
+                                  ></div>
+                                </div>
+                              ) : liveGameDetail?.questions ? (
+                                <div className="bg-surface-container-high/40 border border-white/5 rounded-xl overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full border-collapse text-left text-sm">
+                                      <thead>
+                                        <tr className="border-b border-white/5 bg-white/[0.03] text-xs uppercase tracking-wider text-[var(--text-muted)]">
+                                          <th className="p-3 w-10">#</th>
+                                          <th className="p-3">{t('Question')}</th>
+                                          <th className="p-3 text-center">{t('Result')}</th>
+                                          <th className="p-3 text-center">{t('Marks')}</th>
+                                          <th className="p-3 text-center">{t('Accuracy')}</th>
+                                          <th className="p-3 text-center">{t('Time')}</th>
+                                          <th className="p-3 text-center">{t('Selections')}</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {liveGameDetail.questions.map((q, i) => (
+                                          <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                                            <td className="p-3 font-mono text-[var(--text-muted)]">{i + 1}</td>
+                                            <td className="p-3 max-w-md">
+                                              <p className="text-on-surface line-clamp-2">{q.questionText}</p>
+                                              <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{q.type}</span>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                              {(() => {
+                                                const badge = getStatusBadge(q.status, q.isCorrect);
+                                                return (
+                                                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${badge.cls}`}>
+                                                    <span className="material-symbols-outlined text-sm">{t(badge.icon)}</span>{t(badge.label)}
+                                                  </span>
+                                                );
+                                              })()}
+                                            </td>
+                                            <td className="p-3 text-center font-mono">
+                                              {(q.pointsEarned || 0).toLocaleString()}<span className="text-[var(--text-muted)]">/{(q.maxPoints || 1).toLocaleString()}</span>
+                                            </td>
+                                            <td className="p-3 text-center font-mono font-bold" style={{ color: (q.accuracy ?? 0) >= 50 ? '#10B981' : '#EF4444' }}>
+                                              {q.accuracy ?? (q.isCorrect ? 100 : 0)}%
+                                            </td>
+                                            <td className="p-3 text-center font-mono text-[var(--text-muted)]">{q.timeTaken ?? Math.round((q.responseMs || 0) / 100) / 10}s</td>
+                                            <td className="p-3 text-center">
+                                              {q.selectionTrail?.length > 0 && ['mcq', 'image'].includes(q.type) ? (
+                                                <div className="flex flex-wrap gap-1 justify-center">
+                                                  {q.selectionTrail.map((sel, si) => (
+                                                    <span
+                                                      key={si}
+                                                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${sel.isCorrect ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}
+                                                      title={`${sel.value} @ ${Math.round((sel.elapsedMs || 0) / 100) / 10}s`}
+                                                    >
+                                                      {sel.order}·{sel.value}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              ) : (
+                                                <span className="text-[var(--text-muted)]">—</span>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                        {liveGameDetail.questions.length === 0 && (
+                                          <tr><td colSpan={7} className="p-6 text-center text-[var(--text-muted)]">{t('No question data.')}</td></tr>
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-center text-[var(--text-muted)] py-4 text-sm">{t('No question data.')}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </>
             )}
           </div>

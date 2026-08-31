@@ -71,6 +71,92 @@ function finalizeUnansweredForCurrentQuestion(session, finishedAt = Date.now()) 
 }
 
 /**
+ * Compute 5-state answer status for live game persistence (mirrors solo quiz semantics).
+ */
+function computeLiveAnswerStatus(ansInfo) {
+  if (!ansInfo || ansInfo.answer === null || ansInfo.answer === undefined || ansInfo.answer === '') {
+    return 'not_answered';
+  }
+  return ansInfo.isCorrect ? 'correct' : 'incorrect';
+}
+
+/**
+ * Persist all live game results to the database on game-over.
+ * Writes live_game_attempts, live_game_answers, and live_answer_selections
+ * in a single transaction for atomicity.
+ */
+async function persistLiveGameResults(session, rankings) {
+  const sql = getDB();
+  try {
+    await sql.begin(async (tx) => {
+      const totalPoints = session.questions.reduce((sum, q) => sum + (q.points || DEFAULT_QUESTION_MARKS), 0);
+
+      const candidateIds = rankings
+        .map(r => r.id)
+        .filter(id => id && !String(id).startsWith('guest_'));
+      const validUsers = candidateIds.length > 0
+        ? await tx`SELECT id FROM users WHERE id = ANY(${candidateIds}) AND role = 'student'`
+        : [];
+      const validStudentIds = new Set(validUsers.map(u => u.id));
+
+      for (const ranked of rankings) {
+        const participant = session.participants.get(ranked.id);
+        if (!participant || !validStudentIds.has(participant.id)) continue;
+
+        const existing = await tx`
+          SELECT id FROM live_game_attempts
+          WHERE session_id = ${session.id} AND user_id = ${participant.id}
+        `;
+        if (existing.length > 0) continue;
+
+        const attemptId = uuidv4();
+        const correctCount = participant.answers.filter(a => a && a.isCorrect).length;
+
+        await tx`
+          INSERT INTO live_game_attempts (id, session_id, user_id, final_score, total_points, correct_count, total_questions, max_streak, total_time_ms, final_rank, completed_at)
+          VALUES (${attemptId}, ${session.id}, ${participant.id}, ${ranked.score}, ${totalPoints}, ${correctCount}, ${session.questions.length}, ${participant.maxStreak || 0}, ${participant.totalResponseMs || 0}, ${ranked.rank}, CURRENT_TIMESTAMP)
+        `;
+
+        for (let qIdx = 0; qIdx < session.questions.length; qIdx++) {
+          const question = session.questions[qIdx];
+          const ansInfo = participant.answers[qIdx];
+          const answerId = uuidv4();
+
+          const finalAnswer = ansInfo ? (typeof ansInfo.answer === 'object' ? JSON.stringify(ansInfo.answer) : String(ansInfo.answer ?? '')) : null;
+          const isCorrect = ansInfo?.isCorrect ? 1 : 0;
+          const pointsEarned = ansInfo?.score?.totalScore || 0;
+          const responseMs = ansInfo?.responseMs || 0;
+          const isTimeout = ansInfo?.isTimeout ? 1 : 0;
+          const isLate = ansInfo?.isLate ? 1 : 0;
+          const status = computeLiveAnswerStatus(ansInfo);
+          const correctNorm = question.correct_answer?.toString().toUpperCase().trim() || '';
+
+          await tx`
+            INSERT INTO live_game_answers (id, attempt_id, question_id, question_index, final_answer, is_correct, points_earned, response_ms, is_timeout, is_late, status)
+            VALUES (${answerId}, ${attemptId}, ${question.id}, ${qIdx}, ${finalAnswer}, ${isCorrect}, ${pointsEarned}, ${responseMs}, ${isTimeout}, ${isLate}, ${status})
+          `;
+
+          // Persist selection trail for MCQ and image questions
+          const trail = participant.selectionTrails?.[qIdx];
+          if (trail && trail.length > 0 && (question.type === 'mcq' || question.type === 'image')) {
+            for (const sel of trail) {
+              const selCorrect = String(sel.value).toUpperCase().trim() === correctNorm ? 1 : 0;
+              await tx`
+                INSERT INTO live_answer_selections (id, answer_id, selection_order, selected_value, selected_at, elapsed_ms, is_correct)
+                VALUES (${uuidv4()}, ${answerId}, ${sel.order}, ${String(sel.value)}, ${sel.timestamp}, ${sel.elapsedMs}, ${selCorrect})
+              `;
+            }
+          }
+        }
+      }
+    });
+    console.log(`📊 Persisted live game results for session ${session.id} (${rankings.length} players)`);
+  } catch (err) {
+    console.error('Failed to persist live game results:', err);
+  }
+}
+
+/**
  * Initialize Socket.IO event handlers.
  * @param {import('socket.io').Server} io - The Socket.IO server instance
  */
@@ -122,6 +208,8 @@ function initializeSocket(io) {
       } catch (err) {
         console.error('Failed to update live session ended_at:', err);
       }
+      // Persist all participant answers, scores, and selection trails to the database
+      persistLiveGameResults(session, rankings).catch(err => console.error('persistLiveGameResults error:', err));
       setTimeout(() => liveSessions.delete(session.id), 300000);
       return;
     }
@@ -264,7 +352,9 @@ function initializeSocket(io) {
         socketId: socket.id,
         score: 0,
         streak: 0,
+        maxStreak: 0,
         answers: [],
+        selectionTrails: {},
         totalResponseMs: 0,
         lastScoreReachedAt: null,
         joinedAt: Date.now()
@@ -409,8 +499,12 @@ function initializeSocket(io) {
         isCorrect = data.answer?.toString().toUpperCase().trim() === question.correct_answer?.toString().toUpperCase().trim();
       }
 
-      if (isCorrect) participant.streak++;
-      else participant.streak = 0;
+      if (isCorrect) {
+        participant.streak++;
+        if (participant.streak > (participant.maxStreak || 0)) participant.maxStreak = participant.streak;
+      } else {
+        participant.streak = 0;
+      }
 
       const scoreResult = calculateLiveScoreKahootStyle(isCorrect, responseMs, questionLimitMs, question.points || DEFAULT_QUESTION_MARKS);
       participant.score += scoreResult.totalScore;
@@ -445,6 +539,35 @@ function initializeSocket(io) {
         clearSessionTimers(session);
         emitQuestionResults(session);
       }
+    });
+
+    // Student changes their selected option (before final submit) — MCQ/image only
+    socket.on('selection-change', (data) => {
+      const session = liveSessions.get(socket.sessionId);
+      if (!session) return;
+      const participant = session.participants.get(socket.userId);
+      if (!participant) return;
+      const qIdx = session.currentQuestion;
+      const question = session.questions?.[qIdx];
+      if (!question || (question.type !== 'mcq' && question.type !== 'image')) return;
+      if (participant.answers[qIdx] !== undefined) return;
+      // Only track while the question is active
+      if (!session.questionStartedAt || session.resultsEmittedForQuestion === qIdx) return;
+
+      const value = data?.value;
+      if (value == null || String(value).length > 512) return;
+
+      if (!participant.selectionTrails[qIdx]) participant.selectionTrails[qIdx] = [];
+      const trail = participant.selectionTrails[qIdx];
+      // Cap at 20 selections per question to prevent abuse
+      if (trail.length >= 20) return;
+      const now = Date.now();
+      trail.push({
+        order: trail.length + 1,
+        value,
+        timestamp: now,
+        elapsedMs: Math.max(0, now - session.questionStartedAt)
+      });
     });
 
     // Teacher requests next question or skips

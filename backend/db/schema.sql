@@ -254,3 +254,58 @@ CREATE INDEX IF NOT EXISTS idx_pending_deletions_admin ON admin_pending_deletion
 ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_pending_deletion INTEGER DEFAULT 0;
 
+-- ─── Live Game Analytics ───
+-- Per-student live game participation record (mirrors quiz_attempts for live games).
+CREATE TABLE IF NOT EXISTS live_game_attempts (
+  id              TEXT PRIMARY KEY,
+  session_id      TEXT NOT NULL,
+  user_id         TEXT NOT NULL,
+  final_score     INTEGER DEFAULT 0,
+  total_points    INTEGER DEFAULT 0,
+  correct_count   INTEGER DEFAULT 0,
+  total_questions  INTEGER DEFAULT 0,
+  max_streak      INTEGER DEFAULT 0,
+  total_time_ms   INTEGER DEFAULT 0,
+  final_rank      INTEGER DEFAULT 0,
+  completed_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (session_id) REFERENCES live_sessions(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  UNIQUE(session_id, user_id)
+);
+
+-- Per-question answer record for live games (mirrors question_answers).
+CREATE TABLE IF NOT EXISTS live_game_answers (
+  id              TEXT PRIMARY KEY,
+  attempt_id      TEXT NOT NULL,
+  question_id     TEXT NOT NULL,
+  question_index  INTEGER DEFAULT 0,
+  final_answer    TEXT,
+  is_correct      INTEGER DEFAULT 0,
+  points_earned   INTEGER DEFAULT 0,
+  response_ms     INTEGER DEFAULT 0,
+  is_timeout      INTEGER DEFAULT 0,
+  is_late         INTEGER DEFAULT 0,
+  FOREIGN KEY (attempt_id) REFERENCES live_game_attempts(id) ON DELETE CASCADE,
+  FOREIGN KEY (question_id) REFERENCES questions(id)
+);
+
+-- Selection trail: each option click/change the student made before submitting.
+-- Only populated for MCQ and image-based questions.
+CREATE TABLE IF NOT EXISTS live_answer_selections (
+  id              TEXT PRIMARY KEY,
+  answer_id       TEXT NOT NULL,
+  selection_order INTEGER NOT NULL,
+  selected_value  TEXT NOT NULL,
+  selected_at     BIGINT NOT NULL,
+  elapsed_ms      INTEGER DEFAULT 0,
+  FOREIGN KEY (answer_id) REFERENCES live_game_answers(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_lga_user ON live_game_attempts(user_id);
+CREATE INDEX IF NOT EXISTS idx_lga_session ON live_game_attempts(session_id);
+CREATE INDEX IF NOT EXISTS idx_lgans_attempt ON live_game_answers(attempt_id);
+CREATE INDEX IF NOT EXISTS idx_las_answer ON live_answer_selections(answer_id);
+
+ALTER TABLE live_game_answers ADD COLUMN IF NOT EXISTS status TEXT;
+ALTER TABLE live_answer_selections ADD COLUMN IF NOT EXISTS is_correct INTEGER DEFAULT 0;
+

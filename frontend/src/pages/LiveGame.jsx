@@ -293,6 +293,7 @@ export default function LiveGame() {
   const [selectedLeft, setSelectedLeft] = useState(null);
   const [shuffledRightItems, setShuffledRightItems] = useState([]);
   const [showRankings, setShowRankings] = useState(false);
+  const [selectedOption, setSelectedOption] = useState(null); // MCQ/image selection-before-submit
 
   // Captcha state
   const [captchaBox, setCaptchaBox] = useState(null);
@@ -330,6 +331,7 @@ export default function LiveGame() {
       setAnswered(false);
       setAnswerResult(null);
       setAnswerRevealData(null);
+      setSelectedOption(null);
       setTimeLeft(Math.max(0, Math.ceil(((q.questionEndsAt || Date.now()) - Date.now()) / 1000)));
       setPhase('playing');
     });
@@ -440,12 +442,14 @@ export default function LiveGame() {
   useEffect(() => {
     if (phase === 'playing' && timeLeft === 0 && !answered && !isHost) {
       if (question?.type === 'captcha' && captchaBox && captchaBox.w > 0.01 && captchaBox.h > 0.01) {
-        submitAnswer(JSON.stringify({ x: +captchaBox.x.toFixed(4), y: +captchaBox.y.toFixed(4), w: +captchaBox.w.toFixed(4), h: +captchaBox.h.toFixed(4) }));
+        submitAnswer(JSON.stringify({ x: +captchaBox.x.toFixed(4), y: +captchaBox.y.toFixed(4), w: +captchaBox.w.toFixed(4), h: +captchaBox.h.toFixed(4) }), { allowTimeoutSubmit: true });
+      } else if (selectedOption !== null && ['mcq', 'image'].includes(question?.type)) {
+        submitAnswer(selectedOption, { allowTimeoutSubmit: true });
       } else {
-        submitAnswer(null);
+        submitAnswer(null, { allowTimeoutSubmit: true });
       }
     }
-  }, [timeLeft, phase, answered, isHost, captchaBox, question]);
+  }, [timeLeft, phase, answered, isHost, captchaBox, question, selectedOption]);
 
   useEffect(() => {
     if (phase !== 'get-ready') return;
@@ -509,17 +513,33 @@ export default function LiveGame() {
 
   const startGame = () => socket.emit('start-game');
   const showLeaderboard = () => socket.emit('show-leaderboard');
-  const submitAnswer = (answer) => {
+  const submitAnswer = (answer, { allowTimeoutSubmit = false } = {}) => {
     if (answered || !question) return;
 
-    if (!isHost && timeLeft <= 0) {
+    if (!isHost && timeLeft <= 0 && !allowTimeoutSubmit) {
       setAnswered(true);
       setAnswerResult({ isCorrect: false, tooLate: true, message: 'Too late - time is up for this question.' });
       return;
     }
 
     setAnswered(true);
+    setSelectedOption(null);
     socket.emit('submit-answer', { answer });
+  };
+
+  // MCQ/image option click: first click selects (and emits selection-change), second click confirms
+  const handleOptionClick = (opt) => {
+    if (answered || !question || timeLeft <= 0) return;
+    if (selectedOption === opt) {
+      // Double-click / same option: confirm and submit
+      submitAnswer(opt);
+    } else {
+      // Select this option and emit selection-change for trail tracking
+      setSelectedOption(opt);
+      if (socket && question?.index !== undefined && ['mcq', 'image'].includes(question.type)) {
+        socket.emit('selection-change', { value: opt, questionIndex: question.index });
+      }
+    }
   };
   const nextQuestion = () => socket.emit('next-question');
 
@@ -850,26 +870,46 @@ export default function LiveGame() {
 
             {/* Options Area (Student) */}
             {!isHost && !answered && timeLeft > 0 && ['mcq', 'image', 'video', 'audio'].includes(question.type) && (
+              <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                 {question.options?.map((opt, i) => {
                   const borderColors = ['border-primary', 'border-tertiary-fixed-dim', 'border-error', 'border-amber-400'];
                   const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+                  const isSelected = selectedOption === opt;
                   return (
                     <button 
                       key={i} 
-                      className={`bg-surface-variant/40 backdrop-blur-md p-6 rounded-lg text-left relative overflow-hidden group hover:bg-surface-variant/60 transition-all border-l-4 ${borderColors[i % borderColors.length]}`}
-                      onClick={() => submitAnswer(opt)}
+                      className={`bg-surface-variant/40 backdrop-blur-md p-6 rounded-lg text-left relative overflow-hidden group transition-all border-l-4 ${borderColors[i % borderColors.length]} ${isSelected ? 'ring-2 ring-primary bg-primary/10 scale-[1.02]' : 'hover:bg-surface-variant/60'}`}
+                      onClick={() => handleOptionClick(opt)}
                     >
                       <div className="flex gap-4 items-start">
-                        <div className="w-8 h-8 shrink-0 rounded flex items-center justify-center bg-surface-container-high text-on-surface-variant font-mono text-sm shadow-inner mt-1">
+                        <div className={`w-8 h-8 shrink-0 rounded flex items-center justify-center font-mono text-sm shadow-inner mt-1 ${isSelected ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-on-surface-variant'}`}>
                           {letters[i]}
                         </div>
-                        <span className="font-body text-base text-on-surface group-hover:text-primary transition-colors">{opt}</span>
+                        <span className={`font-body text-base transition-colors ${isSelected ? 'text-primary font-semibold' : 'text-on-surface group-hover:text-primary'}`}>{opt}</span>
                       </div>
+                      {isSelected && (
+                        <div className="absolute top-2 right-2">
+                          <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                        </div>
+                      )}
                     </button>
                   );
                 })}
               </div>
+              {/* Confirm button — appears when an option is selected */}
+              {selectedOption !== null && (
+                <div className="flex justify-center mt-4 animate-fadeIn">
+                  <button
+                    onClick={() => submitAnswer(selectedOption)}
+                    className="px-8 py-3 bg-primary text-on-primary font-bold rounded-xl shadow-lg hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-lg">check</span>
+                    Confirm Answer
+                  </button>
+                </div>
+              )}
+              </>
             )}
 
             {/* Jumbled Letters Area */}

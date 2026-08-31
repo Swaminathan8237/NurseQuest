@@ -163,6 +163,13 @@ export const adminAPI = {
   // retention, Knowledge Score + classification, and badges. `expectedMinutes` optionally
   // overrides the per-unit time budget used by the Speed Score.
   getStudentReport: (id, expectedMinutes) => request(`/admin/students/${id}/report${expectedMinutes ? `?expectedMinutes=${expectedMinutes}` : ''}`),
+  // Live game analytics
+  getStudentLiveGames: (id) => request(`/admin/students/${id}/live-games`),
+  getLiveGameDetail: (attemptId) => request(`/admin/live-games/${attemptId}/detail`),
+  getStudentLiveReport: (id, expectedMinutes) => {
+    const qs = expectedMinutes ? `?expectedMinutes=${encodeURIComponent(expectedMinutes)}` : '';
+    return request(`/admin/students/${id}/live-report${qs}`);
+  },
   // Unit quiz & access management
   getUnitQuizzes: () => request('/admin/unit-quizzes'),
   getUnitAccess: () => request('/admin/units/access'),

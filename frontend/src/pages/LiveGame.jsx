@@ -41,25 +41,43 @@ const VideoPlayer = memo(({ src }) => {
   );
 });
 
-const renderCorrectAnswer = (correctVal) => {
-  if (!correctVal) return null;
-  let parsed = correctVal;
-  if (typeof correctVal === 'string') {
-    try {
-      parsed = JSON.parse(correctVal);
-    } catch {
-      parsed = correctVal;
-    }
+// Parse an answer value into whatever it really is. Answers travel as strings, arrays or
+// objects depending on the question type, and sometimes as a JSON string of one of those.
+const parseAnswerValue = (value) => {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
   }
+};
+
+const isStructuredAnswer = (value) => {
+  const parsed = parseAnswerValue(value);
+  return Array.isArray(parsed) || (typeof parsed === 'object' && parsed !== null);
+};
+
+// `compact` renders the same shapes at list scale, so the host's Class Responses panel and the
+// Correct Answer box stay visually consistent by construction rather than by duplication.
+const renderCorrectAnswer = (correctVal, { compact = false } = {}) => {
+  if (!correctVal) return null;
+  const parsed = parseAnswerValue(correctVal);
 
   // If it's an array (sequence)
   if (Array.isArray(parsed)) {
     return (
-      <div className="flex flex-col gap-2 max-w-xl mx-auto text-left mt-2">
+      <div className={compact
+        ? 'flex flex-col gap-1 text-left'
+        : 'flex flex-col gap-2 max-w-xl mx-auto text-left mt-2'}>
         {parsed.map((step, idx) => (
-          <div key={idx} className="flex items-center gap-3 bg-surface-container-high px-4 py-2 rounded-lg border border-outline-variant/30">
-            <span className="font-mono font-bold text-primary text-sm">{idx + 1}</span>
-            <span className="font-body text-base text-on-surface">{step}</span>
+          <div
+            key={idx}
+            className={`flex items-center gap-3 bg-surface-container-high rounded-lg border border-outline-variant/30 ${
+              compact ? 'px-2.5 py-1' : 'px-4 py-2'
+            }`}
+          >
+            <span className={`font-mono font-bold text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{idx + 1}</span>
+            <span className={`font-body text-on-surface ${compact ? 'text-sm leading-snug' : 'text-base'}`}>{step}</span>
           </div>
         ))}
       </div>
@@ -69,15 +87,20 @@ const renderCorrectAnswer = (correctVal) => {
   // If it's an object (matching or captcha)
   if (typeof parsed === 'object' && parsed !== null) {
     if (parsed.x !== undefined && parsed.y !== undefined) {
-      return <span className="font-body text-sm text-primary">Image Captcha (Target Region Selected)</span>;
+      return <span className={`font-body text-primary ${compact ? 'text-xs' : 'text-sm'}`}>Image Captcha (Target Region Selected)</span>;
     }
     return (
-      <div className="flex flex-wrap justify-center gap-3 mt-2">
+      <div className={compact ? 'flex flex-wrap gap-1.5' : 'flex flex-wrap justify-center gap-3 mt-2'}>
         {Object.entries(parsed).map(([left, right], idx) => (
-          <div key={idx} className="flex items-center gap-2 bg-surface-container-high px-4 py-2 rounded-lg border border-outline-variant/30">
-            <span className="font-body text-sm text-primary">{left}</span>
+          <div
+            key={idx}
+            className={`flex items-center gap-2 bg-surface-container-high rounded-lg border border-outline-variant/30 ${
+              compact ? 'px-2.5 py-1' : 'px-4 py-2'
+            }`}
+          >
+            <span className={`font-body text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{left}</span>
             <span className="material-symbols-outlined text-sm text-on-surface-variant/40">arrow_forward</span>
-            <span className="font-body text-sm text-tertiary">{right}</span>
+            <span className={`font-body text-tertiary ${compact ? 'text-xs' : 'text-sm'}`}>{right}</span>
           </div>
         ))}
       </div>
@@ -85,7 +108,121 @@ const renderCorrectAnswer = (correctVal) => {
   }
 
   // Fallback for plain text
-  return <span className="font-display font-bold text-on-surface text-lg">{parsed.toString()}</span>;
+  return compact
+    ? <span className="font-body font-semibold text-on-surface text-sm break-words">{parsed.toString()}</span>
+    : <span className="font-display font-bold text-on-surface text-lg">{parsed.toString()}</span>;
+};
+
+// Host-side read of how the class answered. Two jobs, in this order: the summary, which is what
+// a teacher with 60 students in the room actually reads and which never grows; then the distinct
+// answers, capped so a sequence question with 60 different arrangements can't flood the panel.
+const RESPONSE_ROW_LIMIT = 5;
+
+const ClassResponses = ({ breakdown, summary, distribution, correctAnswer, fallbackTotal = 0 }) => {
+  // Prefer the structured payload. Fall back to the legacy flattened `distribution` so a host
+  // whose bundle is mid-deploy, or a server that hasn't been restarted yet, still sees rows.
+  const rows = Array.isArray(breakdown) && breakdown.length > 0
+    ? breakdown
+    : Object.entries(distribution || {}).map(([value, count]) => ({
+        value,
+        count,
+        isCorrect: typeof correctAnswer === 'string' && value === correctAnswer.toUpperCase(),
+      }));
+
+  const answeredSum = rows.reduce((n, r) => n + r.count, 0);
+  const roomTotal = summary?.total ?? fallbackTotal ?? 0;
+  const denom = Math.max(1, roomTotal || answeredSum);
+
+  const sorted = [...rows].sort((a, b) => b.count - a.count);
+  const shown = sorted.slice(0, RESPONSE_ROW_LIMIT);
+  const hidden = sorted.slice(RESPONSE_ROW_LIMIT);
+  const hiddenResponses = hidden.reduce((n, r) => n + r.count, 0);
+
+  const segments = summary
+    ? [
+        { key: 'correct', label: 'correct', n: summary.correct || 0, bar: 'bg-tertiary-fixed-dim', dot: 'bg-tertiary-fixed-dim' },
+        { key: 'incorrect', label: 'incorrect', n: summary.incorrect || 0, bar: 'bg-error', dot: 'bg-error' },
+        { key: 'noAnswer', label: 'no answer', n: summary.noAnswer || 0, bar: 'bg-outline-variant', dot: 'bg-outline-variant' },
+      ].filter(s => s.n > 0)
+    : [];
+
+  return (
+    <div className="bg-surface-variant/30 p-8 rounded-2xl border border-outline-variant/20">
+      <div className="flex items-baseline justify-between gap-4 mb-6">
+        <h3 className="font-headline text-lg font-bold text-on-surface uppercase tracking-wider">Class Responses</h3>
+        {roomTotal > 0 && (
+          <span className="font-mono text-xs text-on-surface-variant tabular-nums shrink-0">
+            {roomTotal} in the room
+          </span>
+        )}
+      </div>
+
+      {segments.length > 0 && (
+        <div className="flex flex-col gap-3 mb-8">
+          <div className="flex h-3 w-full rounded-full overflow-hidden bg-surface-container-highest">
+            {segments.map(s => (
+              <div key={s.key} className={s.bar} style={{ width: `${(s.n / denom) * 100}%` }} />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            {segments.map(s => (
+              <span key={s.key} className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${s.dot}`} />
+                <span className="font-display font-bold text-on-surface tabular-nums">{s.n}</span>
+                <span className="text-sm text-on-surface-variant">{s.label}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {shown.length === 0 ? (
+        <p className="text-sm text-on-surface-variant font-body">No answers were submitted.</p>
+      ) : (
+        <div className="flex flex-col gap-3 max-h-[24rem] overflow-y-auto pr-1">
+          {shown.map((row, idx) => {
+            const pct = (row.count / denom) * 100;
+            const structured = isStructuredAnswer(row.value);
+            return (
+              <div
+                key={idx}
+                className={`rounded-xl border-l-[3px] bg-surface-container/70 pl-4 pr-4 py-3 flex flex-col gap-2 ${
+                  row.isCorrect ? 'border-l-tertiary-fixed-dim' : 'border-l-outline-variant/60'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    {structured
+                      ? renderCorrectAnswer(row.value, { compact: true })
+                      : <span className="font-body font-semibold text-on-surface break-words">{String(row.value)}</span>}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {row.isCorrect && (
+                      <span className="material-symbols-outlined text-tertiary-fixed-dim text-[18px]">check_circle</span>
+                    )}
+                    <span className="font-display font-bold text-on-surface tabular-nums">{row.count}</span>
+                    <span className="font-mono text-xs text-on-surface-variant tabular-nums">{Math.round(pct)}%</span>
+                  </div>
+                </div>
+                <div className="w-full h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${row.isCorrect ? 'bg-tertiary-fixed-dim' : 'bg-primary'}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {hidden.length > 0 && (
+        <p className="mt-3 text-xs font-mono text-on-surface-variant">
+          + {hidden.length} more {hidden.length === 1 ? 'answer' : 'answers'} ({hiddenResponses} {hiddenResponses === 1 ? 'response' : 'responses'})
+        </p>
+      )}
+    </div>
+  );
 };
 
 const RankingsList = memo(({ rankings, variant = 'sidebar', currentUserId }) => {
@@ -274,6 +411,11 @@ export default function LiveGame() {
   const [answerRevealData, setAnswerRevealData] = useState(null);
   const [quizzes, setQuizzes] = useState([]);
   const [selectedQuiz, setSelectedQuiz] = useState(location.state?.quizId || '');
+  // Set when the host returns from the Quiz Editor: the live-only copy they just finished
+  // editing, which is hidden from the quiz dropdown by design. Cleared once it has been
+  // handed to a session, because the copy is deleted server-side when that game ends.
+  const [liveDraft, setLiveDraft] = useState(location.state?.liveDraftReady ? location.state.quizId : null);
+  const [preparingDraft, setPreparingDraft] = useState(false);
   const [error, setError] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
   const [jumbledLetters, setJumbledLetters] = useState([]);
@@ -282,8 +424,15 @@ export default function LiveGame() {
   // correct order in place. `sequenceReveal` is raised by `question-results`; the pending
   // payload is held until the animation reports back (or the fallback timer fires).
   const [sequenceReveal, setSequenceReveal] = useState(false);
+  // Host-side mirror of the same reveal, which turns the single "Skip to Results" button into
+  // the two-step Reveal Order → Show Results pair for sequence questions.
+  const [hostRevealedSequence, setHostRevealedSequence] = useState(false);
   const pendingRevealRef = useRef(null);
   const revealTimerRef = useRef(null);
+  // Set when the host revealed the order in place for a given question index. That reveal
+  // holds everyone on the board, so the `question-results` that follows must not try to
+  // animate a second time.
+  const sequenceRevealedIndexRef = useRef(null);
   // Socket handlers are registered once, so they read the live question through a ref
   // rather than closing over a stale `question` value.
   const questionRef = useRef(null);
@@ -354,7 +503,7 @@ export default function LiveGame() {
 
   useEffect(() => {
     socket = io('/', { transports: ['websocket', 'polling'] });
-    socket.on('session-created', (data) => { setSessionInfo(data); setPhase('waiting'); });
+    socket.on('session-created', (data) => { setSessionInfo(data); setPhase('waiting'); setLiveDraft(null); });
     socket.on('session-joined', (data) => { setSessionInfo(data); setPhase('waiting'); });
     socket.on('participant-joined', (data) => setParticipants(data.participants));
     socket.on('participant-left', (data) => setParticipants(data.participants));
@@ -374,6 +523,9 @@ export default function LiveGame() {
       setAnswerResult(null);
       setAnswerRevealData(null);
       setSelectedOption(null);
+      setSequenceReveal(false);
+      setHostRevealedSequence(false);
+      sequenceRevealedIndexRef.current = null;
       setTimeLeft(Math.max(0, Math.ceil(((q.questionEndsAt || Date.now()) - Date.now()) / 1000)));
       setPhase('playing');
     });
@@ -381,12 +533,29 @@ export default function LiveGame() {
       if (isHostRef.current) setAnswerCount(data);
     });
     socket.on('answer-result', (r) => setAnswerResult(r));
+    // Host revealed the correct order in place: every board animates now, and NOBODY leaves
+    // the question screen — the host's next click emits the results as usual. Deliberately no
+    // `pendingRevealRef` and no advance timer here; that pair is what auto-advances the
+    // all-answered path below.
+    socket.on('sequence-revealed', (r) => {
+      sequenceRevealedIndexRef.current = r.questionIndex;
+      if (isHostRef.current) {
+        setHostRevealedSequence(true);
+        return;
+      }
+      // A student who never submitted has no key yet — `answer-result` only reaches submitters.
+      setAnswerResult(prev => prev || { correctAnswer: r.correctAnswer, isCorrect: false });
+      setSequenceReveal(true);
+    });
     socket.on('question-results', (r) => {
       // A student on a sequence question stays on the board for a moment so their cards can
       // animate into the correct order — every student animates their OWN arrangement at the
       // same instant. The host (no board) and every other type switch immediately, as before.
       const isSequenceBoard = !isHostRef.current && questionRef.current?.type === 'jumbled_sequence';
-      if (isSequenceBoard) {
+      // Already revealed in place by the host: the class has had its look, so go straight
+      // through rather than replaying the animation.
+      const alreadyRevealed = sequenceRevealedIndexRef.current === r.questionIndex;
+      if (isSequenceBoard && !alreadyRevealed) {
         pendingRevealRef.current = r;
         // Make sure the board has the key even if the student never answered (timeout), since
         // `answer-result` is only emitted for those who did submit.
@@ -397,6 +566,7 @@ export default function LiveGame() {
         revealTimerRef.current = setTimeout(() => finishSequenceRevealRef.current?.(), 2500);
         return;
       }
+      setSequenceReveal(false);
       setAnswerRevealData(r);
       setPhase('answer-reveal');
     });
@@ -408,10 +578,34 @@ export default function LiveGame() {
     socket.on('error', (e) => setError(e.message));
     socket.on('session-ended', () => { setPhase('menu'); setError('Session ended'); });
 
-    if (isHostRef.current) quizAPI.getMyQuizzes().then(setQuizzes).catch(console.error);
-
     return () => { if (socket) socket.disconnect(); };
   }, []);
+
+  // Kept out of the socket effect above on purpose: that one runs once with `[]` deps, and on a
+  // hard reload of /live the auth context is still hydrating, so `isHost` is false at that
+  // moment and the fetch would never happen and never be retried. Keyed on `[isHost]` it fires
+  // as soon as the role is known.
+  useEffect(() => {
+    if (!isHost) return;
+    let cancelled = false;
+    quizAPI.getHostableQuizzes()
+      .then(list => { if (!cancelled) setQuizzes(Array.isArray(list) ? list : []); })
+      .catch(err => {
+        console.error(err);
+        if (!cancelled) setError('Could not load your quizzes. Please reload the page.');
+      });
+    return () => { cancelled = true; };
+  }, [isHost]);
+
+  // A quiz id handed over from a dashboard must actually be hostable, or the select would sit
+  // blank with nothing to pick while still holding the id. A prepared live draft is exempt: it
+  // is hidden from every quiz list by design and is launched straight from `liveDraft`.
+  useEffect(() => {
+    if (!isHost || liveDraft || !selectedQuiz || quizzes.length === 0) return;
+    if (quizzes.some(q => String(q.id) === String(selectedQuiz))) return;
+    setSelectedQuiz('');
+    setError('That quiz is not available to host. Please pick one from the list.');
+  }, [isHost, liveDraft, selectedQuiz, quizzes]);
 
   const playingQuestionKey = phase === 'playing' && question
     ? `${question.id}-${question.index ?? 0}`
@@ -499,9 +693,26 @@ export default function LiveGame() {
     return () => clearInterval(interval);
   }, [phase]);
 
-  const createSession = () => {
+  const createSession = (quizId = selectedQuiz) => {
+    if (!quizId) return setError('Select a quiz');
+    socket.emit('create-session', { quizId, userId: user.id });
+  };
+
+  // Hosting always routes through the Quiz Editor first so the teacher can make
+  // last-minute changes. Those edits land on a throwaway copy of the quiz (created here)
+  // and are discarded with it after the game, leaving the original untouched.
+  const customizeForLive = async () => {
     if (!selectedQuiz) return setError('Select a quiz');
-    socket.emit('create-session', { quizId: selectedQuiz, userId: user.id });
+    setPreparingDraft(true);
+    setError('');
+    try {
+      const draft = await quizAPI.createLiveClone(selectedQuiz);
+      navigate(`/quiz-builder/${draft.id}?live=1`, { state: { liveEdit: true } });
+    } catch (err) {
+      console.error('Live clone error:', err);
+      setError(err.message || 'Could not prepare the quiz for editing.');
+      setPreparingDraft(false);
+    }
   };
 
   const joinSession = () => {
@@ -599,7 +810,30 @@ export default function LiveGame() {
           
           {error && <div className="bg-error-container/30 border border-error/50 text-error p-3 rounded-lg mb-6">{error}</div>}
 
-          {isHost ? (
+          {isHost && liveDraft ? (
+            <div className="flex flex-col gap-6 text-left">
+              <h2 className="text-xl font-headline font-bold text-on-surface">Ready to Launch</h2>
+              <div className="bg-surface-container border border-primary/30 rounded-lg p-4 flex items-start gap-3">
+                <span className="material-symbols-outlined text-primary">check_circle</span>
+                <p className="text-sm text-on-surface-variant leading-relaxed">
+                  Your live-game copy is prepared. It will be used for this game only, and
+                  discarded once the game ends — your original quiz is unchanged.
+                </p>
+              </div>
+              <button
+                className="w-full bg-gradient-to-r from-primary/80 to-primary-container/80 hover:from-primary hover:to-primary-container text-on-primary font-headline font-bold text-lg tracking-wider py-4 rounded-xl transition-all active:scale-95 shadow-[0_0_20px_rgba(0,229,255,0.3)] uppercase"
+                onClick={() => createSession(liveDraft)}
+              >
+                🚀 Create Game
+              </button>
+              <button
+                className="w-full text-on-surface-variant hover:text-primary text-sm font-mono uppercase tracking-widest transition-colors"
+                onClick={() => navigate(`/quiz-builder/${liveDraft}?live=1`, { state: { liveEdit: true } })}
+              >
+                ← Keep editing
+              </button>
+            </div>
+          ) : isHost ? (
             <div className="flex flex-col gap-6 text-left">
               <h2 className="text-xl font-headline font-bold text-on-surface">Host a Game</h2>
               <div className="flex flex-col gap-2">
@@ -614,10 +848,21 @@ export default function LiveGame() {
                 </select>
               </div>
               <button 
-                className="w-full bg-gradient-to-r from-primary/80 to-primary-container/80 hover:from-primary hover:to-primary-container text-on-primary font-headline font-bold text-lg tracking-wider py-4 rounded-xl transition-all active:scale-95 shadow-[0_0_20px_rgba(0,229,255,0.3)] mt-2 uppercase"
-                onClick={createSession}
+                className="w-full bg-gradient-to-r from-primary/80 to-primary-container/80 hover:from-primary hover:to-primary-container text-on-primary font-headline font-bold text-lg tracking-wider py-4 rounded-xl transition-all active:scale-95 shadow-[0_0_20px_rgba(0,229,255,0.3)] mt-2 uppercase disabled:opacity-50"
+                onClick={customizeForLive}
+                disabled={preparingDraft}
               >
-                🚀 Create Game
+                {preparingDraft ? 'Preparing...' : '🚀 Set Up Live Game'}
+              </button>
+              <p className="text-xs text-on-surface-variant text-center -mt-3">
+                Opens the editor so you can adjust questions and timers for this game only.
+              </p>
+              <button
+                className="w-full text-on-surface-variant hover:text-primary text-sm font-mono uppercase tracking-widest transition-colors"
+                onClick={() => createSession()}
+                disabled={preparingDraft}
+              >
+                Skip editing and host now
               </button>
             </div>
           ) : (
@@ -726,9 +971,7 @@ export default function LiveGame() {
 
   if (phase === 'get-ready' && question) return (
     <div className="bg-surface-container-lowest text-on-surface font-body min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute inset-0 bg-primary/5 flex items-center justify-center">
-        <div className="w-full h-1 bg-primary/20 absolute top-1/2 -translate-y-1/2 animate-pulse"></div>
-      </div>
+      <div className="absolute inset-0 bg-primary/5"></div>
       <div className="z-10 text-center flex flex-col items-center gap-6 max-w-3xl">
         <div className="bg-surface-container/80 px-6 py-2 rounded-full border border-primary/30">
           <span className="font-mono text-primary font-bold tracking-widest">QUESTION {question.index + 1} OF {question.total}</span>
@@ -1371,13 +1614,35 @@ export default function LiveGame() {
             {isHost && (
               <div className="mt-8 p-6 bg-surface-container rounded-xl border border-outline-variant/20 flex flex-col items-center gap-6">
                 <div className="flex items-center gap-4 text-on-surface-variant font-mono">
-                  <span className="material-symbols-outlined animate-spin">sync</span>
-                  <p>Students are answering... ({answerCount?.answered || 0} / {answerCount?.total || participants.length})</p>
+                  {hostRevealedSequence ? (
+                    <>
+                      <span className="material-symbols-outlined text-primary">visibility</span>
+                      <p>Correct order is on every screen — discuss it, then show the results.</p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined animate-spin">sync</span>
+                      <p>Students are answering... ({answerCount?.answered || 0} / {answerCount?.total || participants.length})</p>
+                    </>
+                  )}
                 </div>
-                <button className="bg-primary text-on-primary px-8 py-3 rounded-full font-headline font-bold tracking-widest uppercase hover:bg-primary-container transition-colors shadow-[0_0_15px_rgba(0,229,255,0.4)] flex items-center gap-2" onClick={nextQuestion}>
-                  <span>Skip to Results</span>
-                  <span className="material-symbols-outlined">fast_forward</span>
-                </button>
+                {/* Sequence questions get a two-step control: reveal the order in place so the
+                    class can look at it together, then move on. Every other type keeps the
+                    single skip button. */}
+                {question.type === 'jumbled_sequence' && !hostRevealedSequence ? (
+                  <button
+                    className="bg-primary text-on-primary px-8 py-3 rounded-full font-headline font-bold tracking-widest uppercase hover:bg-primary-container transition-colors shadow-[0_0_15px_rgba(0,229,255,0.4)] flex items-center gap-2"
+                    onClick={() => socket.emit('reveal-sequence')}
+                  >
+                    <span className="material-symbols-outlined">visibility</span>
+                    <span>Reveal Order</span>
+                  </button>
+                ) : (
+                  <button className="bg-primary text-on-primary px-8 py-3 rounded-full font-headline font-bold tracking-widest uppercase hover:bg-primary-container transition-colors shadow-[0_0_15px_rgba(0,229,255,0.4)] flex items-center gap-2" onClick={nextQuestion}>
+                    <span>{hostRevealedSequence ? 'Show Results' : 'Skip to Results'}</span>
+                    <span className="material-symbols-outlined">fast_forward</span>
+                  </button>
+                )}
               </div>
             )}
           </section>
@@ -1441,26 +1706,15 @@ export default function LiveGame() {
               </div>
 
               {isHost && (
-                <div className="bg-surface-variant/30 p-8 rounded-2xl border border-outline-variant/20">
-                  <h3 className="font-headline text-lg font-bold text-on-surface mb-6 uppercase tracking-wider">Class Responses</h3>
-                  <div className="flex flex-col gap-4">
-                    {Object.entries(distribution || {}).map(([ans, count]) => {
-                      const pct = Math.max(0, (count / Math.max(1, answerCount.total)) * 100);
-                      const isCorrect = typeof correctAnswer === 'string' ? ans === correctAnswer : false; // simplified
-                      return (
-                        <div key={ans} className="flex flex-col gap-1">
-                          <div className="flex justify-between text-sm font-mono text-on-surface-variant">
-                            <span className="truncate max-w-[70%]">{ans}</span>
-                            <span>{count} ({Math.round(pct)}%)</span>
-                          </div>
-                          <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${isCorrect ? 'bg-tertiary-fixed-dim shadow-[0_0_8px_rgba(42,229,0,0.5)]' : 'bg-primary'}`} style={{ width: `${pct}%` }}></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-10 flex justify-center">
+                <div className="flex flex-col gap-8">
+                  <ClassResponses
+                    breakdown={answerRevealData.responseBreakdown}
+                    summary={answerRevealData.responseSummary}
+                    distribution={distribution}
+                    correctAnswer={correctAnswer}
+                    fallbackTotal={answerCount?.total || participants.length}
+                  />
+                  <div className="flex justify-center">
                     <button className="bg-primary text-on-primary px-8 py-4 rounded-full font-headline font-bold tracking-widest uppercase hover:bg-primary-container transition-colors shadow-[0_0_15px_rgba(0,229,255,0.4)]" onClick={showLeaderboard}>
                       Show Leaderboard
                     </button>

@@ -10,10 +10,17 @@
     "dev:frontend": "cd frontend && npx vite --port 5173",
     "build": "npm run install:all && cd frontend && npm run build",
     "start": "cd frontend && npm run build && cd ../backend && node server.js",
-    "seed": "cd backend && node db/seed.js"
+    "seed": "cd backend && node db/seed.js",
+    "test:load": "npx playwright test tests/liveGameLoad130.spec.js --project=chromium --headed",
+    "test:load:headless": "npx playwright test tests/liveGameLoad130.spec.js --project=chromium"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.4.1",
+    "concurrently": "^9.1.2",
+    "dotenv": "^17.4.2",
+    "postgres": "^3.4.9",
+    "socket.io-client": "^4.8.3"
   },
   "engines": {
     "node": ">=22.0.0"

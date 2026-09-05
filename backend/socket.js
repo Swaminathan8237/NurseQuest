@@ -6,8 +6,19 @@
 const { getDB } = require('./db/init');
 const { v4: uuidv4 } = require('uuid');
 const { calculateLiveScoreKahootStyle, generateJoinCode, DEFAULT_QUESTION_MARKS } = require('./utils/scoring');
+const { resolveQuestionSeconds } = require('./utils/timing');
 
 const liveSessions = new Map(); // sessionId -> session data
+
+/**
+ * Milliseconds allotted to one question under the session's timer mode.
+ * The session object carries the same timer fields as the quiz row, so it can be
+ * passed straight to the shared resolver. whole_quiz mode has no meaning for a
+ * host-paced synchronized game and resolves to the quiz-wide value.
+ */
+function questionLimitMsFor(session, question) {
+  return Math.max(1000, resolveQuestionSeconds(session, question) * 1000);
+}
 
 function clearSessionTimers(session) {
   if (session.questionTimer) {
@@ -17,6 +28,11 @@ function clearSessionTimers(session) {
   if (session.nextQuestionTimer) {
     clearTimeout(session.nextQuestionTimer);
     session.nextQuestionTimer = null;
+  }
+  // Safety net armed while a sequence reveal is held on screen for discussion.
+  if (session.revealHoldTimer) {
+    clearTimeout(session.revealHoldTimer);
+    session.revealHoldTimer = null;
   }
 }
 
@@ -47,7 +63,7 @@ function finalizeUnansweredForCurrentQuestion(session, finishedAt = Date.now()) 
   const question = session.questions.at(session.currentQuestion);
   if (!question) return;
 
-  const questionLimitMs = Math.max(1000, (session.timePerQuestion || 30) * 1000);
+  const questionLimitMs = questionLimitMsFor(session, question);
   const elapsedAtFinalize = session.questionStartedAt
     ? Math.max(0, Math.min(finishedAt - session.questionStartedAt, questionLimitMs))
     : questionLimitMs;
@@ -99,6 +115,33 @@ function computeLiveAnswerStatus(ansInfo, trail, correctNorm) {
 }
 
 /**
+ * Freeze everything a report needs about a question into JSON.
+ *
+ * Live games can run on a throwaway "live draft" quiz that is deleted the moment the
+ * game ends, and editing any quiz replaces its question rows outright. Either way the
+ * questions row behind an answer can disappear, so the admin live-game reports read
+ * this snapshot whenever the join comes back empty. Keys match the questions columns
+ * so the reporting queries can COALESCE the two sources field for field.
+ */
+function buildQuestionSnapshot(question) {
+  if (!question) return null;
+  return JSON.stringify({
+    question_text: question.question_text ?? null,
+    type: question.type ?? null,
+    options: Array.isArray(question.options) ? question.options : [],
+    correct_answer: question.correct_answer ?? null,
+    explanation: question.explanation ?? null,
+    media_url: question.media_url ?? null,
+    points: question.points ?? DEFAULT_QUESTION_MARKS,
+    slider_min: question.slider_min ?? null,
+    slider_max: question.slider_max ?? null,
+    slider_step: question.slider_step ?? null,
+    slider_unit: question.slider_unit ?? null,
+    matching_pairs: Array.isArray(question.matching_pairs) ? question.matching_pairs : [],
+  });
+}
+
+/**
  * Persist all live game results to the database on game-over.
  * Writes live_game_attempts, live_game_answers, and live_answer_selections
  * in a single transaction for atomicity.
@@ -106,6 +149,7 @@ function computeLiveAnswerStatus(ansInfo, trail, correctNorm) {
 async function persistLiveGameResults(session, rankings) {
   const sql = getDB();
   try {
+    const participantsSnapshot = new Map(session.participants);
     await sql.begin(async (tx) => {
       const totalPoints = session.questions.reduce((sum, q) => sum + (q.points || DEFAULT_QUESTION_MARKS), 0);
 
@@ -117,23 +161,36 @@ async function persistLiveGameResults(session, rankings) {
         : [];
       const validStudentIds = new Set(validUsers.map(u => u.id));
 
-      for (const ranked of rankings) {
-        const participant = session.participants.get(ranked.id);
-        if (!participant || !validStudentIds.has(participant.id)) continue;
+      const existingAttempts = await tx`
+        SELECT user_id FROM live_game_attempts WHERE session_id = ${session.id}
+      `;
+      const existingUserIds = new Set(existingAttempts.map(a => a.user_id));
 
-        const existing = await tx`
-          SELECT id FROM live_game_attempts
-          WHERE session_id = ${session.id} AND user_id = ${participant.id}
-        `;
-        if (existing.length > 0) continue;
+      const attemptRows = [];
+      const answerRows = [];
+      const selectionRows = [];
+
+      for (const ranked of rankings) {
+        const participant = participantsSnapshot.get(ranked.id);
+        if (!participant || !validStudentIds.has(participant.id)) continue;
+        if (existingUserIds.has(participant.id)) continue;
 
         const attemptId = uuidv4();
         const correctCount = participant.answers.filter(a => a && a.isCorrect).length;
 
-        await tx`
-          INSERT INTO live_game_attempts (id, session_id, user_id, final_score, total_points, correct_count, total_questions, max_streak, total_time_ms, final_rank, completed_at)
-          VALUES (${attemptId}, ${session.id}, ${participant.id}, ${ranked.score}, ${totalPoints}, ${correctCount}, ${session.questions.length}, ${participant.maxStreak || 0}, ${participant.totalResponseMs || 0}, ${ranked.rank}, CURRENT_TIMESTAMP)
-        `;
+        attemptRows.push({
+          id: attemptId,
+          session_id: session.id,
+          user_id: participant.id,
+          final_score: ranked.score,
+          total_points: totalPoints,
+          correct_count: correctCount,
+          total_questions: session.questions.length,
+          max_streak: participant.maxStreak || 0,
+          total_time_ms: participant.totalResponseMs || 0,
+          final_rank: ranked.rank,
+          completed_at: new Date()
+        });
 
         for (let qIdx = 0; qIdx < session.questions.length; qIdx++) {
           const question = session.questions[qIdx];
@@ -150,27 +207,108 @@ async function persistLiveGameResults(session, rankings) {
           const correctNorm = question.correct_answer?.toString().toUpperCase().trim() || '';
           const status = computeLiveAnswerStatus(ansInfo, trail, correctNorm);
 
-          await tx`
-            INSERT INTO live_game_answers (id, attempt_id, question_id, question_index, final_answer, is_correct, points_earned, response_ms, is_timeout, is_late, status)
-            VALUES (${answerId}, ${attemptId}, ${question.id}, ${qIdx}, ${finalAnswer}, ${isCorrect}, ${pointsEarned}, ${responseMs}, ${isTimeout}, ${isLate}, ${status})
-          `;
+          answerRows.push({
+            id: answerId,
+            attempt_id: attemptId,
+            question_id: question.id,
+            question_index: qIdx,
+            final_answer: finalAnswer,
+            is_correct: isCorrect,
+            points_earned: pointsEarned,
+            response_ms: responseMs,
+            is_timeout: isTimeout,
+            is_late: isLate,
+            status: status,
+            question_snapshot: buildQuestionSnapshot(question)
+          });
 
           // Persist selection trail for select-then-confirm question types
           if (trail && trail.length > 0 && SELECT_CONFIRM_TYPES.has(question.type)) {
             for (const sel of trail) {
               const selCorrect = String(sel.value).toUpperCase().trim() === correctNorm ? 1 : 0;
-              await tx`
-                INSERT INTO live_answer_selections (id, answer_id, selection_order, selected_value, selected_at, elapsed_ms, is_correct)
-                VALUES (${uuidv4()}, ${answerId}, ${sel.order}, ${String(sel.value)}, ${sel.timestamp}, ${sel.elapsedMs}, ${selCorrect})
-              `;
+              selectionRows.push({
+                id: uuidv4(),
+                answer_id: answerId,
+                selection_order: sel.order,
+                selected_value: String(sel.value),
+                selected_at: sel.timestamp,
+                elapsed_ms: sel.elapsedMs,
+                is_correct: selCorrect
+              });
             }
           }
         }
       }
+
+      if (attemptRows.length > 0) {
+        await tx`
+          INSERT INTO live_game_attempts ${tx(attemptRows, 'id', 'session_id', 'user_id', 'final_score', 'total_points', 'correct_count', 'total_questions', 'max_streak', 'total_time_ms', 'final_rank', 'completed_at')}
+        `;
+      }
+      if (answerRows.length > 0) {
+        await tx`
+          INSERT INTO live_game_answers ${tx(answerRows, 'id', 'attempt_id', 'question_id', 'question_index', 'final_answer', 'is_correct', 'points_earned', 'response_ms', 'is_timeout', 'is_late', 'status', 'question_snapshot')}
+        `;
+      }
+      if (selectionRows.length > 0) {
+        await tx`
+          INSERT INTO live_answer_selections ${tx(selectionRows, 'id', 'answer_id', 'selection_order', 'selected_value', 'selected_at', 'elapsed_ms', 'is_correct')}
+        `;
+      }
     });
     console.log(`📊 Persisted live game results for session ${session.id} (${rankings.length} players)`);
+    return true;
   } catch (err) {
     console.error('Failed to persist live game results:', err);
+    return false;
+  }
+}
+
+/**
+ * Drop the throwaway quiz a live game was hosted from.
+ *
+ * Only ever called for is_live_draft clones. Deleting the quiz cascades to its
+ * questions; live_sessions.quiz_id and live_game_answers.question_id are ON DELETE
+ * SET NULL, so the recorded results stay put and fall back to the snapshots written
+ * above. Never called when persistence failed — the results come first.
+ */
+async function deleteLiveDraftQuiz(quizId) {
+  if (!quizId) return;
+  const sql = getDB();
+  try {
+    const deleted = await sql`
+      DELETE FROM quizzes WHERE id = ${quizId} AND is_live_draft = 1 RETURNING id
+    `;
+    if (deleted.length > 0) console.log(`🧹 Removed live draft quiz ${quizId}`);
+  } catch (err) {
+    console.error('Failed to delete live draft quiz:', err);
+  }
+}
+
+/**
+ * Remove live drafts that were created but never played (host closed the editor,
+ * abandoned the lobby, ...). Anything still referenced by an in-memory session is
+ * left alone, so a host who is slowly editing never loses their work.
+ */
+const LIVE_DRAFT_MAX_AGE_HOURS = 6;
+
+async function sweepAbandonedLiveDrafts() {
+  const sql = getDB();
+  try {
+    const inUse = Array.from(liveSessions.values())
+      .map(s => s.quizId)
+      .filter(Boolean);
+
+    const deleted = await sql`
+      DELETE FROM quizzes
+      WHERE is_live_draft = 1
+        AND created_at < NOW() - (${LIVE_DRAFT_MAX_AGE_HOURS} * INTERVAL '1 hour')
+        ${inUse.length > 0 ? sql`AND NOT (id = ANY(${inUse}))` : sql``}
+      RETURNING id
+    `;
+    if (deleted.length > 0) console.log(`🧹 Swept ${deleted.length} abandoned live draft quiz(zes)`);
+  } catch (err) {
+    console.error('Failed to sweep abandoned live drafts:', err);
   }
 }
 
@@ -179,6 +317,10 @@ async function persistLiveGameResults(session, rankings) {
  * @param {import('socket.io').Server} io - The Socket.IO server instance
  */
 function initializeSocket(io) {
+
+  // Catch live drafts whose game never ran. Delayed on boot so the DB is ready.
+  setTimeout(() => { sweepAbandonedLiveDrafts(); }, 30000);
+  setInterval(() => { sweepAbandonedLiveDrafts(); }, 6 * 60 * 60 * 1000).unref?.();
 
   function emitQuestionResults(session) {
     if (session.currentQuestion < 0) return;
@@ -190,8 +332,14 @@ function initializeSocket(io) {
     finalizeUnansweredForCurrentQuestion(session);
     session.resultsEmittedForQuestion = session.currentQuestion;
 
-    // Calculate answer distributions
+    // Calculate answer distributions.
+    // `distribution` is the legacy shape: answers flattened and upper-cased into one string
+    // key. It is kept byte-for-byte so a client still on an older bundle keeps working.
+    // `responseBreakdown` is the structured replacement — raw answer values with the server's
+    // own grading verdict, so the host panel never has to re-implement grading.
     const distributionMap = new Map();
+    const breakdownMap = new Map();
+    const summary = { correct: 0, incorrect: 0, noAnswer: 0, total: session.participants.size };
     for (const p of session.participants.values()) {
       const ansInfo = p.answers.at(session.currentQuestion);
       if (ansInfo && ansInfo.answer !== null) {
@@ -200,14 +348,37 @@ function initializeSocket(io) {
         else if (ansKey === undefined) ansKey = 'Timeout';
         ansKey = String(ansKey).toUpperCase();
         distributionMap.set(ansKey, (distributionMap.get(ansKey) || 0) + 1);
+
+        // Key on the serialized answer so identical arrangements collapse into one row and
+        // different ones stay apart, while `value` keeps its original structure for display.
+        let rowKey;
+        try {
+          rowKey = JSON.stringify(ansInfo.answer);
+        } catch {
+          rowKey = String(ansInfo.answer);
+        }
+        const row = breakdownMap.get(rowKey);
+        if (row) row.count++;
+        else breakdownMap.set(rowKey, { value: ansInfo.answer, count: 1, isCorrect: !!ansInfo.isCorrect });
+
+        if (ansInfo.isCorrect) summary.correct++;
+        else summary.incorrect++;
+      } else {
+        summary.noAnswer++;
       }
     }
+
+    const responseBreakdown = Array.from(breakdownMap.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
 
     io.to(session.id).emit('question-results', {
       questionIndex: session.currentQuestion,
       correctAnswer: question.correct_answer,
       explanation: question.explanation,
       distribution: Object.fromEntries(distributionMap),
+      responseBreakdown,
+      responseSummary: summary,
       rankings: getRankings(session)
     });
   }
@@ -226,8 +397,15 @@ function initializeSocket(io) {
       } catch (err) {
         console.error('Failed to update live session ended_at:', err);
       }
-      // Persist all participant answers, scores, and selection trails to the database
-      persistLiveGameResults(session, rankings).catch(err => console.error('persistLiveGameResults error:', err));
+      // Persist all participant answers, scores, and selection trails to the database,
+      // then drop the throwaway quiz this game was hosted from (if any). Ordering
+      // matters: the snapshots written during persistence are what let the results
+      // outlive the quiz.
+      persistLiveGameResults(session, rankings)
+        .then(persisted => {
+          if (persisted && session.isLiveDraft) return deleteLiveDraftQuiz(session.quizId);
+        })
+        .catch(err => console.error('persistLiveGameResults error:', err));
       setTimeout(() => liveSessions.delete(session.id), 300000);
       return;
     }
@@ -244,7 +422,7 @@ function initializeSocket(io) {
 
     // After 5s Get Ready, start question timer and allow answers
     session.questionTimer = setTimeout(() => {
-      const questionLimitMs = Math.max(1000, (session.timePerQuestion || 30) * 1000);
+      const questionLimitMs = questionLimitMsFor(session, question);
 
       session.questionStartedAt = Date.now();
       session.questionEndsAt = session.questionStartedAt + questionLimitMs;
@@ -257,7 +435,7 @@ function initializeSocket(io) {
         questionText: question.question_text,
         mediaUrl: question.media_url,
         options: question.options,
-        timeLimit: session.timePerQuestion,
+        timeLimit: Math.round(questionLimitMs / 1000),
         maxPoints: question.points || DEFAULT_QUESTION_MARKS,
         questionStartedAt: session.questionStartedAt,
         questionEndsAt: session.questionEndsAt,
@@ -324,18 +502,33 @@ function initializeSocket(io) {
           currentQuestion: -1,
           questions,
           participants: new Map(),
-          timePerQuestion: quiz.time_per_question,
+          // Timer fields are named exactly as on the quiz row so the session can be
+          // handed straight to resolveQuestionSeconds().
+          time_per_question: quiz.time_per_question,
+          timer_mode: quiz.timer_mode || 'fixed',
+          total_time: quiz.total_time,
+          type_time_config: quiz.type_time_config,
+          isLiveDraft: quiz.is_live_draft === 1 || quiz.is_live_draft === true,
           questionTimer: null,
           nextQuestionTimer: null,
+          revealHoldTimer: null,
           questionStartedAt: null,
           questionEndsAt: null,
-          resultsEmittedForQuestion: -1
+          resultsEmittedForQuestion: -1,
+          sequenceRevealedForQuestion: -1
         };
 
         liveSessions.set(sessionId, session);
 
-        // Save to DB
-        await sql`INSERT INTO live_sessions (id, quiz_id, host_id, join_code, status) VALUES (${sessionId}, ${data.quizId}, ${data.userId}, ${joinCode}, 'waiting')`;
+        // quiz_title / quiz_time_per_question / quiz_unit are snapshots: a live-draft quiz is
+        // deleted after the game, so reporting cannot rely on joining quizzes.
+        // The unit comes from source_unit when hosting a clone (the clone's own unit is
+        // deliberately NULL) and from unit when an original quiz is hosted directly.
+        const quizUnit = quiz.unit ?? quiz.source_unit ?? null;
+        await sql`
+          INSERT INTO live_sessions (id, quiz_id, host_id, join_code, status, quiz_title, quiz_time_per_question, quiz_unit)
+          VALUES (${sessionId}, ${data.quizId}, ${data.userId}, ${joinCode}, 'waiting', ${quiz.title}, ${quiz.time_per_question}, ${quizUnit})
+        `;
 
         socket.join(sessionId);
         socket.sessionId = sessionId;
@@ -432,7 +625,7 @@ function initializeSocket(io) {
       if (participant.answers[questionIndex] !== undefined) return;
 
       const now = Date.now();
-      const questionLimitMs = Math.max(1000, (session.timePerQuestion || 30) * 1000);
+      const questionLimitMs = questionLimitMsFor(session, question);
       const responseMs = session.questionStartedAt
         ? Math.max(0, Math.min(now - session.questionStartedAt, questionLimitMs))
         : questionLimitMs;
@@ -590,6 +783,51 @@ function initializeSocket(io) {
       });
     });
 
+    /**
+     * Host reveals the correct order for a Procedure/Sequence question *in place*, so the
+     * class can look at it together before results are shown. Answering closes, every board
+     * animates into the correct order, and nobody leaves the question screen — the host's
+     * second click goes through the existing `next-question` handler, which emits the results
+     * exactly as it always has.
+     */
+    socket.on('reveal-sequence', () => {
+      const session = liveSessions.get(socket.sessionId);
+      if (!session || session.hostId !== socket.userId) return;
+      if (session.currentQuestion < 0) return;
+
+      const question = session.questions.at(session.currentQuestion);
+      if (!question || question.type !== 'jumbled_sequence') return;
+
+      // Idempotent: once results are out there is nothing left to reveal, and a second
+      // click on an already-revealed question must not re-broadcast or re-arm the hold.
+      if (session.resultsEmittedForQuestion === session.currentQuestion) return;
+      if (session.sequenceRevealedForQuestion === session.currentQuestion) return;
+
+      // Close answering and score the stragglers now, on the same terms the timer would.
+      finalizeUnansweredForCurrentQuestion(session);
+      session.questionEndsAt = Date.now();
+      session.sequenceRevealedForQuestion = session.currentQuestion;
+
+      clearSessionTimers(session);
+      // Safety net only: a host who walks away mid-reveal must never strand the room.
+      // (Host *disconnect* already ends the session further down.)
+      session.revealHoldTimer = setTimeout(() => {
+        session.revealHoldTimer = null;
+        emitQuestionResults(session);
+      }, 120000);
+
+      io.to(session.id).emit('sequence-revealed', {
+        questionIndex: session.currentQuestion,
+        correctAnswer: question.correct_answer
+      });
+
+      // Answering is closed, so the host's tally should read as complete.
+      io.to(session.id).emit('answer-count', {
+        answered: session.participants.size,
+        total: session.participants.size
+      });
+    });
+
     // Teacher requests next question or skips
     socket.on('next-question', () => {
       const session = liveSessions.get(socket.sessionId);
@@ -627,11 +865,13 @@ function initializeSocket(io) {
             clearSessionTimers(session);
             liveSessions.delete(socket.sessionId);
           } else {
-            session.participants.delete(socket.userId);
-            const participantList = Array.from(session.participants.values()).map(p => ({
-              id: p.id, name: p.name, avatarConfig: p.avatarConfig, score: p.score
-            }));
-            io.to(session.id).emit('participant-left', { userId: socket.userId, participants: participantList });
+            if (session.status !== 'finished') {
+              session.participants.delete(socket.userId);
+              const participantList = Array.from(session.participants.values()).map(p => ({
+                id: p.id, name: p.name, avatarConfig: p.avatarConfig, score: p.score
+              }));
+              io.to(session.id).emit('participant-left', { userId: socket.userId, participants: participantList });
+            }
           }
         }
       }

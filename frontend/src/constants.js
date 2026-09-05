@@ -17,3 +17,14 @@
  * remains authoritative: it enforces this gate itself and returns the verdict.
  */
 export const PASS_PERCENT = 60;
+
+/**
+ * Universities a student can belong to.
+ *
+ * Mirrored from UNIVERSITIES in backend/utils/profile.js, which is itself mirrored by the
+ * `users_university_check` CHECK constraint in backend/db/schema.sql — the same
+ * belt-and-braces arrangement `role` already uses (a CHECK plus an allow-list in the route).
+ * Adding an institution means editing all three; the server stays authoritative and rejects
+ * anything outside its own list with a 400.
+ */
+export const UNIVERSITIES = ['SRIHER', 'ACS'];

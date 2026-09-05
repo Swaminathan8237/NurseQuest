@@ -23,7 +23,14 @@ async function request(endpoint, options = {}) {
   }
   
   if (!res.ok) {
-    throw new Error(data.error || `Request failed with status ${res.status}`);
+    // Carry the status and the parsed body onto the Error. Callers that only read `.message`
+    // are unaffected; the ones that need more — the 409 duplicate-registration path, which
+    // names the offending field so a form can hang the message off it — read `.status`/`.data`
+    // instead of pattern-matching the message text.
+    const err = new Error(data.error || `Request failed with status ${res.status}`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
   }
   
   return data;
@@ -40,6 +47,10 @@ export const authAPI = {
   updateAvatar: (avatarConfig) => request('/auth/avatar', { method: 'PUT', body: JSON.stringify({ avatarConfig }) }),
   updatePreferences: (prefs) => request('/auth/preferences', { method: 'PUT', body: JSON.stringify({ prefs }) }),
   googleLogin: (credential) => request('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
+  // One shared write path for every profile-completion flow: a brand-new Google user, a new
+  // Supabase user, and an existing student caught by ProfileCompletionGate. The server takes the
+  // user id from the verified cookie, never from this body.
+  completeProfile: (data) => request('/auth/complete-profile', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // Quizzes
@@ -49,6 +60,9 @@ export const quizAPI = {
     return request(`/quizzes${query ? '?' + query : ''}`);
   },
   getMyQuizzes: () => request('/quizzes/my-quizzes'),
+  // Quizzes this user may host a live game from. Wider than getMyQuizzes for an admin, who
+  // can host any quiz — including the unit quizzes the Admin dashboard offers a Live button on.
+  getHostableQuizzes: () => request('/quizzes/hostable'),
   getById: (id) => request(`/quizzes/${id}`),
   // Teacher/admin editing path — returns the full quiz WITH the answer key.
   // Ownership-gated server-side; students must never call this.
@@ -56,6 +70,9 @@ export const quizAPI = {
   create: (data) => request('/quizzes', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => request(`/quizzes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id) => request(`/quizzes/${id}`, { method: 'DELETE' }),
+  // Throwaway copy hosted for a single live game, so last-minute edits made from the
+  // Live flow never touch the original quiz. Deleted server-side once the game ends.
+  createLiveClone: (id) => request(`/quizzes/${id}/live-clone`, { method: 'POST' }),
   importFile: async (file) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -148,6 +165,10 @@ export const userAPI = {
 export const adminAPI = {
   getUsers: () => request('/admin/users'),
   updateUserRole: (id, role) => request(`/admin/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  // Partial update — only the keys present in `data` are touched. The server validates the
+  // MERGED row, so sending just a registration number is fine for a student who already has a
+  // university stored. Rejects a duplicate registration number with a readable 409.
+  updateUserProfile: (id, data) => request(`/admin/users/${id}/profile`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
   submitQuizRequest: (quizId, unit) => request('/admin/requests', { method: 'POST', body: JSON.stringify({ quizId, unit }) }),
   getMyQuizRequests: () => request('/admin/my-requests'),
@@ -174,6 +195,11 @@ export const adminAPI = {
   getUnitQuizzes: () => request('/admin/unit-quizzes'),
   getUnitAccess: () => request('/admin/units/access'),
   updateUnitAccess: (unit, data) => request(`/admin/units/${unit}/access`, { method: 'POST', body: JSON.stringify(data) }),
+  // Classes & sections. Grouped by (university, class_section) — the same label at two
+  // universities is two different classes, so both are always carried together.
+  getClasses: () => request('/admin/classes'),
+  mergeClasses: ({ university, from, to }) =>
+    request('/admin/classes/merge', { method: 'POST', body: JSON.stringify({ university, from, to }) }),
   // Telegram-style 5s pending deletion undo
   initiatePendingDeletion: ({ entityType, entityId }) => request('/admin/pending-deletions', { method: 'POST', body: JSON.stringify({ entityType, entityId }) }),
   undoPendingDeletion: (id) => request(`/admin/pending-deletions/${id}/undo`, { method: 'POST' }),

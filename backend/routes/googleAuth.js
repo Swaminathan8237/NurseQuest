@@ -4,6 +4,7 @@ const { getDB } = require('../db/init');
 const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
 const { sanitizeLogInput } = require('../utils/logger');
+const { PROFILE_COLUMNS, isProfileComplete, splitName } = require('../utils/profile');
 
 const router = express.Router();
 
@@ -52,6 +53,11 @@ router.post('/google', async (req, res) => {
     const emailVerified = payloadFromGoogle.email_verified;
     // Google account display name; fall back to the local-part of the email if absent.
     const name = payloadFromGoogle.name || (email ? email.split('@')[0] : 'New User');
+    // Google splits the name for us, so seed first_name/last_name from its claims rather than
+    // guessing at a space. Only a starting point — the profile-completion step lets them correct it.
+    const { firstName: fallbackFirst, lastName: fallbackLast } = splitName(name);
+    const givenName = payloadFromGoogle.given_name || fallbackFirst || null;
+    const familyName = payloadFromGoogle.family_name || fallbackLast || null;
 
     if (!email) {
       return res.status(400).json({ error: 'Google account did not provide an email' });
@@ -77,8 +83,8 @@ router.post('/google', async (req, res) => {
     } else {
       userId = uuidv4();
       await sql`
-        INSERT INTO users (id, email, password, name, role, avatar_config, is_verified)
-        VALUES (${userId}, ${email}, ${null}, ${name}, 'student', '{}', true)
+        INSERT INTO users (id, email, password, name, role, avatar_config, is_verified, first_name, last_name)
+        VALUES (${userId}, ${email}, ${null}, ${name}, 'student', '{}', true, ${givenName}, ${familyName})
       `;
       console.log(`✅ Google sign-in created new user: ${sanitizeLogInput(email)}`);
     }
@@ -103,13 +109,17 @@ router.post('/google', async (req, res) => {
     res.cookie('skillquest_token', token, cookieOptions);
 
     // 4. Return the same shape as /login so the frontend can reuse its user-setting path.
-    const fullUsers = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
+    //    profileComplete is false for a brand-new Google user — Google supplies a name and an
+    //    email but no university, registration number or class — which is what makes the frontend
+    //    show the "Complete Your Profile" step before letting them into the app.
+    const fullUsers = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak, ${sql(PROFILE_COLUMNS)} FROM users WHERE id = ${userId}`;
     const user = fullUsers[0];
 
     res.json({
       user: {
         ...user,
-        avatar_config: JSON.parse(user.avatar_config || '{}')
+        avatar_config: JSON.parse(user.avatar_config || '{}'),
+        profileComplete: isProfileComplete(user)
       }
     });
   } catch (err) {

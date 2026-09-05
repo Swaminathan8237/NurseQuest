@@ -7,6 +7,13 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { sanitizeLogInput, escapeHtml } = require('../utils/logger');
+const {
+  PROFILE_COLUMNS,
+  validateStudentProfile,
+  isProfileComplete,
+  joinName,
+  splitName,
+} = require('../utils/profile');
 
 const router = express.Router();
 
@@ -97,12 +104,13 @@ router.post('/login', async (req, res) => {
       };
       res.cookie('skillquest_token', token, cookieOptions);
 
-      const fullUsers = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userId}`;
+      const fullUsers = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak, ${sql(PROFILE_COLUMNS)} FROM users WHERE id = ${userId}`;
       const user = fullUsers[0];
       return res.json({
         user: {
           ...user,
-          avatar_config: JSON.parse(user.avatar_config || '{}')
+          avatar_config: JSON.parse(user.avatar_config || '{}'),
+          profileComplete: isProfileComplete(user)
         }
       });
     }
@@ -167,13 +175,14 @@ router.post('/login', async (req, res) => {
 
     res.cookie('skillquest_token', token, cookieOptions);
 
-    const fullUsers = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${userRecord.id}`;
+    const fullUsers = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak, ${sql(PROFILE_COLUMNS)} FROM users WHERE id = ${userRecord.id}`;
     const user = fullUsers[0];
 
     res.json({
       user: {
         ...user,
-        avatar_config: JSON.parse(user.avatar_config || '{}')
+        avatar_config: JSON.parse(user.avatar_config || '{}'),
+        profileComplete: isProfileComplete(user)
       }
     });
 
@@ -186,13 +195,31 @@ router.post('/login', async (req, res) => {
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   const { email, password, name, role, avatarConfig } = req.body;
-  if (!email || !password || !name || !role) {
+  if (!email || !password || !role) {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
   const allowedRoles = ['student', 'teacher'];
   if (!allowedRoles.includes(role)) {
     return res.status(400).json({ error: 'Invalid registration role. Admin registration is prohibited.' });
+  }
+
+  // The form now posts firstName/lastName, but accept a single `name` as a fallback so a browser
+  // still running the pre-deploy bundle can register during a rollout instead of hitting a 400.
+  const split = (!req.body.firstName && !req.body.lastName && name) ? splitName(name) : null;
+  const profileBody = split ? { ...req.body, ...split } : req.body;
+
+  // A university, its registration number and a class are student identifiers. Teachers
+  // self-register through this same endpoint, so they are only asked for their name.
+  const isStudent = role === 'student';
+  const { errors, values } = validateStudentProfile(profileBody, { requireIdentifiers: isStudent });
+  if (errors.length > 0) {
+    return res.status(400).json({ error: errors[0], errors });
+  }
+
+  const fullName = joinName(values.first_name, values.last_name);
+  if (!fullName) {
+    return res.status(400).json({ error: 'First name is required' });
   }
 
   try {
@@ -217,17 +244,26 @@ router.post('/register', async (req, res) => {
 
     const userId = uuidv4();
     await sql`
-      INSERT INTO users (id, email, password, name, role, avatar_config, is_verified, verification_token, token_expires_at)
+      INSERT INTO users (
+        id, email, password, name, role, avatar_config, is_verified, verification_token, token_expires_at,
+        first_name, last_name, mobile_number, university, university_reg_number, class_section
+      )
       VALUES (
-        ${userId}, 
-        ${lowerEmail}, 
-        ${hashedPassword}, 
-        ${name}, 
-        ${role}, 
-        ${JSON.stringify(avatarConfig || {})}, 
-        false, 
-        ${verificationToken}, 
-        ${tokenExpiresAt}
+        ${userId},
+        ${lowerEmail},
+        ${hashedPassword},
+        ${fullName},
+        ${role},
+        ${JSON.stringify(avatarConfig || {})},
+        false,
+        ${verificationToken},
+        ${tokenExpiresAt},
+        ${values.first_name},
+        ${values.last_name},
+        ${values.mobile_number ?? null},
+        ${values.university ?? null},
+        ${values.university_reg_number ?? null},
+        ${values.class_section ?? null}
       )
     `;
 
@@ -259,11 +295,11 @@ router.post('/register', async (req, res) => {
     });
 
     // This markup renders in the recipient's mail client, so every interpolated value must be
-    // HTML-escaped (CWE-116). `name` comes straight from the registration request body, so an
+    // HTML-escaped (CWE-116). The name comes straight from the registration request body, so an
     // unescaped value could inject arbitrary markup into the email. verifyUrl is built from a
     // crypto token and an encodeURIComponent'd address, but is escaped too so the template has
     // no unescaped holes — `&` correctly becomes `&amp;` inside the href.
-    const safeName = escapeHtml(name);
+    const safeName = escapeHtml(fullName);
     const safeVerifyUrl = escapeHtml(verifyUrl);
 
     const mailOptions = {
@@ -313,6 +349,15 @@ router.post('/register', async (req, res) => {
     return res.status(201).json({ message: "Registration successful. Verification email transmitted.", emailVerificationPending: true });
 
   } catch (err) {
+    // 23505 = unique_violation. The only unique constraint the new profile fields can trip is
+    // uq_users_university_reg_number (email is checked explicitly above), so answer with a
+    // readable 409 instead of a 500 — and never echo the constraint name or the other account.
+    if (err.code === '23505') {
+      return res.status(409).json({
+        error: 'That registration number is already registered to another account at your university. Check the number, or contact your administrator.',
+        field: 'universityRegNumber'
+      });
+    }
     console.error('Registration error:', err);
     res.status(500).json({ error: 'Server error: ' + err.message });
   }
@@ -459,20 +504,21 @@ router.post('/sync-profile', authenticateToken, async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUsers = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${req.user.id}`;
+    const existingUsers = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak, ${sql(PROFILE_COLUMNS)} FROM users WHERE id = ${req.user.id}`;
     if (existingUsers.length > 0) {
       // User already exists, return current profile
       const user = existingUsers[0];
       return res.json({
         user: {
           ...user,
-          avatar_config: JSON.parse(user.avatar_config || '{}')
+          avatar_config: JSON.parse(user.avatar_config || '{}'),
+          profileComplete: isProfileComplete(user)
         }
       });
     }
 
     // Check if a user with the same email exists (migration case)
-    const oldUsers = await sql`SELECT id, email, password, name, role, avatar_config, xp, level, streak, last_active, created_at FROM users WHERE email = ${req.user.email}`;
+    const oldUsers = await sql`SELECT id, email, password, name, role, avatar_config, xp, level, streak, last_active, created_at, ${sql(PROFILE_COLUMNS)} FROM users WHERE email = ${req.user.email}`;
     if (oldUsers.length > 0) {
       const oldUser = oldUsers[0];
       const oldId = oldUser.id;
@@ -480,25 +526,37 @@ router.post('/sync-profile', authenticateToken, async (req, res) => {
         // Run migration in a transaction to update all foreign keys
         console.log(`🔄 Migrating user profile via /sync-profile for ${req.user.email} from old ID ${oldId} to Supabase Auth ID ${req.user.id}`);
         await sql.begin(async (tx) => {
-          // 1. Temporarily rename the old user's email to free up the unique constraint
+          // 1. Temporarily rename the old user's email to free up the unique constraint.
+          //    university_reg_number is cleared for the same reason: the new row below carries the
+          //    same value, and uq_users_university_reg_number would reject it while the old row
+          //    still holds it — aborting the whole migration. The old row is deleted in step 4.
           const tempEmail = `${oldUser.email}_old_${req.user.id}`;
-          await tx`UPDATE users SET email = ${tempEmail} WHERE id = ${oldId}`;
+          await tx`UPDATE users SET email = ${tempEmail}, university_reg_number = NULL WHERE id = ${oldId}`;
 
           // 2. Insert new user record with the new ID, copying details from the old user
           await tx`
-            INSERT INTO users (id, email, password, name, role, avatar_config, xp, level, streak, last_active, created_at)
+            INSERT INTO users (
+              id, email, password, name, role, avatar_config, xp, level, streak, last_active, created_at,
+              first_name, last_name, mobile_number, university, university_reg_number, class_section
+            )
             VALUES (
-              ${req.user.id}, 
-              ${oldUser.email}, 
-              ${oldUser.password || null}, 
-              ${name || oldUser.name}, 
-              ${finalRole}, 
-              ${JSON.stringify(avatarConfig || JSON.parse(oldUser.avatar_config || '{}'))}, 
-              ${oldUser.xp || 0}, 
-              ${oldUser.level || 1}, 
-              ${oldUser.streak || 0}, 
-              ${oldUser.last_active || null}, 
-              ${oldUser.created_at}
+              ${req.user.id},
+              ${oldUser.email},
+              ${oldUser.password || null},
+              ${name || oldUser.name},
+              ${finalRole},
+              ${JSON.stringify(avatarConfig || JSON.parse(oldUser.avatar_config || '{}'))},
+              ${oldUser.xp || 0},
+              ${oldUser.level || 1},
+              ${oldUser.streak || 0},
+              ${oldUser.last_active || null},
+              ${oldUser.created_at},
+              ${oldUser.first_name || null},
+              ${oldUser.last_name || null},
+              ${oldUser.mobile_number || null},
+              ${oldUser.university || null},
+              ${oldUser.university_reg_number || null},
+              ${oldUser.class_section || null}
             )
           `;
 
@@ -522,13 +580,14 @@ router.post('/sync-profile', authenticateToken, async (req, res) => {
       `;
     }
 
-    const users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak FROM users WHERE id = ${req.user.id}`;
+    const users = await sql`SELECT id, email, name, role, avatar_config, xp, level, streak, ${sql(PROFILE_COLUMNS)} FROM users WHERE id = ${req.user.id}`;
     const user = users[0];
 
     res.status(201).json({
       user: {
         ...user,
-        avatar_config: JSON.parse(user.avatar_config || '{}')
+        avatar_config: JSON.parse(user.avatar_config || '{}'),
+        profileComplete: isProfileComplete(user)
       }
     });
   } catch (err) {
@@ -541,12 +600,12 @@ router.post('/sync-profile', authenticateToken, async (req, res) => {
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     const sql = getDB();
-    let users = await sql`SELECT id, email, name, role, avatar_config, preferences, xp, level, streak, created_at FROM users WHERE id = ${req.user.id}`;
+    let users = await sql`SELECT id, email, name, role, avatar_config, preferences, xp, level, streak, created_at, ${sql(PROFILE_COLUMNS)} FROM users WHERE id = ${req.user.id}`;
     let user = users[0];
 
     // If no user found by Supabase Auth UUID, check by email and migrate
     if (!user && req.user.email) {
-      const oldUsers = await sql`SELECT id, email, password, name, role, avatar_config, xp, level, streak, last_active, created_at FROM users WHERE email = ${req.user.email}`;
+      const oldUsers = await sql`SELECT id, email, password, name, role, avatar_config, xp, level, streak, last_active, created_at, ${sql(PROFILE_COLUMNS)} FROM users WHERE email = ${req.user.email}`;
       if (oldUsers.length > 0) {
         const oldUser = oldUsers[0];
         const oldId = oldUser.id;
@@ -563,25 +622,37 @@ router.get('/me', authenticateToken, async (req, res) => {
                 migratedRole = 'admin';
               }
 
-              // 1. Temporarily rename the old user's email to free up the unique constraint
+              // 1. Temporarily rename the old user's email to free up the unique constraint.
+              //    university_reg_number is cleared for the same reason: the new row below carries
+              //    the same value, and uq_users_university_reg_number would reject it while the
+              //    old row still holds it — aborting the migration. Old row is deleted in step 4.
               const tempEmail = `${oldUser.email}_old_${req.user.id}`;
-              await tx`UPDATE users SET email = ${tempEmail} WHERE id = ${oldId}`;
+              await tx`UPDATE users SET email = ${tempEmail}, university_reg_number = NULL WHERE id = ${oldId}`;
 
               // 2. Insert new user record with the new ID, copying details from the old user
               await tx`
-                INSERT INTO users (id, email, password, name, role, avatar_config, xp, level, streak, last_active, created_at)
+                INSERT INTO users (
+                  id, email, password, name, role, avatar_config, xp, level, streak, last_active, created_at,
+                  first_name, last_name, mobile_number, university, university_reg_number, class_section
+                )
                 VALUES (
-                  ${req.user.id}, 
-                  ${oldUser.email}, 
-                  ${oldUser.password || null}, 
-                  ${oldUser.name}, 
-                  ${migratedRole}, 
-                  ${oldUser.avatar_config || '{}'}, 
-                  ${oldUser.xp || 0}, 
-                  ${oldUser.level || 1}, 
-                  ${oldUser.streak || 0}, 
-                  ${oldUser.last_active || null}, 
-                  ${oldUser.created_at}
+                  ${req.user.id},
+                  ${oldUser.email},
+                  ${oldUser.password || null},
+                  ${oldUser.name},
+                  ${migratedRole},
+                  ${oldUser.avatar_config || '{}'},
+                  ${oldUser.xp || 0},
+                  ${oldUser.level || 1},
+                  ${oldUser.streak || 0},
+                  ${oldUser.last_active || null},
+                  ${oldUser.created_at},
+                  ${oldUser.first_name || null},
+                  ${oldUser.last_name || null},
+                  ${oldUser.mobile_number || null},
+                  ${oldUser.university || null},
+                  ${oldUser.university_reg_number || null},
+                  ${oldUser.class_section || null}
                 )
               `;
 
@@ -598,7 +669,7 @@ router.get('/me', authenticateToken, async (req, res) => {
             });
 
             // Re-fetch the now-migrated user
-            users = await sql`SELECT id, email, name, role, avatar_config, preferences, xp, level, streak, created_at FROM users WHERE id = ${req.user.id}`;
+            users = await sql`SELECT id, email, name, role, avatar_config, preferences, xp, level, streak, created_at, ${sql(PROFILE_COLUMNS)} FROM users WHERE id = ${req.user.id}`;
             user = users[0];
             console.log(`✅ Migration complete for ${req.user.email}`);
           } catch (migrationErr) {
@@ -621,7 +692,7 @@ router.get('/me', authenticateToken, async (req, res) => {
           VALUES (${req.user.id}, ${req.user.email}, ${name}, ${role}, ${JSON.stringify(avatarConfig)})
         `;
 
-        users = await sql`SELECT id, email, name, role, avatar_config, preferences, xp, level, streak, created_at FROM users WHERE id = ${req.user.id}`;
+        users = await sql`SELECT id, email, name, role, avatar_config, preferences, xp, level, streak, created_at, ${sql(PROFILE_COLUMNS)} FROM users WHERE id = ${req.user.id}`;
         user = users[0];
       }
     }
@@ -657,11 +728,83 @@ router.get('/me', authenticateToken, async (req, res) => {
       ...user,
       avatar_config: safeParseJSON(user.avatar_config, {}),
       preferences: safeParseJSON(user.preferences, {}),
+      profileComplete: isProfileComplete(user),
       achievements,
       stats
     });
   } catch (err) {
     console.error('Profile error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/auth/complete-profile
+//
+// The single write path for the student profile fields after account creation. Three different
+// flows need it and none of them can do the job themselves:
+//   - a new Google user (routes/googleAuth.js creates the row from Google's claims alone),
+//   - a new Supabase user (/sync-profile only inserts; it returns early for users that already
+//     exist, so it can never update one),
+//   - an existing student pushed through ProfileCompletionGate.
+//
+// Callers may only ever write their own row — the id comes from the verified token, never the body.
+router.post('/complete-profile', authenticateToken, async (req, res) => {
+  try {
+    const sql = getDB();
+    const rows = await sql`SELECT id, email, name, role FROM users WHERE id = ${req.user.id}`;
+    const current = rows[0];
+    if (!current) return res.status(404).json({ error: 'User not found' });
+
+    // Teachers and admins have no university, class or registration number, so only their name is
+    // validated. They never see the gate either; this is belt-and-braces for a direct POST.
+    const isStudent = current.role === 'student';
+    const { errors, values } = validateStudentProfile(req.body, { requireIdentifiers: isStudent });
+    if (errors.length > 0) {
+      return res.status(400).json({ error: errors[0], errors });
+    }
+
+    const fullName = joinName(values.first_name, values.last_name);
+    if (!fullName) {
+      return res.status(400).json({ error: 'First name is required' });
+    }
+
+    // users.name stays authoritative for display and is rewritten from the pair, so the
+    // leaderboard, reports and avatar header all keep reading a single field.
+    await sql`
+      UPDATE users SET
+        first_name            = ${values.first_name},
+        last_name             = ${values.last_name},
+        name                  = ${fullName},
+        mobile_number         = ${values.mobile_number ?? null},
+        university            = ${values.university ?? null},
+        university_reg_number = ${values.university_reg_number ?? null},
+        class_section         = ${values.class_section ?? null}
+      WHERE id = ${req.user.id}
+    `;
+
+    const updated = await sql`
+      SELECT id, email, name, role, avatar_config, xp, level, streak, ${sql(PROFILE_COLUMNS)}
+      FROM users WHERE id = ${req.user.id}
+    `;
+    const user = updated[0];
+
+    res.json({
+      user: {
+        ...user,
+        avatar_config: safeParseJSON(user.avatar_config, {}),
+        profileComplete: isProfileComplete(user)
+      }
+    });
+  } catch (err) {
+    // The gate must stay open on a collision so the student can retype, rather than being trapped
+    // at a wall — so this is a 409 with a readable message, not a 500 and not the constraint name.
+    if (err.code === '23505') {
+      return res.status(409).json({
+        error: 'That registration number is already registered to another account at your university. Check the number, or contact your administrator.',
+        field: 'universityRegNumber'
+      });
+    }
+    console.error('Complete profile error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

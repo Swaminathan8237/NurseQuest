@@ -4,8 +4,49 @@ const { getDB } = require('../db/init');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const analytics = require('../utils/analytics');
 const { PASS_PERCENT } = require('../utils/scoring');
+const {
+  UNIVERSITIES,
+  validateStudentProfile,
+  joinName,
+  normalizeClassSection,
+  normalizeUniversity,
+} = require('../utils/profile');
+const {
+  QUESTION_TYPES,
+  parseAnalyticsFilters,
+  hasDateWindow,
+  isFiltered,
+  echoFilters,
+  dateClause,
+  unitClause,
+  qtypeClause,
+  cohortClause,
+  buildMeta,
+} = require('../utils/analyticsFilters');
 
 const router = express.Router();
+
+// Validate the analytics filter set, or answer 400. Matches the shape of the existing
+// expectedMinutes validation further down: reject the request rather than silently filtering on
+// something the caller did not ask for.
+function readFilters(req, res, options) {
+  const filters = parseAnalyticsFilters(req.query, options);
+  if (filters.errors.length > 0) {
+    res.status(400).json({ error: filters.errors[0], errors: filters.errors });
+    return null;
+  }
+  return filters;
+}
+
+// Parse a JSON-TEXT column defensively: a malformed value (from a legacy row or a manual DB edit)
+// yields the fallback instead of throwing and 500-ing the response. Mirrors routes/auth.js.
+function safeParseJSON(value, fallback) {
+  try {
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 // Helper to check if a user is an admin
 function requireAdmin(req, res, next) {
@@ -28,26 +69,61 @@ function requireTeacherOrAdmin(req, res, next) {
    ========================================================================== */
 
 // Get all users (students, teachers, admins)
+//
+// The whole roster loads on tab open and is filtered client-side (searchQuery, roleFilter), so this
+// takes no query params — the new columns exist so those client-side filters and sorts have
+// something to work with. All additive: every key the tab read before is still here, unchanged.
 router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const sql = getDB();
     const users = await sql`
       SELECT u.id, u.email, u.name, u.role, u.xp, u.level, u.streak, u.last_active, u.created_at,
+        u.avatar_config,
+        u.first_name, u.last_name, u.mobile_number,
+        u.university, u.university_reg_number, u.class_section,
         (SELECT COUNT(*) FROM quiz_attempts WHERE user_id = u.id) as quizzes_taken,
-        (SELECT COUNT(*) FROM quizzes WHERE created_by = u.id) as quizzes_created
+        (SELECT COUNT(*) FROM quizzes WHERE created_by = u.id) as quizzes_created,
+        (SELECT COUNT(*) FROM live_game_attempts WHERE user_id = u.id) as live_games_played,
+        -- GREATEST ignores NULLs, so a student who has only ever played solo (or only live) still
+        -- resolves to their real last activity instead of collapsing to NULL.
+        GREATEST(
+          (SELECT MAX(completed_at) FROM quiz_attempts WHERE user_id = u.id),
+          (SELECT MAX(completed_at) FROM live_game_attempts WHERE user_id = u.id)
+        ) as last_played_at,
+        -- Pooled across both modes, because an accuracy band that ignored live games would
+        -- mis-band every student who mostly plays live.
+        (COALESCE((SELECT SUM(correct_count) FROM quiz_attempts WHERE user_id = u.id), 0)
+         + COALESCE((SELECT SUM(correct_count) FROM live_game_attempts WHERE user_id = u.id), 0)) as total_correct,
+        (COALESCE((SELECT SUM(total_questions) FROM quiz_attempts WHERE user_id = u.id), 0)
+         + COALESCE((SELECT SUM(total_questions) FROM live_game_attempts WHERE user_id = u.id), 0)) as total_answered
       FROM users u
       WHERE (u.status IS NULL OR u.status != 'pending_deletion')
       ORDER BY u.role DESC, u.xp DESC, u.created_at DESC
     `;
 
-    const formattedUsers = users.map(u => ({
-      ...u,
-      xp: parseInt(u.xp || 0, 10),
-      level: parseInt(u.level || 1, 10),
-      streak: parseInt(u.streak || 0, 10),
-      quizzes_taken: parseInt(u.quizzes_taken || 0, 10),
-      quizzes_created: parseInt(u.quizzes_created || 0, 10)
-    }));
+    const formattedUsers = users.map(u => {
+      const totalAnswered = parseInt(u.total_answered || 0, 10);
+      const totalCorrect = parseInt(u.total_correct || 0, 10);
+      return {
+        ...u,
+        // avatar_config was never selected here, so the student picker rendered
+        // <Avatar config={s.avatar_config || {}} /> against undefined and every card showed a
+        // default avatar. Parsed defensively — a malformed row must not 500 the whole tab.
+        avatar_config: safeParseJSON(u.avatar_config, {}),
+        xp: parseInt(u.xp || 0, 10),
+        level: parseInt(u.level || 1, 10),
+        streak: parseInt(u.streak || 0, 10),
+        quizzes_taken: parseInt(u.quizzes_taken || 0, 10),
+        quizzes_created: parseInt(u.quizzes_created || 0, 10),
+        live_games_played: parseInt(u.live_games_played || 0, 10),
+        total_correct: totalCorrect,
+        total_answered: totalAnswered,
+        // Sent computed so the roster's accuracy sort and band filter agree with every other
+        // screen instead of each caller rounding differently. null, not 0, when nothing was
+        // answered — 0% and "never played" are different facts.
+        accuracy: totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : null
+      };
+    });
 
     res.json(formattedUsers);
   } catch (err) {
@@ -87,6 +163,189 @@ router.put('/users/:id/role', authenticateToken, requireAdmin, async (req, res) 
     res.json({ success: true, message: `User role updated to ${role}.` });
   } catch (err) {
     console.error('Admin update user role error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update a user's profile fields (name, mobile, university, registration number, class).
+//
+// Two jobs: filling in the accounts that predate these columns without waiting for the student to
+// log in, and acting as the escape hatch when a registration number collides — the admin clears or
+// corrects the value that is squatting and the blocked student can then register.
+//
+// Partial by design: only the keys present in the body are changed. The validator still runs
+// against the MERGED state (current row overridden by the request) rather than the body alone,
+// because the cross-field rule "a registration number needs a university" has to be judged on
+// what the row will actually look like afterwards, not on what this one request happened to send.
+router.patch('/users/:id/profile', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sql = getDB();
+
+    const rows = await sql`
+      SELECT id, name, role, first_name, last_name, mobile_number,
+             university, university_reg_number, class_section
+      FROM users WHERE id = ${id}
+    `;
+    const current = rows[0];
+    if (!current) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const pick = (key, fallback) =>
+      Object.prototype.hasOwnProperty.call(req.body, key) ? req.body[key] : fallback;
+
+    const merged = {
+      firstName: pick('firstName', current.first_name),
+      lastName: pick('lastName', current.last_name),
+      mobileNumber: pick('mobileNumber', current.mobile_number),
+      university: pick('university', current.university),
+      universityRegNumber: pick('universityRegNumber', current.university_reg_number),
+      classSection: pick('classSection', current.class_section),
+    };
+
+    // Nothing is mandatory here — an admin must be able to clear a wrong value, and a
+    // teacher/admin row legitimately has no university, class or registration number at all.
+    const { errors, values } = validateStudentProfile(merged, {
+      requireIdentifiers: false,
+      requireName: false,
+    });
+    if (errors.length > 0) {
+      return res.status(400).json({ error: errors[0], errors });
+    }
+
+    // users.name is NOT NULL and drives every display surface, so it is only rewritten when the
+    // pair actually yields something. Clearing both names keeps the existing display name.
+    const joined = joinName(values.first_name, values.last_name);
+    const finalName = joined || current.name;
+
+    await sql`
+      UPDATE users SET
+        first_name            = ${values.first_name ?? null},
+        last_name             = ${values.last_name ?? null},
+        name                  = ${finalName},
+        mobile_number         = ${values.mobile_number ?? null},
+        university            = ${values.university ?? null},
+        university_reg_number = ${values.university_reg_number ?? null},
+        class_section         = ${values.class_section ?? null}
+      WHERE id = ${id}
+    `;
+
+    const updated = await sql`
+      SELECT id, email, name, role, first_name, last_name, mobile_number,
+             university, university_reg_number, class_section
+      FROM users WHERE id = ${id}
+    `;
+
+    res.json({ success: true, user: updated[0] });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({
+        error: 'Another account at that university already uses this registration number.',
+        field: 'universityRegNumber'
+      });
+    }
+    console.error('Admin update user profile error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// List the distinct classes, grouped by (university, class_section).
+//
+// Grouped by the PAIR, never by the class label alone: 'CSE A' at SRIHER and 'CSE A' at ACS are
+// two different classes, and collapsing them would silently blend two cohorts in every downstream
+// average. The counts also tell the admin how much profile backfilling is still outstanding.
+router.get('/classes', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const sql = getDB();
+    const rows = await sql`
+      SELECT u.university, u.class_section, COUNT(*)::int AS student_count
+      FROM users u
+      WHERE u.role = 'student'
+        AND (u.status IS NULL OR u.status != 'pending_deletion')
+      GROUP BY u.university, u.class_section
+      ORDER BY u.university NULLS LAST, u.class_section NULLS LAST
+    `;
+
+    const totals = await sql`
+      SELECT
+        COUNT(*)::int AS total_students,
+        COUNT(*) FILTER (WHERE u.university IS NULL)::int AS missing_university,
+        COUNT(*) FILTER (WHERE u.class_section IS NULL)::int AS missing_class,
+        COUNT(*) FILTER (WHERE u.university_reg_number IS NULL)::int AS missing_reg_number,
+        COUNT(*) FILTER (
+          WHERE u.university IS NULL OR u.class_section IS NULL OR u.university_reg_number IS NULL
+        )::int AS incomplete_profiles
+      FROM users u
+      WHERE u.role = 'student'
+        AND (u.status IS NULL OR u.status != 'pending_deletion')
+    `;
+
+    // Only a row with BOTH halves is a real class; anything else is unassigned work to chase.
+    const classes = rows
+      .filter(r => r.university && r.class_section)
+      .map(r => ({
+        university: r.university,
+        classSection: r.class_section,
+        studentCount: r.student_count
+      }));
+
+    const unassignedCount = rows
+      .filter(r => !r.university || !r.class_section)
+      .reduce((sum, r) => sum + r.student_count, 0);
+
+    res.json({
+      classes,
+      unassignedCount,
+      universities: UNIVERSITIES,
+      stats: totals[0] || {}
+    });
+  } catch (err) {
+    console.error('Admin get classes error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Merge one class label into another, WITHIN a single university.
+//
+// Normalization already collapses 'cse  a' / ' CSE A ' into one value; this handles what it can't
+// see, like 'CSE-A' vs 'CSE A'. Scoped to one institution by the WHERE clause, so merging SRIHER's
+// labels can never touch an ACS student. Writes to the live users table, so the UI confirms first.
+router.post('/classes/merge', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const university = normalizeUniversity(req.body.university);
+    const from = normalizeClassSection(req.body.from);
+    const to = normalizeClassSection(req.body.to);
+
+    if (!university || !UNIVERSITIES.includes(university)) {
+      return res.status(400).json({ error: `University must be one of: ${UNIVERSITIES.join(', ')}` });
+    }
+    if (!from || !to) {
+      return res.status(400).json({ error: 'Both the source and target class are required' });
+    }
+    if (from === to) {
+      return res.status(400).json({ error: 'The source and target class are the same' });
+    }
+
+    const sql = getDB();
+    const affected = await sql`
+      UPDATE users SET class_section = ${to}
+      WHERE role = 'student'
+        AND university = ${university}
+        AND class_section = ${from}
+      RETURNING id
+    `;
+
+    res.json({
+      success: true,
+      moved: affected.length,
+      university,
+      from,
+      to,
+      message: `Moved ${affected.length} student(s) from ${from} to ${to} at ${university}.`
+    });
+  } catch (err) {
+    console.error('Admin merge classes error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -321,6 +580,7 @@ router.get('/unit-quizzes', authenticateToken, requireAdmin, async (req, res) =>
       JOIN users u ON q.created_by = u.id
       WHERE q.unit IS NOT NULL
         AND (q.is_pending_deletion = 0 OR q.is_pending_deletion IS NULL)
+        AND (q.is_live_draft = 0 OR q.is_live_draft IS NULL)
       ORDER BY q.unit ASC, q.created_at DESC
     `;
 
@@ -467,6 +727,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
         COUNT(CASE WHEN unit IS NOT NULL THEN 1 END) as unit_linked,
         COUNT(CASE WHEN is_published = 1 THEN 1 END) as published
       FROM quizzes
+      WHERE (is_live_draft = 0 OR is_live_draft IS NULL)
     `;
     const quizStats = {
       total: parseInt(quizzesResult[0].total || 0, 10),
@@ -733,6 +994,17 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
       expectedMinutes = parsed;
     }
 
+    // Solo-only surface, so mode is fixed rather than read from the query — this endpoint has no
+    // access to the live tables. qtype is deliberately NOT applied here: queries 1 and 4 are
+    // answer-level (a question has a type) but 2, 3 and 5 are attempt-level (an attempt does not),
+    // so filtering by type would print "answered: 12" beside "attempts: 40" — internally
+    // inconsistent numbers with no error. Question type lives in the class analytics breakdown and
+    // its drill-down, where every figure on the screen is answer-level.
+    const f = readFilters(req, res, { defaultMode: 'solo' });
+    if (!f) return;
+    const dateWindow = dateClause(sql, 'qa.completed_at', f);
+    const unitWindow = unitClause(sql, 'q.unit', f);
+
     const students = await sql`
       SELECT id, name, email, role, avatar_config, xp, level, streak
       FROM users WHERE id = ${id}
@@ -764,6 +1036,8 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
       JOIN quiz_attempts qa ON qa.id = qans.attempt_id
       JOIN quizzes q        ON q.id  = qa.quiz_id
       WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+        ${dateWindow}
+        ${unitWindow}
       GROUP BY q.unit
     `;
 
@@ -779,6 +1053,8 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
       FROM quiz_attempts qa
       JOIN quizzes q ON q.id = qa.quiz_id
       WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+        ${dateWindow}
+        ${unitWindow}
       GROUP BY q.unit
     `;
 
@@ -786,6 +1062,8 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
     //    total_time sums EVERY attempt — comparing that against a single-pass budget
     //    would punish a student for retrying. The inner joins also restrict this to
     //    quizzes the student actually attempted, so both sides cover the same work.
+    //    The date window has to go on the inner attempt count as well, or a filtered
+    //    report would budget time for attempts query 2 excluded and read as too slow.
     const expectedRows = await sql`
       SELECT q.unit,
         SUM(q.time_per_question * qc.question_count * ac.attempt_count) AS expected_time,
@@ -797,14 +1075,20 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
         FROM questions GROUP BY quiz_id
       ) qc ON qc.quiz_id = q.id
       JOIN (
-        SELECT quiz_id, COUNT(*) AS attempt_count
-        FROM quiz_attempts WHERE user_id = ${id} GROUP BY quiz_id
+        SELECT qa.quiz_id, COUNT(*) AS attempt_count
+        FROM quiz_attempts qa WHERE qa.user_id = ${id} ${dateWindow}
+        GROUP BY qa.quiz_id
       ) ac ON ac.quiz_id = q.id
       WHERE q.unit IS NOT NULL
+        ${unitWindow}
       GROUP BY q.unit
     `;
 
     // 4. First-attempt correctness: the student's EARLIEST answer to each question.
+    //    With a date window this becomes "earliest answer within the window" — the
+    //    student's true first-ever attempt may sit before it. That is the only reading
+    //    available once earlier attempts are excluded, and it is what "first attempt in
+    //    this period" means on screen.
     const firstAttemptRows = await sql`
       WITH ranked AS (
         SELECT qans.question_id, qans.is_correct, q.unit,
@@ -813,13 +1097,16 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
         JOIN quiz_attempts qa ON qa.id = qans.attempt_id
         JOIN quizzes q        ON q.id  = qa.quiz_id
         WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+          ${dateWindow}
+          ${unitWindow}
       )
       SELECT unit, COUNT(*) AS total, SUM(is_correct) AS correct
       FROM ranked WHERE rn = 1
       GROUP BY unit
     `;
 
-    // 5. Retention: accuracy of the earliest vs latest attempt per unit.
+    // 5. Retention: accuracy of the earliest vs latest attempt per unit. Windowed the same
+    //    way as query 4 — "earliest and latest attempt within the selected period".
     const retentionRows = await sql`
       WITH ranked AS (
         SELECT q.unit,
@@ -830,6 +1117,8 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
         FROM quiz_attempts qa
         JOIN quizzes q ON q.id = qa.quiz_id
         WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+          ${dateWindow}
+          ${unitWindow}
       )
       SELECT unit,
         MAX(unit_attempts)                            AS unit_attempts,
@@ -839,7 +1128,9 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
       GROUP BY unit
     `;
 
-    // 6. Units available platform-wide (denominator for Completion).
+    // 6. Units available platform-wide (denominator for Completion). Deliberately NOT
+    //    filtered: Completion means "of everything published", so narrowing the
+    //    denominator to the selected unit would make every single-unit view read 100%.
     const availableRows = await sql`
       SELECT COUNT(DISTINCT unit) AS units_available
       FROM quizzes WHERE unit IS NOT NULL AND is_published = 1
@@ -1078,7 +1369,22 @@ router.get('/students/:id/report', authenticateToken, requireAdmin, async (req, 
       badges,
       meta: {
         expectedMinutes,
-        liveGamesExcluded: true
+        liveGamesExcluded: true,
+        // Nothing is added when nothing was filtered, so an unfiltered call returns exactly the
+        // response it returned before filters existed.
+        ...(isFiltered(f) ? {
+          filters: echoFilters(f),
+          // Mastery and Retention compare a student's first attempt against their latest. Inside a
+          // window those become "first and latest IN THIS PERIOD" — earlier attempts are excluded,
+          // so the baseline moves. The screen has to say so or the two numbers look wrong.
+          windowedBaseline: hasDateWindow(f),
+          // Completion still divides by every published unit, not by the units in view — a
+          // single-unit report would otherwise always read 100%.
+          completionDenominatorUnfiltered: true,
+          // A question type cannot be applied here: half these figures are per-attempt, and an
+          // attempt has no type. It is honoured in the class analytics breakdown instead.
+          ...(f.qtype ? { qtypeNotApplicable: true } : {}),
+        } : {})
       }
     });
   } catch (err) {
@@ -1104,12 +1410,12 @@ router.get('/students/:id/live-games', authenticateToken, requireAdmin, async (r
         lga.correct_count, lga.total_questions, lga.max_streak, lga.total_time_ms,
         lga.final_rank, lga.completed_at,
         ls.join_code, ls.started_at, ls.ended_at,
-        q.title AS quiz_title,
+        COALESCE(q.title, ls.quiz_title) AS quiz_title,
         host.name AS hosted_by,
         (SELECT COUNT(*) FROM live_game_attempts WHERE session_id = lga.session_id) AS total_players
       FROM live_game_attempts lga
       JOIN live_sessions ls ON ls.id = lga.session_id
-      JOIN quizzes q ON q.id = ls.quiz_id
+      LEFT JOIN quizzes q ON q.id = ls.quiz_id
       JOIN users host ON host.id = ls.host_id
       WHERE lga.user_id = ${id}
       ORDER BY lga.completed_at DESC
@@ -1154,27 +1460,42 @@ router.get('/live-games/:attemptId/detail', authenticateToken, requireAdmin, asy
     // Attempt info
     const attempts = await sql`
       SELECT lga.*, ls.join_code, ls.started_at, ls.ended_at,
-        q.title AS quiz_title, q.time_per_question,
+        COALESCE(q.title, ls.quiz_title) AS quiz_title,
+        COALESCE(q.time_per_question, ls.quiz_time_per_question) AS time_per_question,
         host.name AS hosted_by,
         (SELECT COUNT(*) FROM live_game_attempts WHERE session_id = lga.session_id) AS total_players
       FROM live_game_attempts lga
       JOIN live_sessions ls ON ls.id = lga.session_id
-      JOIN quizzes q ON q.id = ls.quiz_id
+      LEFT JOIN quizzes q ON q.id = ls.quiz_id
       JOIN users host ON host.id = ls.host_id
       WHERE lga.id = ${attemptId}
     `;
     if (attempts.length === 0) return res.status(404).json({ error: 'Live game attempt not found' });
     const attempt = attempts[0];
 
-    // Answers with question info
+    // Answers with question info.
+    // The questions row is optional: live games hosted from a throwaway "live draft"
+    // quiz delete it on game-over, and editing any quiz replaces its question rows.
+    // live_game_answers.question_snapshot holds a frozen copy for exactly those cases,
+    // so every field falls back to it when the join comes back empty.
     const answerRows = await sql`
       SELECT lgans.id AS answer_id, lgans.question_index, lgans.final_answer, lgans.is_correct,
         lgans.points_earned, lgans.response_ms, lgans.is_timeout, lgans.is_late, lgans.status,
-        qs.question_text, qs.type, qs.options, qs.correct_answer, qs.explanation,
-        qs.media_url, qs.points AS max_points,
-        qs.slider_min, qs.slider_max, qs.slider_step, qs.slider_unit, qs.matching_pairs
+        COALESCE(qs.question_text, snap.data->>'question_text')      AS question_text,
+        COALESCE(qs.type, snap.data->>'type')                        AS type,
+        COALESCE(qs.options, snap.data->>'options')                  AS options,
+        COALESCE(qs.correct_answer, snap.data->>'correct_answer')    AS correct_answer,
+        COALESCE(qs.explanation, snap.data->>'explanation')          AS explanation,
+        COALESCE(qs.media_url, snap.data->>'media_url')              AS media_url,
+        COALESCE(qs.points, (snap.data->>'points')::int)             AS max_points,
+        COALESCE(qs.slider_min, (snap.data->>'slider_min')::real)    AS slider_min,
+        COALESCE(qs.slider_max, (snap.data->>'slider_max')::real)    AS slider_max,
+        COALESCE(qs.slider_step, (snap.data->>'slider_step')::real)  AS slider_step,
+        COALESCE(qs.slider_unit, snap.data->>'slider_unit')          AS slider_unit,
+        COALESCE(qs.matching_pairs, snap.data->>'matching_pairs')    AS matching_pairs
       FROM live_game_answers lgans
-      JOIN questions qs ON qs.id = lgans.question_id
+      LEFT JOIN questions qs ON qs.id = lgans.question_id
+      LEFT JOIN LATERAL (SELECT NULLIF(lgans.question_snapshot, '')::jsonb AS data) snap ON true
       WHERE lgans.attempt_id = ${attemptId}
       ORDER BY lgans.question_index
     `;
@@ -1292,6 +1613,27 @@ router.get('/students/:id/live-report', authenticateToken, requireAdmin, async (
       expectedMinutes = parsed;
     }
 
+    // Live-only surface, so mode is fixed. Everything downstream of the attempts query keys off
+    // `allAttemptIds`, so restricting that ONE query restricts the whole report — the answer-level
+    // queries, the per-session rollup and the overall aggregate all follow automatically.
+    const f = readFilters(req, res, { defaultMode: 'live' });
+    if (!f) return;
+    // The unit lives on live_sessions.quiz_unit, not on quizzes: the live-draft clone is deleted
+    // when the game ends, so by report time the quiz row is usually gone.
+    const filterMeta = isFiltered(f)
+      ? {
+        filters: echoFilters(f),
+        // Retention compares a student's earliest and latest game of the same quiz. Inside a
+        // window those become "earliest and latest IN THIS PERIOD".
+        windowedBaseline: hasDateWindow(f),
+        // Sessions that ran before quiz_unit existed have no unit and cannot get one — the quiz
+        // they came from is deleted. `= unit` is NULL for them, so they drop out. Say so, rather
+        // than letting the screen look like it lost data.
+        ...buildMeta(f, { mode: 'live' }),
+        ...(f.qtype ? { qtypeNotApplicable: true } : {}),
+      }
+      : {};
+
     // Verify student exists
     const students = await sql`SELECT id, name, email FROM users WHERE id = ${id}`;
     if (students.length === 0) return res.status(404).json({ error: 'Student not found' });
@@ -1301,14 +1643,18 @@ router.get('/students/:id/live-report', authenticateToken, requireAdmin, async (
       SELECT lga.id AS attempt_id, lga.session_id, lga.final_score, lga.total_points,
         lga.correct_count, lga.total_questions, lga.max_streak, lga.total_time_ms,
         lga.final_rank, lga.completed_at,
-        ls.quiz_id, ls.join_code, q.title AS quiz_title, q.time_per_question,
+        ls.quiz_id, ls.join_code,
+        COALESCE(q.title, ls.quiz_title) AS quiz_title,
+        COALESCE(q.time_per_question, ls.quiz_time_per_question) AS time_per_question,
         host.name AS hosted_by,
         (SELECT COUNT(*) FROM live_game_attempts WHERE session_id = lga.session_id) AS total_players
       FROM live_game_attempts lga
       JOIN live_sessions ls ON ls.id = lga.session_id
-      JOIN quizzes q ON q.id = ls.quiz_id
+      LEFT JOIN quizzes q ON q.id = ls.quiz_id
       JOIN users host ON host.id = ls.host_id
       WHERE lga.user_id = ${id}
+        ${dateClause(sql, 'lga.completed_at', f)}
+        ${unitClause(sql, 'ls.quiz_unit', f)}
       ORDER BY lga.completed_at ASC
     `;
 
@@ -1317,7 +1663,9 @@ router.get('/students/:id/live-report', authenticateToken, requireAdmin, async (
         overall: null,
         sessions: [],
         badges: [],
-        meta: { gamesPlayed: 0, gamesCompleted: 0, noData: true, expectedMinutes }
+        // filterMeta matters most on this branch: without it, "filtered everything out" and
+        // "never played a live game" render as the same empty screen.
+        meta: { gamesPlayed: 0, gamesCompleted: 0, noData: true, expectedMinutes, ...filterMeta }
       });
     }
 
@@ -1339,10 +1687,13 @@ router.get('/students/:id/live-report', authenticateToken, requireAdmin, async (
 
     // First-selection accuracy: check if the FIRST selection in the trail matches correct_answer
     const firstSelectionRows = await sql`
-      SELECT las.answer_id, las.selected_value, lgans.attempt_id, q.correct_answer, q.type
+      SELECT las.answer_id, las.selected_value, lgans.attempt_id,
+        COALESCE(q.correct_answer, snap.data->>'correct_answer') AS correct_answer,
+        COALESCE(q.type, snap.data->>'type') AS type
       FROM live_answer_selections las
       JOIN live_game_answers lgans ON lgans.id = las.answer_id
-      JOIN questions q ON q.id = lgans.question_id
+      LEFT JOIN questions q ON q.id = lgans.question_id
+      LEFT JOIN LATERAL (SELECT NULLIF(lgans.question_snapshot, '')::jsonb AS data) snap ON true
       WHERE lgans.attempt_id = ANY(${allAttemptIds})
         AND las.selection_order = 1
     `;
@@ -1358,9 +1709,11 @@ router.get('/students/:id/live-report', authenticateToken, requireAdmin, async (
 
     // Build per-answer map for non-trail questions
     const allAnswerRows = await sql`
-      SELECT lgans.id AS answer_id, lgans.attempt_id, lgans.is_correct, q.type
+      SELECT lgans.id AS answer_id, lgans.attempt_id, lgans.is_correct,
+        COALESCE(q.type, snap.data->>'type') AS type
       FROM live_game_answers lgans
-      JOIN questions q ON q.id = lgans.question_id
+      LEFT JOIN questions q ON q.id = lgans.question_id
+      LEFT JOIN LATERAL (SELECT NULLIF(lgans.question_snapshot, '')::jsonb AS data) snap ON true
       WHERE lgans.attempt_id = ANY(${allAttemptIds})
     `;
     let firstAttemptTotal = 0;
@@ -1582,10 +1935,418 @@ router.get('/students/:id/live-report', authenticateToken, requireAdmin, async (
       overall,
       sessions,
       badges,
-      meta: { gamesPlayed, gamesCompleted, noData: false, expectedMinutes }
+      meta: { gamesPlayed, gamesCompleted, noData: false, expectedMinutes, ...filterMeta }
     });
   } catch (err) {
     console.error('Admin get student live report error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ==========================================================================
+   5c. COMBINED STUDENT SUMMARY (Admin Only)
+   ==========================================================================
+   The two reports above each cover one half of a student's work and neither can
+   answer "how is this student doing overall?" — solo attempts live in
+   quiz_attempts, live answers in live_game_attempts, and there is no mode column
+   joining them.
+
+   THE ONE RULE THAT MATTERS HERE: mode=all must NOT average the two reports'
+   knowledge scores. KNOWLEDGE_WEIGHTS are weights over MEASUREMENTS, not over
+   scores — averaging two composites lets a student's three live games outweigh
+   forty solo attempts. So this endpoint sums correct / answered / time / expected
+   across both tables and calls analytics.knowledgeScore() ONCE on the pooled
+   inputs, exactly as the reports call it once on their own pooled inputs.
+
+   `bySource` then reproduces each report's own figures for side-by-side cards, so
+   a number on this screen can always be traced to the report it came from.
+
+   Aggregates only — this does not duplicate the per-unit or per-session machinery.
+*/
+
+router.get('/students/:id/summary', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sql = getDB();
+
+    // Same override and same bounds as both reports, because the Speed Score is only
+    // comparable across the three screens if the time budget is.
+    let expectedMinutes = null;
+    if (req.query.expectedMinutes !== undefined && req.query.expectedMinutes !== '') {
+      const parsed = parseInt(req.query.expectedMinutes, 10);
+      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1440) {
+        return res.status(400).json({ error: 'expectedMinutes must be an integer between 1 and 1440.' });
+      }
+      expectedMinutes = parsed;
+    }
+
+    // This is the one endpoint whose whole purpose is spanning both sources, so unlike the
+    // reports it reads `mode` from the query and defaults to 'all'.
+    const f = readFilters(req, res, { defaultMode: 'all' });
+    if (!f) return;
+    const wantSolo = f.mode === 'all' || f.mode === 'solo';
+    const wantLive = f.mode === 'all' || f.mode === 'live';
+
+    const students = await sql`
+      SELECT id, name, email, role, avatar_config, xp, level, streak,
+        university, class_section
+      FROM users WHERE id = ${id}
+    `;
+    if (students.length === 0) return res.status(404).json({ error: 'Student not found' });
+    const s = students[0];
+
+    // Solo and live each need their own date column and their own unit column, which is the
+    // asymmetry analyticsFilters exists to hold: a live session's unit is denormalized onto
+    // live_sessions.quiz_unit because the live-draft quiz row is deleted when the game ends.
+    const soloDate = dateClause(sql, 'qa.completed_at', f);
+    const soloUnit = unitClause(sql, 'q.unit', f);
+    const liveDate = dateClause(sql, 'lga.completed_at', f);
+    const liveUnit = unitClause(sql, 'ls.quiz_unit', f);
+
+    const empty = {
+      attempts: 0, answered: 0, correct: 0, incorrect: 0, points: 0,
+      totalTime: 0, expectedTime: 0, avgResponseTime: 0,
+      accuracy: 0, firstAttemptAccuracy: 0, speedScore: 0, efficiency: 0,
+      timeUtilization: 0, retention: null,
+      knowledgeScore: 0, retentionApplied: false, knowledgeLevel: null
+    };
+
+    // ---- Solo side ----------------------------------------------------------------
+    let soloRaw = { attempts: 0, answered: 0, correct: 0, points: 0, totalTime: 0, expected: 0, avgTimeBasis: 0, avgTimeCount: 0, faTotal: 0, faCorrect: 0 };
+    if (wantSolo) {
+      // Attempt-level: one row. q.unit IS NOT NULL matches the report, which reports on units
+      // only — a standalone quiz attempt is not part of the unit curriculum.
+      const a = (await sql`
+        SELECT COUNT(*)::int AS attempts,
+          COALESCE(SUM(qa.time_taken), 0)::float8 AS total_time,
+          COALESCE(SUM(qa.score), 0)::float8      AS points
+        FROM quiz_attempts qa
+        JOIN quizzes q ON q.id = qa.quiz_id
+        WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+          ${soloDate}
+          ${soloUnit}
+      `)[0];
+
+      // Answer-level: correctness and the response-time sum. NULLIF(...,0) mirrors the report's
+      // AVG(NULLIF(time_taken,0)) — an untimed answer must not drag the mean toward zero.
+      const ans = (await sql`
+        SELECT COUNT(*)::int AS answered,
+          COALESCE(SUM(qans.is_correct), 0)::int              AS correct,
+          COALESCE(SUM(NULLIF(qans.time_taken, 0)), 0)::float8 AS resp_sum,
+          COUNT(NULLIF(qans.time_taken, 0))::int               AS timed
+        FROM question_answers qans
+        JOIN quiz_attempts qa ON qa.id = qans.attempt_id
+        JOIN quizzes q        ON q.id  = qa.quiz_id
+        WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+          ${soloDate}
+          ${soloUnit}
+      `)[0];
+
+      // Expected time, scaled by attempt count for the same reason the report scales it: the
+      // measured total_time above covers EVERY attempt, so a single-pass budget would make a
+      // student who retried look slow.
+      const exp = (await sql`
+        SELECT COALESCE(SUM(q.time_per_question * qc.question_count * ac.attempt_count), 0)::float8 AS expected_time,
+          COALESCE(SUM(ac.attempt_count), 0)::int AS attempt_count
+        FROM quizzes q
+        JOIN (SELECT quiz_id, COUNT(*) AS question_count FROM questions GROUP BY quiz_id) qc
+          ON qc.quiz_id = q.id
+        JOIN (
+          SELECT qa.quiz_id, COUNT(*) AS attempt_count
+          FROM quiz_attempts qa WHERE qa.user_id = ${id} ${soloDate}
+          GROUP BY qa.quiz_id
+        ) ac ON ac.quiz_id = q.id
+        WHERE q.unit IS NOT NULL
+          ${soloUnit}
+      `)[0];
+
+      // First-attempt correctness: the EARLIEST answer to each question. Same CTE as report
+      // query 4, without its GROUP BY unit.
+      const fa = (await sql`
+        WITH ranked AS (
+          SELECT qans.is_correct,
+            ROW_NUMBER() OVER (PARTITION BY qans.question_id ORDER BY qa.completed_at ASC) AS rn
+          FROM question_answers qans
+          JOIN quiz_attempts qa ON qa.id = qans.attempt_id
+          JOIN quizzes q        ON q.id  = qa.quiz_id
+          WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+            ${soloDate}
+            ${soloUnit}
+        )
+        SELECT COUNT(*)::int AS total, COALESCE(SUM(is_correct), 0)::int AS correct
+        FROM ranked WHERE rn = 1
+      `)[0];
+
+      soloRaw = {
+        attempts: analytics.num(a.attempts),
+        answered: analytics.num(ans.answered),
+        correct: analytics.num(ans.correct),
+        points: analytics.num(a.points),
+        totalTime: analytics.num(a.total_time),
+        // The admin override applies per attempt, matching the report.
+        expected: expectedMinutes !== null
+          ? expectedMinutes * 60 * analytics.num(exp.attempt_count)
+          : analytics.num(exp.expected_time),
+        // Solo's mean response time is per ANSWER (question_answers.time_taken), the same
+        // measurement the report averages — see the live side for why its basis differs.
+        avgTimeBasis: analytics.num(ans.resp_sum),
+        avgTimeCount: analytics.num(ans.timed),
+        faTotal: analytics.num(fa.total),
+        faCorrect: analytics.num(fa.correct)
+      };
+    }
+
+    // Solo retention: mean of the units where it is measurable, which is precisely what the
+    // report's overall.retention is — so the two screens agree.
+    let soloRetention = null;
+    let soloRetentionSamples = [];
+    if (wantSolo) {
+      const rows = await sql`
+        WITH ranked AS (
+          SELECT q.unit,
+            qa.correct_count * 100.0 / NULLIF(qa.total_questions, 0) AS acc,
+            ROW_NUMBER() OVER (PARTITION BY q.unit ORDER BY qa.completed_at ASC)  AS rn_first,
+            ROW_NUMBER() OVER (PARTITION BY q.unit ORDER BY qa.completed_at DESC) AS rn_last,
+            COUNT(*)    OVER (PARTITION BY q.unit)                                AS unit_attempts
+          FROM quiz_attempts qa
+          JOIN quizzes q ON q.id = qa.quiz_id
+          WHERE qa.user_id = ${id} AND q.unit IS NOT NULL
+            ${soloDate}
+            ${soloUnit}
+        )
+        SELECT MAX(unit_attempts)                       AS unit_attempts,
+          MAX(CASE WHEN rn_first = 1 THEN acc END)      AS initial_acc,
+          MAX(CASE WHEN rn_last  = 1 THEN acc END)      AS latest_acc
+        FROM ranked
+        GROUP BY unit
+      `;
+      const measured = rows
+        .filter(r => analytics.num(r.unit_attempts) >= 2)
+        .map(r => analytics.retention(r.latest_acc, r.initial_acc))
+        .filter(v => v !== null);
+      if (measured.length) soloRetention = analytics.round(measured.reduce((x, y) => x + y, 0) / measured.length);
+      soloRetentionSamples = measured; // pooled below
+    }
+
+    // ---- Live side ----------------------------------------------------------------
+    let liveRaw = { attempts: 0, answered: 0, correct: 0, points: 0, totalTime: 0, expected: 0, avgTimeBasis: 0, avgTimeCount: 0, faTotal: 0, faCorrect: 0 };
+    if (wantLive) {
+      // total_time_ms and expected seconds are the unit mismatch analyticsFilters' header calls
+      // out; converted to seconds here so the pooled sums are in one unit.
+      //
+      // The time budget reproduces the live report's `a.time_per_question || 30` exactly,
+      // including its zero case: COALESCE picks the quiz's value then the session's snapshot,
+      // and NULLIF turns a stored 0 into the 30s default rather than a zero budget (which
+      // would make speedScore read 0 instead of 100).
+      const g = (await sql`
+        SELECT COUNT(*)::int AS games,
+          COALESCE(SUM(lga.correct_count), 0)::int   AS correct,
+          COALESCE(SUM(lga.total_questions), 0)::int AS answered,
+          COALESCE(SUM(lga.final_score), 0)::float8  AS points,
+          COALESCE(SUM(lga.total_time_ms), 0)::float8 / 1000.0 AS total_time_sec,
+          COALESCE(SUM(
+            COALESCE(NULLIF(COALESCE(q.time_per_question, ls.quiz_time_per_question), 0), 30)
+              * lga.total_questions
+          ), 0)::float8 AS expected_time
+        FROM live_game_attempts lga
+        JOIN live_sessions ls ON ls.id = lga.session_id
+        LEFT JOIN quizzes q ON q.id = ls.quiz_id
+        WHERE lga.user_id = ${id}
+          ${liveDate}
+          ${liveUnit}
+      `)[0];
+
+      // First-attempt correctness, the live rule: if a selection trail exists use the FIRST
+      // selection's correctness, otherwise fall back to the answer's own is_correct (758 of
+      // 1431 live answers in production have no trail, so the fallback carries real weight).
+      // This is the live report's JS rule expressed in SQL; verified to return the identical
+      // figure. The LATERAL ... LIMIT 1 is deliberate: a plain join on selection_order = 1
+      // would duplicate an answer row if a trail ever recorded two, inflating the count where
+      // the report's Set-keyed-by-answer collapses it.
+      const fa = (await sql`
+        SELECT COUNT(*)::int AS total,
+          COALESCE(SUM(CASE
+            WHEN fs.selected_value IS NOT NULL
+              THEN CASE WHEN UPPER(TRIM(fs.selected_value))
+                           = UPPER(TRIM(COALESCE(q.correct_answer, snap.data->>'correct_answer')))
+                        THEN 1 ELSE 0 END
+            ELSE COALESCE(lgans.is_correct, 0)
+          END), 0)::int AS correct
+        FROM live_game_answers lgans
+        JOIN live_game_attempts lga ON lga.id = lgans.attempt_id
+        JOIN live_sessions ls ON ls.id = lga.session_id
+        LEFT JOIN questions q ON q.id = lgans.question_id
+        LEFT JOIN LATERAL (SELECT NULLIF(lgans.question_snapshot, '')::jsonb AS data) snap ON true
+        LEFT JOIN LATERAL (
+          SELECT las.selected_value FROM live_answer_selections las
+          WHERE las.answer_id = lgans.id AND las.selection_order = 1 LIMIT 1
+        ) fs ON true
+        WHERE lga.user_id = ${id}
+          ${liveDate}
+          ${liveUnit}
+      `)[0];
+
+      liveRaw = {
+        attempts: analytics.num(g.games),
+        answered: analytics.num(g.answered),
+        correct: analytics.num(g.correct),
+        points: analytics.num(g.points),
+        totalTime: analytics.num(g.total_time_sec),
+        // The live report's override is per GAME, not per question, so it is applied here the
+        // same way rather than reusing the solo scaling.
+        expected: expectedMinutes !== null
+          ? expectedMinutes * 60 * analytics.num(g.games)
+          : analytics.num(g.expected_time),
+        // Deliberately the total GAME time, not a sum of response_ms: the live report divides
+        // total_time_ms by the question count for its avgResponseTime (admin.js:1856), and a
+        // response_ms sum would give a different number on a screen sitting next to it. Live
+        // answers also have gaps between questions that response_ms does not capture, so game
+        // time is the honest basis here.
+        avgTimeBasis: analytics.num(g.total_time_sec),
+        avgTimeCount: analytics.num(g.answered),
+        faTotal: analytics.num(fa.total),
+        faCorrect: analytics.num(fa.correct)
+      };
+    }
+
+    // Live retention: mean over the quizzes played more than once, matching the live report.
+    let liveRetention = null;
+    let liveRetentionSamples = [];
+    if (wantLive) {
+      const rows = await sql`
+        WITH games AS (
+          SELECT ls.quiz_id, lga.completed_at,
+            lga.correct_count * 100.0 / NULLIF(lga.total_questions, 0) AS acc
+          FROM live_game_attempts lga
+          JOIN live_sessions ls ON ls.id = lga.session_id
+          WHERE lga.user_id = ${id}
+            ${liveDate}
+            ${liveUnit}
+        ), ranked AS (
+          SELECT quiz_id, acc,
+            ROW_NUMBER() OVER (PARTITION BY quiz_id ORDER BY completed_at ASC)  AS rn_first,
+            ROW_NUMBER() OVER (PARTITION BY quiz_id ORDER BY completed_at DESC) AS rn_last,
+            COUNT(*)    OVER (PARTITION BY quiz_id)                             AS quiz_games
+          FROM games
+        )
+        SELECT MAX(quiz_games)                          AS quiz_games,
+          MAX(CASE WHEN rn_first = 1 THEN acc END)      AS initial_acc,
+          MAX(CASE WHEN rn_last  = 1 THEN acc END)      AS latest_acc
+        FROM ranked
+        GROUP BY quiz_id
+      `;
+      liveRetentionSamples = rows
+        .filter(r => analytics.num(r.quiz_games) >= 2)
+        .map(r => analytics.retention(r.latest_acc, r.initial_acc))
+        .filter(v => v !== null);
+      if (liveRetentionSamples.length) {
+        liveRetention = analytics.round(liveRetentionSamples.reduce((x, y) => x + y, 0) / liveRetentionSamples.length);
+      }
+    }
+
+    /** Derive one source's (or the pooled) metric block from raw sums. */
+    const derive = (raw, retentionValue) => {
+      const acc = analytics.accuracy(raw.correct, raw.answered);
+      const firstAttemptAccuracy = analytics.accuracy(raw.faCorrect, raw.faTotal);
+      const speed = analytics.speedScore(raw.expected, raw.totalTime);
+      // Each source carries its own time basis and its own divisor, because each report defines
+      // avgResponseTime differently — solo over timed answers, live over total game time per
+      // question. Pooling the two bases and the two divisors is therefore still one honest mean.
+      const avgResponseTime = raw.avgTimeCount > 0
+        ? analytics.round(raw.avgTimeBasis / raw.avgTimeCount)
+        : 0;
+      const ks = analytics.knowledgeScore({
+        accuracy: acc,
+        firstAttemptAccuracy,
+        speed,
+        retention: retentionValue
+      });
+      return {
+        attempts: raw.attempts,
+        answered: raw.answered,
+        correct: raw.correct,
+        incorrect: raw.answered - raw.correct,
+        points: analytics.round(raw.points),
+        totalTime: analytics.round(raw.totalTime),
+        expectedTime: analytics.round(raw.expected),
+        avgResponseTime,
+        accuracy: acc,
+        firstAttemptAccuracy,
+        speedScore: speed,
+        efficiency: analytics.efficiency(acc, avgResponseTime),
+        timeUtilization: analytics.timeUtilization(raw.totalTime, raw.expected),
+        retention: retentionValue,
+        knowledgeScore: ks.score,
+        retentionApplied: ks.retentionApplied,
+        knowledgeLevel: analytics.classify(ks.score)
+      };
+    };
+
+    // THE POOLED FIGURES. Every input is a SUM of measurements, so the weights land on the
+    // measurements — forty solo attempts outweigh three live games, as they should.
+    const pooled = {
+      attempts: soloRaw.attempts + liveRaw.attempts,
+      answered: soloRaw.answered + liveRaw.answered,
+      correct: soloRaw.correct + liveRaw.correct,
+      points: soloRaw.points + liveRaw.points,
+      totalTime: soloRaw.totalTime + liveRaw.totalTime,
+      expected: soloRaw.expected + liveRaw.expected,
+      avgTimeBasis: soloRaw.avgTimeBasis + liveRaw.avgTimeBasis,
+      avgTimeCount: soloRaw.avgTimeCount + liveRaw.avgTimeCount,
+      faTotal: soloRaw.faTotal + liveRaw.faTotal,
+      faCorrect: soloRaw.faCorrect + liveRaw.faCorrect
+    };
+
+    // Retention is the one metric with no pooled measurement behind it: it is a ratio of two
+    // accuracies within one unit or one quiz, so there is nothing to sum. Pooling the
+    // OBSERVATIONS rather than the two source averages keeps a single flat mean over exactly
+    // the groups the reports each average internally — and reduces to the report's own number
+    // when only one source has data, instead of half-weighting whichever source has fewer.
+    const allRetention = [...soloRetentionSamples, ...liveRetentionSamples];
+    const pooledRetention = allRetention.length
+      ? analytics.round(allRetention.reduce((x, y) => x + y, 0) / allRetention.length)
+      : null;
+
+    const solo = wantSolo ? derive(soloRaw, soloRetention) : { ...empty, excluded: true };
+    const live = wantLive ? derive(liveRaw, liveRetention) : { ...empty, excluded: true };
+
+    res.json({
+      student: {
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        role: s.role,
+        avatar_config: s.avatar_config,
+        xp: parseInt(s.xp || 0, 10),
+        level: parseInt(s.level || 1, 10),
+        streak: parseInt(s.streak || 0, 10),
+        university: s.university,
+        class_section: s.class_section
+      },
+      combined: derive(pooled, pooledRetention),
+      bySource: { solo, live },
+      meta: {
+        expectedMinutes,
+        filters: echoFilters(f),
+        // Says which halves are in the combined figure, so a card can never imply it covers
+        // both when mode restricted it to one.
+        sources: { solo: wantSolo, live: wantLive },
+        // Both reports call retention "first vs latest"; inside a window that means first and
+        // latest WITHIN the window, and the baseline moves.
+        windowedBaseline: hasDateWindow(f),
+        // The pooled knowledge score is computed once over summed measurements. Stated because
+        // averaging the two bySource scores gives a DIFFERENT (and wrong) number, and someone
+        // reading these three figures together will otherwise try to reconcile them that way.
+        knowledgePooled: true,
+        retentionGroupsPooled: allRetention.length,
+        ...buildMeta(f, { mode: f.mode }),
+        // A summary is a pure aggregate, so there is no per-question row to filter — the same
+        // limitation the two reports disclose.
+        ...(f.qtype ? { qtypeNotApplicable: true } : {})
+      }
+    });
+  } catch (err) {
+    console.error('Admin get student summary error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

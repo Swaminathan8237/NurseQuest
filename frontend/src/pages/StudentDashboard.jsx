@@ -8,6 +8,7 @@ import useScrollReveal from '../hooks/useScrollReveal';
 import { StatTile, ProgressBar, SectionHeading } from '../components/ui';
 import StreakCalendar from '../components/StreakCalendar';
 import StreakBreakGate from '../components/StreakBreakGate';
+import ProfileCompletionGate from '../components/ProfileCompletionGate';
 import { UNIT_COLORS, UNIT_ICONS } from '../components/LevelPath';
 import { PASS_PERCENT } from '../constants';
 import {
@@ -76,6 +77,10 @@ export default function StudentDashboard() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showStreakBreak, setShowStreakBreak] = useState(false);
+  // Set the moment the student saves, so the dashboard renders immediately without waiting for a
+  // /me refetch. The server-side `profileComplete` flag stays the source of truth on every later
+  // visit — this is only the local "they just did it" acknowledgement.
+  const [profileJustCompleted, setProfileJustCompleted] = useState(false);
   const scrollRevealRef = useScrollReveal();
 
   useEffect(() => {
@@ -131,6 +136,15 @@ export default function StudentDashboard() {
         onContinue={dismissStreakBreak}
       />
     );
+  }
+
+  // Accounts created before the university / class / registration-number fields existed are asked
+  // for them once, here. Checked against `=== false` on purpose: the flag is only ever false for a
+  // student the server knows is incomplete, so an older cached user object, a teacher, an admin, or
+  // any response that predates the flag all pass straight through rather than being gated on a
+  // missing key.
+  if (user?.profileComplete === false && !profileJustCompleted) {
+    return <ProfileCompletionGate onComplete={() => setProfileJustCompleted(true)} />;
   }
 
   const levelInfo = stats?.levelInfo || { level: 1, name: 'Rookie', progress: 0, xpInLevel: 0, xpForNextLevel: 1000 };

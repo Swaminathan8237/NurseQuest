@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../supabaseClient';
 import { Button, Input } from '../components/ui';
+import StudentProfileFields from '../components/StudentProfileFields';
 import VerificationSentModal from '../components/VerificationSentModal';
 
 import logo from '../assets/skillquest-logo.png';
@@ -13,7 +14,7 @@ const t = (val) => val;
 export default function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login, register, googleLogin, syncOAuthProfile, user } = useAuth();
+  const { login, register, googleLogin, completeProfile, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   // State flags for different views
@@ -26,7 +27,19 @@ export default function AuthPage() {
   });
 
   // Form states
-  const [formData, setFormData] = useState({ email: '', password: '', name: '', role: 'student' });
+  // firstName/lastName replace the old single `name` field — the server joins them back into
+  // users.name, which stays authoritative everywhere else in the app.
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    mobileNumber: '',
+    university: '',
+    universityRegNumber: '',
+    classSection: '',
+    role: 'student',
+  });
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
@@ -35,7 +48,19 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   // OAuth user details completion fields
-  const [profileFormData, setProfileFormData] = useState({ name: '', role: 'student' });
+  const [profileFormData, setProfileFormData] = useState({
+    firstName: '',
+    lastName: '',
+    mobileNumber: '',
+    university: '',
+    universityRegNumber: '',
+    classSection: '',
+    role: 'student',
+  });
+
+  // Per-field messages, so a duplicate registration number lands on the field that caused it
+  // instead of only in the banner. Keyed by the `field` the server names on a 409.
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Email verification pending state
   const [isVerificationPending, setIsVerificationPending] = useState(false);
@@ -72,6 +97,7 @@ export default function AuthPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
     setLoading(true);
     try {
       if (isLogin) {
@@ -97,20 +123,9 @@ export default function AuthPage() {
       }
     } catch (err) {
       setError(err.message || t('Authentication failed'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOAuthProfileSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const updatedUser = await syncOAuthProfile(profileFormData.name, profileFormData.role);
-      navigate(getDashboardRoute(updatedUser.role));
-    } catch (err) {
-      setError(err.message || t('Failed to update profile'));
+      // A duplicate registration number names its field, so the message also lands next to the
+      // input the student has to change rather than only in the banner above the form.
+      if (err.data?.field) setFieldErrors({ [err.data.field]: err.message });
     } finally {
       setLoading(false);
     }
@@ -154,16 +169,46 @@ export default function AuthPage() {
     }
   };
 
+  // Seed the completion form from whatever the account already knows. Google gives us a display
+  // name (and often its own given/family split), so pre-fill rather than making them retype it —
+  // and pre-split on the first space when only the joined name exists, as a suggestion they can
+  // correct. Runs only while the form is actually on screen, and only into fields still empty, so
+  // it can never overwrite something the student has started typing.
+  useEffect(() => {
+    if (!user?.needProfileSetup) return;
+    setProfileFormData((prev) => {
+      if (prev.firstName || prev.lastName) return prev;
+      const joined = String(user.name || '').trim();
+      const space = joined.indexOf(' ');
+      return {
+        ...prev,
+        firstName: user.first_name || (space === -1 ? joined : joined.slice(0, space)),
+        lastName: user.last_name || (space === -1 ? '' : joined.slice(space + 1).trim()),
+        mobileNumber: user.mobile_number || prev.mobileNumber,
+        university: user.university || prev.university,
+        universityRegNumber: user.university_reg_number || prev.universityRegNumber,
+        classSection: user.class_section || prev.classSection,
+        role: user.role || prev.role,
+      };
+    });
+  }, [user]);
+
   // Handle profile details sync (OAuth profile completion flow)
   const handleProfileComplete = async (e) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
     setLoading(true);
     try {
-      const updatedUser = await syncOAuthProfile({
-        name: profileFormData.name,
-        role: profileFormData.role,
-        avatarConfig: {}
+      // complete-profile, not sync-profile: sync-profile exists to migrate a legacy Supabase id
+      // and returns early for a user that already exists, so it can never update one.
+      const updatedUser = await completeProfile({
+        firstName: profileFormData.firstName,
+        lastName: profileFormData.lastName,
+        mobileNumber: profileFormData.mobileNumber,
+        university: profileFormData.university,
+        universityRegNumber: profileFormData.universityRegNumber,
+        classSection: profileFormData.classSection,
       });
       if (updatedUser.role === 'student') {
         navigate('/avatar-setup');
@@ -172,6 +217,7 @@ export default function AuthPage() {
       }
     } catch (err) {
       setError(err.message);
+      if (err.data?.field) setFieldErrors({ [err.data.field]: err.message });
     } finally {
       setLoading(false);
     }
@@ -423,14 +469,13 @@ export default function AuthPage() {
               <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{t('Just a couple quick details to finalize your account setup!')}</p>
             </div>
             <form onSubmit={handleProfileComplete} className="space-y-5">
-              <Input
-                id="profile-name"
-                type="text"
-                label={t('Full Name')}
-                placeholder={t('Enter your full name')}
-                value={profileFormData.name}
-                onChange={(e) => setProfileFormData({ ...profileFormData, name: e.target.value })}
-                required
+              <StudentProfileFields
+                idPrefix="profile"
+                value={profileFormData}
+                onChange={(patch) => setProfileFormData({ ...profileFormData, ...patch })}
+                fieldErrors={fieldErrors}
+                showIdentifiers={profileFormData.role === 'student'}
+                disabled={loading}
               />
 
               <div className="space-y-2 pt-1">
@@ -586,15 +631,14 @@ export default function AuthPage() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {!isLogin && (
-                <div className="animate-fadeIn">
-                  <Input
-                    id="name"
-                    type="text"
-                    label={t('Full Name')}
-                    placeholder={t('Enter your full name')}
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required={!isLogin}
+                <div className="animate-fadeIn space-y-5">
+                  <StudentProfileFields
+                    idPrefix="signup"
+                    value={formData}
+                    onChange={(patch) => setFormData({ ...formData, ...patch })}
+                    fieldErrors={fieldErrors}
+                    showIdentifiers={formData.role === 'student'}
+                    disabled={loading}
                   />
                 </div>
               )}

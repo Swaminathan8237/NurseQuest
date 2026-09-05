@@ -94,7 +94,14 @@ export function AuthProvider({ children }) {
       const response = await authAPI.register({
         email: formData.email,
         password: formData.password,
-        name: formData.name,
+        // The server joins first + last back into users.name, which stays authoritative for the
+        // leaderboard, reports and the verification email.
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        mobileNumber: formData.mobileNumber,
+        university: formData.university,
+        universityRegNumber: formData.universityRegNumber,
+        classSection: formData.classSection,
         role: formData.role,
         avatarConfig: { ...formData.avatarConfig, gender: formData.gender }
       });
@@ -110,6 +117,19 @@ export function AuthProvider({ children }) {
       console.error('Registration failed:', err);
       throw err;
     }
+  };
+
+  // The one write path for the student profile fields after the account exists — used by the
+  // post-Google completion step and by ProfileCompletionGate. The server takes the user id from
+  // the verified cookie, so this can only ever write the caller's own row.
+  const completeProfile = async (fields) => {
+    const response = await authAPI.completeProfile(fields);
+    const finalUser = response.user || response;
+    // Merge rather than replace: the /me payload the app is running on also carries achievements
+    // and stats, which this narrower response does not, and dropping them would blank the
+    // dashboard behind the gate.
+    setUser((prev) => (prev ? { ...prev, ...finalUser } : finalUser));
+    return finalUser;
   };
 
   const syncOAuthProfile = async (formData) => {
@@ -152,7 +172,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, googleLogin, register, syncOAuthProfile, logout, updateAvatar, updatePreferences }}>
+    <AuthContext.Provider value={{ user, loading, login, googleLogin, register, syncOAuthProfile, completeProfile, logout, updateAvatar, updatePreferences }}>
       {children}
     </AuthContext.Provider>
   );

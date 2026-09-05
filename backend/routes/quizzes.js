@@ -9,6 +9,7 @@ const { getDB } = require('../db/init');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { parseQuizText, quizToText, FORMAT, normalize } = require('../utils/quizParser');
 const { PASS_PERCENT } = require('../utils/scoring');
+const { TIMER_MODES } = require('../utils/timing');
 
 const requireTeacherOrAdmin = (req, res, next) => {
   if (!req.user || (req.user.role !== 'teacher' && req.user.role !== 'admin')) {
@@ -54,6 +55,39 @@ function safeWriteMedia(category, extension, buffer) {
   return urlPrefix + safeName;
 }
 
+// ─── Timer Mode Normalizers ─────────────────────────────────────────
+// Timer settings arrive from the builder as free-form JSON, so each value is
+// clamped to something the players can actually run before it reaches the DB.
+
+function normalizeTimerMode(mode) {
+  return TIMER_MODES.includes(mode) ? mode : 'fixed';
+}
+
+function normalizeSeconds(value, { max = 7200 } = {}) {
+  const n = typeof value === 'string' ? parseInt(value, 10) : value;
+  if (typeof n !== 'number' || !Number.isFinite(n) || n <= 0) return null;
+  return Math.min(Math.round(n), max);
+}
+
+function normalizeTotalTime(value) {
+  return normalizeSeconds(value);
+}
+
+function normalizeQuestionTimeLimit(value) {
+  return normalizeSeconds(value, { max: 3600 });
+}
+
+/** Keep only positive per-type overrides; an empty config stores as NULL. */
+function serializeTypeTimeConfig(config) {
+  if (!config || typeof config !== 'object') return null;
+  const cleaned = {};
+  for (const [type, seconds] of Object.entries(config)) {
+    const normalized = normalizeSeconds(seconds, { max: 3600 });
+    if (normalized) cleaned[type] = normalized;
+  }
+  return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : null;
+}
+
 // ─── Shared Quiz Insert Function ────────────────────────────────────
 // Used by both POST / (manual create) and POST /import/confirm
 // Zero SQL duplication.
@@ -61,8 +95,8 @@ function safeWriteMedia(category, extension, buffer) {
 async function insertQuizWithQuestions(sql, userId, quizData, questions) {
   const quizId = uuidv4();
   await sql`
-    INSERT INTO quizzes (id, title, description, category, difficulty, unit, time_per_question, created_by, is_published)
-    VALUES (${quizId}, ${quizData.title}, ${quizData.description || ''}, ${quizData.category || 'General Knowledge'}, ${quizData.difficulty || 'medium'}, ${quizData.unit === null ? null : (quizData.unit || 1)}, ${quizData.timePerQuestion || 30}, ${userId}, ${quizData.isPublished ? 1 : 0})
+    INSERT INTO quizzes (id, title, description, category, difficulty, unit, time_per_question, timer_mode, total_time, type_time_config, created_by, is_published)
+    VALUES (${quizId}, ${quizData.title}, ${quizData.description || ''}, ${quizData.category || 'General Knowledge'}, ${quizData.difficulty || 'medium'}, ${quizData.unit === null ? null : (quizData.unit || 1)}, ${quizData.timePerQuestion || 30}, ${normalizeTimerMode(quizData.timerMode)}, ${normalizeTotalTime(quizData.totalTime)}, ${serializeTypeTimeConfig(quizData.typeTimeConfig)}, ${userId}, ${quizData.isPublished ? 1 : 0})
   `;
 
   if (questions && Array.isArray(questions) && questions.length > 0) {
@@ -71,8 +105,8 @@ async function insertQuizWithQuestions(sql, userId, quizData, questions) {
       if (!q || typeof q !== 'object') continue;
       const matchingPairsJson = q.matchingPairs && (Array.isArray(q.matchingPairs) ? q.matchingPairs.length > 0 : true) ? JSON.stringify(q.matchingPairs) : null;
       await sql`
-        INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs)
-        VALUES (${uuidv4()}, ${quizId}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1}, ${orderIndex}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
+        INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs, time_limit)
+        VALUES (${uuidv4()}, ${quizId}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1}, ${orderIndex}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson}, ${normalizeQuestionTimeLimit(q.timeLimit)})
       `;
       orderIndex++;
     }
@@ -433,6 +467,7 @@ router.get('/my-quizzes', authenticateToken, requireTeacherOrAdmin, async (req, 
         (SELECT COALESCE(AVG(score * 100.0 / NULLIF(total_points, 0)), 0) FROM quiz_attempts WHERE quiz_id = q.id) as avg_score
       FROM quizzes q
       WHERE q.created_by = ${req.user.id}
+        AND (q.is_live_draft = 0 OR q.is_live_draft IS NULL)
         ${req.user.role === 'teacher' ? sql`AND q.unit IS NULL` : sql``}
       ORDER BY q.created_at DESC
     `;
@@ -447,6 +482,47 @@ router.get('/my-quizzes', authenticateToken, requireTeacherOrAdmin, async (req, 
     res.json(quizzes);
   } catch (err) {
     console.error('Get my quizzes error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─── GET /hostable — Quizzes this user is allowed to host a live game from ───
+//
+// Deliberately separate from /my-quizzes, which several dashboards depend on. The rules here
+// mirror exactly what the two places that *authorise* hosting already enforce — the
+// `create-session` socket handler and POST /:id/live-clone below:
+//   admin   → any quiz, whoever created it (this is what makes the Admin → Unit "Live"
+//             button work; that list is unfiltered by creator).
+//   teacher → their own standalone quizzes only, identical to /my-quizzes today.
+// Same SELECT shape as /my-quizzes so the client needs no new field handling.
+
+router.get('/hostable', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
+  try {
+    const sql = getDB();
+    const quizzesResult = await sql`
+      SELECT q.*,
+        (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) as question_count,
+        (SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = q.id) as attempt_count,
+        (SELECT COALESCE(AVG(score * 100.0 / NULLIF(total_points, 0)), 0) FROM quiz_attempts WHERE quiz_id = q.id) as avg_score
+      FROM quizzes q
+      WHERE (q.is_live_draft = 0 OR q.is_live_draft IS NULL)
+        AND (q.is_pending_deletion = 0 OR q.is_pending_deletion IS NULL)
+        ${req.user.role === 'teacher'
+          ? sql`AND q.created_by = ${req.user.id} AND q.unit IS NULL`
+          : sql``}
+      ORDER BY q.unit ASC NULLS FIRST, q.created_at DESC
+    `;
+
+    const quizzes = quizzesResult.map(q => ({
+      ...q,
+      question_count: parseInt(q.question_count || 0, 10),
+      attempt_count: parseInt(q.attempt_count || 0, 10),
+      avg_score: parseFloat(q.avg_score || 0),
+    }));
+
+    res.json(quizzes);
+  } catch (err) {
+    console.error('Get hostable quizzes error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -468,6 +544,7 @@ router.get('/', authenticateToken, async (req, res) => {
       FROM quizzes q JOIN users u ON q.created_by = u.id
       WHERE q.is_published = 1
         AND (q.is_pending_deletion = 0 OR q.is_pending_deletion IS NULL)
+        AND (q.is_live_draft = 0 OR q.is_live_draft IS NULL)
         AND (${unitVal}::integer IS NULL OR q.unit = ${unitVal})
         AND (${catVal}::text IS NULL OR q.category = ${catVal})
         AND (${diffVal}::text IS NULL OR q.difficulty = ${diffVal})
@@ -748,13 +825,14 @@ async function generateDocxBuffer(title, textContent) {
 
 router.post('/', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
   try {
-    const { title, description, category, difficulty, unit, timePerQuestion, questions } = req.body;
+    const { title, description, category, difficulty, unit, timePerQuestion, timerMode, totalTime, typeTimeConfig, questions } = req.body;
     const sql = getDB();
 
     const finalUnit = req.user.role === 'admin' ? unit : null;
 
     const quiz = await insertQuizWithQuestions(sql, req.user.id, {
-      title, description, category, difficulty, unit: finalUnit, timePerQuestion, isPublished: false,
+      title, description, category, difficulty, unit: finalUnit, timePerQuestion,
+      timerMode, totalTime, typeTimeConfig, isPublished: false,
     }, questions);
 
     res.status(201).json(quiz);
@@ -768,7 +846,7 @@ router.post('/', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
 
 router.put('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
   try {
-    const { title, description, category, difficulty, unit, timePerQuestion, isPublished, questions } = req.body;
+    const { title, description, category, difficulty, unit, timePerQuestion, timerMode, totalTime, typeTimeConfig, isPublished, questions } = req.body;
     const sql = getDB();
 
     const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id}`;
@@ -800,6 +878,9 @@ router.put('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res) =>
             difficulty = ${difficulty || quiz.difficulty},
             unit = ${finalUnit},
             time_per_question = ${timePerQuestion || quiz.time_per_question},
+            timer_mode = ${timerMode !== undefined ? normalizeTimerMode(timerMode) : (quiz.timer_mode || 'fixed')},
+            total_time = ${totalTime !== undefined ? normalizeTotalTime(totalTime) : quiz.total_time},
+            type_time_config = ${typeTimeConfig !== undefined ? serializeTypeTimeConfig(typeTimeConfig) : quiz.type_time_config},
             is_published = ${isPublished !== undefined ? (isPublished ? 1 : 0) : quiz.is_published}
         WHERE id = ${req.params.id}
       `;
@@ -821,8 +902,8 @@ router.put('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res) =>
           if (!q || typeof q !== 'object') continue;
           const matchingPairsJson = q.matchingPairs && q.matchingPairs.length > 0 ? JSON.stringify(q.matchingPairs) : null;
           await sql`
-            INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs)
-            VALUES (${uuidv4()}, ${req.params.id}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1}, ${orderIndex}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson})
+            INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs, time_limit)
+            VALUES (${uuidv4()}, ${req.params.id}, ${q.type}, ${q.questionText}, ${q.mediaUrl || null}, ${JSON.stringify(q.options || [])}, ${q.correctAnswer}, ${q.explanation || ''}, ${q.points || 1}, ${orderIndex}, ${q.sliderMin || null}, ${q.sliderMax || null}, ${q.sliderStep || 1}, ${q.sliderUnit || null}, ${matchingPairsJson}, ${normalizeQuestionTimeLimit(q.timeLimit)})
           `;
           orderIndex++;
         }
@@ -832,6 +913,64 @@ router.put('/:id', authenticateToken, requireTeacherOrAdmin, async (req, res) =>
     res.json({ success: true });
   } catch (err) {
     console.error('Update quiz error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─── POST /:id/live-clone — Throwaway copy for one live game ────────
+// Hosting a live game goes through the Quiz Editor so the host can make
+// last-minute changes. Those changes must never reach the original quiz, so the
+// host edits this clone instead. It is flagged is_live_draft, which hides it from
+// every quiz listing, and socket.js deletes it once the game finishes.
+// Ownership mirrors the 'create-session' checks in socket.js.
+
+router.post('/:id/live-clone', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
+  try {
+    const sql = getDB();
+    const quizzes = await sql`SELECT * FROM quizzes WHERE id = ${req.params.id}`;
+    const source = quizzes[0];
+    if (!source) return res.status(404).json({ error: 'Quiz not found' });
+
+    if (req.user.role === 'teacher') {
+      if (source.created_by !== req.user.id) {
+        return res.status(403).json({ error: 'Access denied. You do not own this quiz.' });
+      }
+      if (source.unit !== null) {
+        return res.status(403).json({ error: 'Access denied. Teachers cannot host unit-based quizzes.' });
+      }
+    }
+
+    if (source.is_live_draft) {
+      return res.status(400).json({ error: 'This quiz is already a live draft.' });
+    }
+
+    const sourceQuestions = await sql`
+      SELECT * FROM questions WHERE quiz_id = ${req.params.id} ORDER BY order_index
+    `;
+
+    const cloneId = uuidv4();
+
+    await sql.begin(async (tx) => {
+      // unit is dropped so the clone can never be picked up by unit-scoped queries. It is kept in
+      // source_unit purely so socket.js can snapshot it onto live_sessions — live analytics needs
+      // to know which unit a game belonged to, and by report time both the clone and this row
+      // are gone.
+      await tx`
+        INSERT INTO quizzes (id, title, description, category, difficulty, unit, source_unit, time_per_question, timer_mode, total_time, type_time_config, created_by, is_published, is_live_draft)
+        VALUES (${cloneId}, ${source.title}, ${source.description}, ${source.category}, ${source.difficulty}, ${null}, ${source.unit ?? null}, ${source.time_per_question}, ${source.timer_mode || 'fixed'}, ${source.total_time}, ${source.type_time_config}, ${req.user.id}, ${0}, ${1})
+      `;
+
+      for (const q of sourceQuestions) {
+        await tx`
+          INSERT INTO questions (id, quiz_id, type, question_text, media_url, options, correct_answer, explanation, points, order_index, slider_min, slider_max, slider_step, slider_unit, matching_pairs, time_limit)
+          VALUES (${uuidv4()}, ${cloneId}, ${q.type}, ${q.question_text}, ${q.media_url}, ${q.options}, ${q.correct_answer}, ${q.explanation}, ${q.points}, ${q.order_index}, ${q.slider_min}, ${q.slider_max}, ${q.slider_step}, ${q.slider_unit}, ${q.matching_pairs}, ${q.time_limit})
+        `;
+      }
+    });
+
+    res.status(201).json({ id: cloneId, sourceQuizId: req.params.id, title: source.title });
+  } catch (err) {
+    console.error('Create live clone error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

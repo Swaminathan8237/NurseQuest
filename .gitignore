@@ -43,3 +43,26 @@ frontend/testsprite_tests/tmp/
 frontend/build_log.txt
 
 .superpowers/
+
+# Local verification scratch — one-off scripts and standalone preview harnesses
+# used to check work against a real database/browser. Never part of a deploy.
+backend/__verify_migration.js
+frontend/dev-preview.html
+frontend/src/dev-preview.jsx
+.verify/
+
+# Machine-local editor/agent state. These hold absolute paths and per-machine
+# permission grants, so sharing them across checkouts causes more churn than help.
+# Note: .claude_backup/agents/*.md stays tracked — those are shared definitions,
+# so only the per-machine files inside are excluded.
+.claude/
+.claude_backup/settings.local.json
+.claude_backup/scheduled_tasks.lock
+.vscode_backup/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

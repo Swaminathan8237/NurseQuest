@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router';
 import { quizAPI } from '../api';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
+import { TIMER_MODES, parseTypeTimeConfig, resolveTotalSeconds, resolveQuestionSeconds, isWholeQuizTimer, formatSeconds } from '../utils/timing';
 
 /* ─── Captcha Bounding-Box Editor (Teacher draws the correct region) ─── */
 function CaptchaBoundingBoxEditor({ imageUrl, value, onChange }) {
@@ -133,7 +134,7 @@ function CaptchaBoundingBoxEditor({ imageUrl, value, onChange }) {
     <div className="space-y-3">
       <div
         ref={containerRef}
-        className="relative rounded-xl overflow-hidden border-2 border-outline-variant/30 bg-surface-container-highest cursor-crosshair select-none touch-none"
+        className="relative rounded-xl overflow-hidden border-2 border-brand-elevated bg-brand-surface cursor-crosshair select-none touch-none"
         onMouseDown={handlePointerDown}
         onMouseMove={handlePointerMove}
         onMouseUp={handlePointerUp}
@@ -198,7 +199,7 @@ function CaptchaBoundingBoxEditor({ imageUrl, value, onChange }) {
         {/* Instruction overlay when no box */}
         {!box && imgLoaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
-            <div className="bg-surface/80 backdrop-blur-sm px-6 py-3 rounded-xl border border-outline-variant/30 text-center">
+            <div className="bg-surface/80 backdrop-blur-sm px-6 py-3 rounded-xl border-2 border-brand-elevated text-center">
               <span className="material-symbols-outlined text-primary text-3xl block mb-1">center_focus_strong</span>
               <p className="text-sm font-medium text-on-surface">Click & drag to select the correct region</p>
             </div>
@@ -236,16 +237,38 @@ const Q_TYPES = [
   { value: 'captcha', label: 'Image Captcha', icon: 'center_focus_strong' },
 ];
 
+// What "Default time per question" actually does in each timer mode. This lives in helper
+// text so the field's label can stay put instead of renaming itself based on a control the
+// user may not have reached yet.
+const DEFAULT_TIME_ROLE = {
+  fixed: 'Every question in this quiz uses this timer.',
+  whole_quiz: 'Only used to estimate the total when Total Quiz Time is left blank.',
+  per_question: 'Fallback for any question you leave blank in its own editor.',
+  per_type: 'Fallback for any question type you leave blank below.',
+};
+
 export default function QuizBuilder() {
   const { user } = useAuth();
   const { id: editId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [saving, setSaving] = useState(false);
-  const [quiz, setQuiz] = useState({ title: '', description: '', category: 'Patient Care', difficulty: 'medium', unit: null, timePerQuestion: 30 });
+  const [quiz, setQuiz] = useState({ title: '', description: '', category: 'Patient Care', difficulty: 'medium', unit: null, timePerQuestion: 30, timerMode: 'fixed', totalTime: null, typeTimeConfig: {} });
   const [questions, setQuestions] = useState([createEmptyQuestion()]);
   const [activeQ, setActiveQ] = useState(0);
   const [uploading, setUploading] = useState(false);
+
+  // Settings are set once, question editing is continuous — so a new quiz opens on
+  // settings and an existing one opens straight into its questions.
+  const [activeTab, setActiveTab] = useState(() => (editId ? 'questions' : 'settings'));
+
+  // Live-edit mode: the host arrived here from the Live lobby and is editing a
+  // throwaway copy of the quiz. Read from the URL (not just router state) so a page
+  // refresh mid-edit does not silently turn this into a normal quiz edit.
+  const isLiveEdit = Boolean(editId) && (
+    location.state?.liveEdit === true ||
+    new URLSearchParams(location.search).get('live') === '1'
+  );
 
   // Upload media file to server
   async function handleMediaUpload(questionIndex, file) {
@@ -278,7 +301,10 @@ export default function QuizBuilder() {
           category: data.category || 'Patient Care',
           difficulty: data.difficulty || 'medium',
           unit: data.unit !== undefined ? data.unit : 1,
-          timePerQuestion: data.time_per_question || 30
+          timePerQuestion: data.time_per_question || 30,
+          timerMode: data.timer_mode || 'fixed',
+          totalTime: data.total_time || null,
+          typeTimeConfig: parseTypeTimeConfig(data.type_time_config)
         });
         if (data.questions && data.questions.length > 0) {
           setQuestions(data.questions.map(q => ({
@@ -294,7 +320,8 @@ export default function QuizBuilder() {
             sliderMax: q.slider_max !== null ? q.slider_max : 100,
             sliderStep: q.slider_step !== null ? q.slider_step : 1,
             sliderUnit: q.slider_unit || '',
-            matchingPairs: q.matching_pairs && q.matching_pairs.length > 0 ? q.matching_pairs : ['', '', '', '']
+            matchingPairs: q.matching_pairs && q.matching_pairs.length > 0 ? q.matching_pairs : ['', '', '', ''],
+            timeLimit: q.time_limit || null
           })));
         }
       }).catch(err => {
@@ -306,7 +333,7 @@ export default function QuizBuilder() {
 
 
   function createEmptyQuestion() {
-    return { type: 'mcq', questionText: '', mediaUrl: '', options: ['', '', '', ''], correctAnswer: '', explanation: '', points: 1, sliderMin: 0, sliderMax: 100, sliderStep: 1, sliderUnit: '', matchingPairs: ['', '', '', ''] };
+    return { type: 'mcq', questionText: '', mediaUrl: '', options: ['', '', '', ''], correctAnswer: '', explanation: '', points: 1, sliderMin: 0, sliderMax: 100, sliderStep: 1, sliderUnit: '', matchingPairs: ['', '', '', ''], timeLimit: null };
   }
 
   const updateQuestion = (i, field, value) => {
@@ -337,12 +364,44 @@ export default function QuizBuilder() {
       const data = { ...quiz, questions, isPublished: publish };
       if (editId) await quizAPI.update(editId, data);
       else await quizAPI.create(data);
-      navigate('/teacher');
+      // Live-edit sends the host back to the lobby with this copy ready to launch,
+      // rather than to the dashboard where the throwaway quiz is deliberately hidden.
+      if (isLiveEdit) navigate('/live', { state: { quizId: editId, liveDraftReady: true } });
+      else navigate('/teacher');
     } catch (err) { console.error(err); alert(err.message); }
     finally { setSaving(false); }
   };
 
   const q = questions[activeQ] || questions[0];
+  const totalQuizSeconds = resolveTotalSeconds(quiz, questions);
+  const timerModeMeta = TIMER_MODES.find(m => m.value === quiz.timerMode);
+
+  // ─── Time Budget bar ───
+  // One proportional segment per question. Every number below comes from utils/timing.js
+  // so the bar can never disagree with the clock the player actually sees. whole_quiz has
+  // no per-question budget, so it renders one undivided segment instead of faking a split.
+  const wholeQuizTimer = isWholeQuizTimer(quiz);
+  const questionSeconds = wholeQuizTimer ? [] : questions.map(qq => resolveQuestionSeconds(quiz, qq));
+  const budgetTotal = questionSeconds.reduce((sum, s) => sum + s, 0);
+
+  const setTypeTime = (type, value) => {
+    const seconds = parseInt(value, 10);
+    setQuiz(prev => {
+      const next = { ...parseTypeTimeConfig(prev.typeTimeConfig) };
+      if (Number.isFinite(seconds) && seconds > 0) next[type] = seconds;
+      else delete next[type];
+      return { ...prev, typeTimeConfig: next };
+    });
+  };
+
+  // per_type mode only lists the types this quiz actually uses, so the rows follow the
+  // questions as they are added, deleted, or retyped. Driven off Q_TYPES rather than the
+  // raw question types so a new entry in Q_TYPES shows up here automatically, and an
+  // unrecognised type never renders a row with no label.
+  const usedQTypes = useMemo(
+    () => Q_TYPES.filter(t => questions.some(q => q.type === t.value)),
+    [questions]
+  );
 
   return (
     <div className="min-h-screen bg-background text-on-surface font-body flex flex-col overflow-hidden">
@@ -362,15 +421,159 @@ export default function QuizBuilder() {
                 <span>/</span>
                 <span onClick={() => navigate('/teacher')} className="cursor-pointer hover:text-primary transition-colors">Dashboard</span>
                 <span>/</span>
-                <span className="text-primary">{editId ? 'Edit Quiz' : 'Create Quiz'}</span>
+                <span className="text-primary">{isLiveEdit ? 'Live Game Setup' : (editId ? 'Edit Quiz' : 'Create Quiz')}</span>
               </nav>
               <h2 className="text-3xl font-headline font-extrabold text-on-surface tracking-tight flex items-center gap-3">
-                <span className="text-3xl">✏️</span> {editId ? 'Edit Quiz' : 'Create Quiz'}
+                <span className="text-3xl">{isLiveEdit ? '🎮' : '✏️'}</span> {isLiveEdit ? 'Prepare Live Game' : (editId ? 'Edit Quiz' : 'Create Quiz')}
               </h2>
             </div>
 
+            {isLiveEdit && (
+              <div className="clay-card p-5 border-l-4 border-primary flex items-start gap-4">
+                <span className="material-symbols-outlined text-primary text-3xl">bolt</span>
+                <div className="space-y-1">
+                  <p className="font-headline font-bold text-on-surface">This is a live-game-only copy</p>
+                  <p className="text-sm text-slate-400 leading-relaxed">
+                    Tweak anything you like — questions, answers, timers. These changes apply to this
+                    live game only and will never touch the original quiz. The copy is discarded once
+                    the game ends.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Orientation strip ──────────────────────────────────────────────
+                Summary + time budget sit ABOVE the tabs and are never editable, so
+                switching tabs can't hide the state you need for the next decision. */}
+            <div className="clay-card p-6 space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-label font-semibold text-slate-400 uppercase tracking-wider mb-1">Quiz</p>
+                  <p className="font-headline font-bold text-xl text-on-surface truncate">
+                    {quiz.title || <span className="italic font-normal text-slate-500">Untitled quiz</span>}
+                  </p>
+                </div>
+                {/* No shrink-0 here: a non-shrinking flex item is sized to its max-content
+                    width, so the wrap below would never fire and the last badge would be
+                    clipped by the card at narrow widths. Letting it shrink to min-content
+                    (its widest single badge) is what makes the wrap actually happen. */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="badge">
+                    <span className="material-symbols-outlined text-[14px]">format_list_bulleted</span>
+                    {questions.length} {questions.length === 1 ? 'question' : 'questions'}
+                  </span>
+                  <span className="badge">
+                    <span className="material-symbols-outlined text-[14px]">timer</span>
+                    {timerModeMeta?.label ?? 'Timer'}
+                  </span>
+                  <span className="badge">
+                    <span className="material-symbols-outlined text-[14px]">schedule</span>
+                    {formatSeconds(totalQuizSeconds)}
+                  </span>
+                </div>
+              </div>
+
+              {/* ─── Time Budget bar ───
+                  One proportional segment per question: width = that question's share of
+                  the total. Doubles as navigation. Every number comes from utils/timing.js. */}
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
+                  <p className="text-[11px] font-label font-semibold text-slate-400 uppercase tracking-wider">Time budget</p>
+                  <p className="text-[11px] text-slate-500">
+                    {wholeQuizTimer ? 'One countdown across the whole quiz' : 'Click a segment to jump to that question'}
+                  </p>
+                </div>
+                <div
+                  className="flex w-full h-9 gap-[2px] rounded-lg overflow-hidden"
+                  style={{ border: 'var(--border-ink)', background: 'var(--bg-input)', boxShadow: 'var(--shadow-hard-sm)' }}
+                >
+                  {wholeQuizTimer ? (
+                    /* No per-question budget exists in this mode, so the bar tells the truth
+                       about the mode rather than faking a breakdown. */
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('settings')}
+                      title={`Whole quiz — ${formatSeconds(totalQuizSeconds)}`}
+                      className="relative flex-1 flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest"
+                      style={{ background: 'var(--primary)', color: '#ffffff' }}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">hourglass_top</span>
+                      Whole quiz · {formatSeconds(totalQuizSeconds)}
+                    </button>
+                  ) : (
+                    questionSeconds.map((secs, i) => {
+                      const isActive = i === activeQ;
+                      const share = budgetTotal > 0 ? (secs / budgetTotal) * 100 : 100 / questionSeconds.length;
+                      const typeLabel = Q_TYPES.find(t => t.value === questions[i]?.type)?.label ?? 'Question';
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => { setActiveQ(i); setActiveTab('questions'); }}
+                          title={`Q${i + 1} · ${typeLabel} · ${formatSeconds(secs)}`}
+                          aria-label={`Question ${i + 1}, ${typeLabel}, ${formatSeconds(secs)}`}
+                          aria-current={isActive ? 'true' : undefined}
+                          className="relative min-w-[8px] flex items-center justify-center overflow-hidden"
+                          style={{
+                            flex: `1 1 ${share}%`,
+                            outline: isActive ? 'var(--border-ink)' : 'none',
+                            outlineOffset: '-2px',
+                          }}
+                        >
+                          {/* Tint lives on its own layer so the label stays at full opacity. */}
+                          <span
+                            aria-hidden="true"
+                            className="absolute inset-0"
+                            style={{ background: 'var(--primary)', opacity: isActive ? 1 : 0.45 + (i % 4) * 0.13 }}
+                          ></span>
+                          {share > 6 && (
+                            <span
+                              className="relative text-[10px] font-black"
+                              style={{ color: isActive ? '#ffffff' : 'var(--text-primary)' }}
+                            >
+                              {i + 1}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ─── Tabs ─── */}
+            <div role="tablist" aria-label="Quiz builder sections" className="flex flex-wrap gap-3">
+              {[
+                { id: 'questions', label: 'Questions', icon: 'quiz', count: questions.length },
+                { id: 'settings', label: 'Quiz settings', icon: 'tune', count: undefined },
+              ].map(t => {
+                const on = activeTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    id={`tab-${t.id}`}
+                    aria-selected={on}
+                    aria-controls={`panel-${t.id}`}
+                    onClick={() => setActiveTab(t.id)}
+                    className={`clay-button px-5 py-2.5 text-sm uppercase tracking-widest ${on ? 'clay-button-primary' : ''}`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">{t.icon}</span>
+                    {t.label}
+                    {t.count !== undefined && (
+                      <span className={`ml-1 px-2 py-0.5 rounded-full text-[11px] font-black ${on ? 'bg-white/25 text-white' : 'bg-brand-elevated text-primary'}`}>
+                        {t.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Quiz Details Form */}
-            <div className="clay-card p-8 space-y-6">
+            <div id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden={activeTab !== 'settings'} className="clay-card p-8 space-y-6">
               <h3 className="text-xl font-headline font-bold text-primary mb-4 border-b border-brand-elevated/40 pb-2">Quiz Settings</h3>
               <div className="space-y-4">
                 <div>
@@ -392,7 +595,7 @@ export default function QuizBuilder() {
                     placeholder="Enter quiz description..."
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-label font-semibold text-slate-400 mb-1 uppercase tracking-wider">Category</label>
                     <select 
@@ -409,9 +612,9 @@ export default function QuizBuilder() {
                   </div>
                   <div>
                     <label className="block text-sm font-label font-semibold text-slate-400 mb-1 uppercase tracking-wider">Difficulty</label>
-                    <select 
+                    <select
                       className="input cursor-pointer"
-                      value={quiz.difficulty} 
+                      value={quiz.difficulty}
                       onChange={e => setQuiz({...quiz, difficulty: e.target.value})}
                     >
                       <option value="easy">Easy</option>
@@ -419,15 +622,90 @@ export default function QuizBuilder() {
                       <option value="hard">Hard</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-label font-semibold text-slate-400 mb-1 uppercase tracking-wider">Time (Secs)</label>
-                    <input 
-                      className="input" 
-                      type="number" min="5" max="120" 
-                      value={quiz.timePerQuestion} 
-                      onChange={e => setQuiz({...quiz, timePerQuestion: parseInt(e.target.value)})} 
-                    />
+                </div>
+
+                {/* ─── Timer Mode ─── */}
+                <div className="rounded-xl bg-brand-surface shadow-clay-sunken p-5 space-y-4">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <label className="block text-sm font-label font-semibold text-slate-400 uppercase tracking-wider">Timer Mode</label>
+                    <span className="text-xs font-mono text-primary">
+                      Est. total {formatSeconds(totalQuizSeconds)}
+                    </span>
                   </div>
+
+                  <select
+                    className="input cursor-pointer"
+                    value={quiz.timerMode}
+                    onChange={e => setQuiz({ ...quiz, timerMode: e.target.value })}
+                  >
+                    {TIMER_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {timerModeMeta?.hint}
+                  </p>
+
+                  {/* Sits BELOW the mode selector on purpose: the control that governs this
+                      field's meaning is now read first, so the label can stop mutating. */}
+                  <div>
+                    <label className="block text-sm font-label font-semibold text-slate-400 mb-1 uppercase tracking-wider">Default time per question</label>
+                    <input
+                      className="input"
+                      type="number" min="5" max="120"
+                      value={quiz.timePerQuestion}
+                      onChange={e => setQuiz({ ...quiz, timePerQuestion: parseInt(e.target.value) })}
+                    />
+                    <p className="text-xs text-slate-500 mt-1">{DEFAULT_TIME_ROLE[quiz.timerMode] ?? DEFAULT_TIME_ROLE.fixed}</p>
+                  </div>
+
+                  {quiz.timerMode === 'whole_quiz' && (
+                    <div>
+                      <label className="block text-sm font-label font-semibold text-slate-400 mb-1 uppercase tracking-wider">Total Quiz Time (Secs)</label>
+                      <input
+                        className="input"
+                        type="number" min="10" max="7200"
+                        value={quiz.totalTime ?? ''}
+                        placeholder={String(questions.length * (quiz.timePerQuestion || 30))}
+                        onChange={e => setQuiz({ ...quiz, totalTime: e.target.value === '' ? null : parseInt(e.target.value, 10) })}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        Leave blank to use {questions.length} x {quiz.timePerQuestion || 30}s.
+                      </p>
+                    </div>
+                  )}
+
+                  {quiz.timerMode === 'per_question' && (
+                    <p className="text-xs text-slate-500">
+                      Set each question&apos;s timer in its editor on the right. Questions left blank
+                      fall back to {quiz.timePerQuestion || 30}s.
+                    </p>
+                  )}
+
+                  {quiz.timerMode === 'per_type' && (
+                    usedQTypes.length === 0 ? (
+                      <p className="text-xs text-slate-500">
+                        Add a question first — each type used in this quiz gets its own timer here.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3">
+                        {usedQTypes.map(t => (
+                          /* title = hover tooltip: the sidebar is narrow enough that the label
+                             often truncates, so the icon alone has to be identifiable. */
+                          <label key={t.value} title={t.label} className="flex items-center gap-3">
+                            <span className="material-symbols-outlined text-[18px] text-slate-400 shrink-0">{t.icon}</span>
+                            <span className="flex-1 text-sm text-slate-300 truncate">{t.label}</span>
+                            <input
+                              className="input-sm w-24 shrink-0"
+                              type="number" min="1" max="3600"
+                              value={parseTypeTimeConfig(quiz.typeTimeConfig)[t.value] ?? ''}
+                              placeholder={String(quiz.timePerQuestion || 30)}
+                              onChange={e => setTypeTime(t.value, e.target.value)}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    )
+                  )}
                 </div>
 
                 {/* Unit Selector */}
@@ -453,7 +731,7 @@ export default function QuizBuilder() {
               </div>
             </div>
             {/* Question Editor */}
-            <div className="clay-card p-8 space-y-6 relative overflow-hidden">
+            <div id="panel-questions" role="tabpanel" aria-labelledby="tab-questions" hidden={activeTab !== 'questions'} className="clay-card p-8 space-y-6 relative overflow-hidden">
               <div className="absolute -top-20 -right-20 w-64 h-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none"></div>
               
               <div className="flex justify-between items-center mb-4 border-b border-brand-elevated/40 pb-3">
@@ -470,18 +748,21 @@ export default function QuizBuilder() {
                 </div>
               </div>
 
-              {/* Question Types Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-5 xl:grid-cols-9 gap-3 mb-6">
+              {/* Question type picker — a wrapping row of chips that size to their own labels,
+                  so all 9 types fit at any width without a breakpoint that strands the last row. */}
+              <div className="flex flex-wrap gap-2 mb-6">
                 {Q_TYPES.map(t => {
                   const isActive = q.type === t.value;
                   return (
-                    <button 
-                      key={t.value} 
-                      className={`rounded-xl py-3 flex flex-col items-center justify-center gap-1 transition-all border-2 ${isActive ? 'bg-brand-surface shadow-clay-sunken border-primary text-primary' : 'bg-brand-surface border-transparent text-slate-400 hover:scale-[1.02]'}`}
+                    <button
+                      key={t.value}
+                      type="button"
+                      aria-pressed={isActive}
+                      className={`clay-button px-3.5 py-2 text-sm normal-case ${isActive ? 'clay-button-primary' : ''}`}
                       onClick={() => updateQuestion(activeQ, 'type', t.value)}
                     >
-                      <span className="material-symbols-outlined text-[20px]">{t.icon}</span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-center px-1">{t.label}</span>
+                      <span className="material-symbols-outlined text-[18px]">{t.icon}</span>
+                      {t.label}
                     </button>
                   );
                 })}
@@ -578,14 +859,14 @@ export default function QuizBuilder() {
 
                     {/* OR use URL */}
                     <div className="flex items-center gap-3 mt-3">
-                      <div className="h-px flex-1 bg-outline-variant/20"></div>
+                      <div className="h-px flex-1 bg-brand-elevated"></div>
                       <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">or paste URL</span>
-                      <div className="h-px flex-1 bg-outline-variant/20"></div>
+                      <div className="h-px flex-1 bg-brand-elevated"></div>
                     </div>
-                    <div className="flex items-center gap-3 bg-surface-container-highest border border-outline-variant/30 rounded-lg p-2 pl-4 mt-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 transition-all">
-                      <span className="material-symbols-outlined text-slate-400 text-[18px]">link</span>
+                    <div className="field-row mt-2">
+                      <span className="material-symbols-outlined text-slate-400 text-[18px] shrink-0">link</span>
                       <input
-                        className="bg-transparent border-none text-sm text-on-surface flex-1 outline-none"
+                        className="input-borderless"
                         value={
                           q.mediaUrl && q.mediaUrl.includes('.supabase.co/storage/')
                             ? q.mediaUrl.split('/').pop()
@@ -619,13 +900,13 @@ export default function QuizBuilder() {
                         const colors = ['bg-primary', 'bg-[#71d7cd]', 'bg-amber-400', 'bg-error'];
                         const shadows = ['shadow-[0_0_8px_rgba(221,183,255,0.6)]', 'shadow-[0_0_8px_rgba(113,215,205,0.6)]', 'shadow-[0_0_8px_rgba(251,191,36,0.6)]', 'shadow-[0_0_8px_rgba(255,180,171,0.6)]'];
                         return (
-                          <div key={oi} className="flex items-center gap-3 bg-surface-container-high rounded-lg p-3 pl-4 border border-outline-variant/20 focus-within:border-primary/50 transition-colors">
-                            <div className={`w-3 h-3 rounded-full ${colors[oi % 4]} ${shadows[oi % 4]}`}></div>
-                            <input 
-                              className="bg-transparent border-none text-sm text-on-surface flex-1 outline-none" 
-                              value={opt} 
-                              onChange={e => updateOption(activeQ, oi, e.target.value)} 
-                              placeholder={`Option ${oi+1}`} 
+                          <div key={oi} className="field-row">
+                            <div className={`w-3 h-3 rounded-full shrink-0 ${colors[oi % 4]} ${shadows[oi % 4]}`}></div>
+                            <input
+                              className="input-borderless"
+                              value={opt}
+                              onChange={e => updateOption(activeQ, oi, e.target.value)}
+                              placeholder={`Option ${oi+1}`}
                             />
                           </div>
                         );
@@ -638,9 +919,9 @@ export default function QuizBuilder() {
                 {q.type === 'jumbled_letters' && (
                   <div>
                     <label className="block text-sm font-label font-semibold text-slate-400 mb-2 uppercase tracking-wider">Correct Word (Answer)</label>
-                    <input 
-                      className="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-3 text-on-surface font-body font-bold text-lg uppercase tracking-widest focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all outline-none" 
-                      value={q.correctAnswer} 
+                    <input
+                      className="input font-bold text-lg uppercase tracking-widest"
+                      value={q.correctAnswer}
                       onChange={e => {
                         const word = e.target.value.toUpperCase();
                         updateQuestion(activeQ, 'correctAnswer', word);
@@ -662,11 +943,11 @@ export default function QuizBuilder() {
                     <p className="text-xs text-slate-500 mb-3">Students see these as shuffled cards to drag into numbered containers — the order you enter here is the answer key.</p>
                     <div className="space-y-3">
                       {(q.options || ['']).map((step, si) => (
-                        <div key={si} className="flex items-center gap-3 bg-surface-container-high rounded-lg p-3 pl-4 border border-outline-variant/20">
-                          <span className="font-mono font-bold text-slate-500">{si+1}</span>
-                          <input 
-                            className="bg-transparent border-none text-sm text-on-surface flex-1 outline-none" 
-                            value={step} 
+                        <div key={si} className="field-row">
+                          <span className="font-mono font-bold text-slate-500 shrink-0">{si+1}</span>
+                          <input
+                            className="input-borderless"
+                            value={step}
                             onChange={e => {
                               const opts = [...(q.options || [])]; opts[si] = e.target.value;
                               updateQuestion(activeQ, 'options', opts);
@@ -675,7 +956,7 @@ export default function QuizBuilder() {
                             placeholder={`Step ${si+1}`} 
                           />
                           <button 
-                            className="text-slate-500 hover:text-error transition-colors p-1" 
+                            className="text-slate-500 hover:text-error transition-colors p-1 shrink-0"
                             onClick={() => {
                               const opts = q.options.filter((_,i)=>i!==si);
                               updateQuestion(activeQ, 'options', opts);
@@ -687,7 +968,7 @@ export default function QuizBuilder() {
                         </div>
                       ))}
                       <button 
-                        className="w-full py-3 border border-dashed border-outline-variant/50 rounded-lg text-slate-400 font-semibold hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center justify-center gap-2" 
+                        className="w-full py-3 border-2 border-dashed border-brand-elevated rounded-xl text-slate-400 font-semibold hover:text-primary hover:border-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
                         onClick={() => {
                           // correctAnswer must be rewritten alongside options: grading requires
                           // both to be the same length, so a step added but never typed into
@@ -711,7 +992,7 @@ export default function QuizBuilder() {
                       <div>
                         <label className="block text-xs font-label text-slate-500 mb-1">Min Value</label>
                         <input 
-                          className="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-3 text-on-surface font-body focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all outline-none" 
+                          className="input" 
                           type="number" 
                           value={q.sliderMin} 
                           onChange={e => updateQuestion(activeQ, 'sliderMin', parseFloat(e.target.value) || 0)} 
@@ -721,7 +1002,7 @@ export default function QuizBuilder() {
                       <div>
                         <label className="block text-xs font-label text-slate-500 mb-1">Max Value</label>
                         <input 
-                          className="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-3 text-on-surface font-body focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all outline-none" 
+                          className="input" 
                           type="number" 
                           value={q.sliderMax} 
                           onChange={e => updateQuestion(activeQ, 'sliderMax', parseFloat(e.target.value) || 100)} 
@@ -731,7 +1012,7 @@ export default function QuizBuilder() {
                       <div>
                         <label className="block text-xs font-label text-slate-500 mb-1">Step</label>
                         <input 
-                          className="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-3 text-on-surface font-body focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all outline-none" 
+                          className="input" 
                           type="number" 
                           value={q.sliderStep} 
                           onChange={e => updateQuestion(activeQ, 'sliderStep', parseFloat(e.target.value) || 1)} 
@@ -741,7 +1022,7 @@ export default function QuizBuilder() {
                       <div>
                         <label className="block text-xs font-label text-slate-500 mb-1">Unit Label</label>
                         <input 
-                          className="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-3 text-on-surface font-body focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all outline-none" 
+                          className="input" 
                           type="text" 
                           value={q.sliderUnit} 
                           onChange={e => updateQuestion(activeQ, 'sliderUnit', e.target.value)} 
@@ -752,7 +1033,7 @@ export default function QuizBuilder() {
                     <div className="mb-4">
                       <label className="block text-xs font-label text-slate-500 mb-1">Correct Value</label>
                       <input 
-                        className="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-3 text-on-surface font-body font-bold text-lg focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all outline-none" 
+                        className="input font-bold text-lg" 
                         type="number" 
                         value={q.correctAnswer} 
                         onChange={e => updateQuestion(activeQ, 'correctAnswer', e.target.value)} 
@@ -763,7 +1044,7 @@ export default function QuizBuilder() {
                       />
                     </div>
                     {/* Slider Preview */}
-                    <div className="bg-surface-container-high rounded-lg p-4 border border-outline-variant/20">
+                    <div className="rounded-xl bg-brand-surface shadow-clay-sunken p-4">
                       <p className="text-xs font-label text-slate-500 mb-3 uppercase tracking-wider">Preview</p>
                       <div className="flex items-center gap-3">
                         <span className="font-mono text-sm text-primary">{q.sliderMin}</span>
@@ -792,11 +1073,11 @@ export default function QuizBuilder() {
                     </p>
                     <div className="space-y-3">
                       {(q.options || ['']).map((leftItem, pi) => (
-                        <div key={pi} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-surface-container-high rounded-lg p-3 border border-outline-variant/20">
-                          <div className="flex items-center gap-2 flex-1">
+                        <div key={pi} className="field-row flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
                             <div className="w-3 h-3 rounded-full bg-primary shadow-[0_0_8px_rgba(221,183,255,0.6)] shrink-0"></div>
                             <input 
-                              className="bg-transparent border-none text-sm text-on-surface flex-1 outline-none min-w-0" 
+                              className="input-borderless" 
                               value={leftItem} 
                               onChange={e => {
                                 const opts = [...(q.options || [])]; opts[pi] = e.target.value;
@@ -811,7 +1092,7 @@ export default function QuizBuilder() {
                             <div className="flex items-center gap-2 flex-1">
                               <div className="w-3 h-3 rounded-full bg-[#71d7cd] shadow-[0_0_8px_rgba(113,215,205,0.6)] shrink-0"></div>
                               <input 
-                                className="bg-transparent border-none text-sm text-on-surface flex-1 outline-none min-w-0" 
+                                className="input-borderless" 
                                 value={(q.matchingPairs || [])[pi] || ''} 
                                 onChange={e => {
                                   const pairs = [...(q.matchingPairs || [])]; pairs[pi] = e.target.value;
@@ -838,7 +1119,7 @@ export default function QuizBuilder() {
                         </div>
                       ))}
                       <button 
-                        className="w-full py-3 border border-dashed border-outline-variant/50 rounded-lg text-slate-400 font-semibold hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center justify-center gap-2" 
+                        className="w-full py-3 border-2 border-dashed border-brand-elevated rounded-xl text-slate-400 font-semibold hover:text-primary hover:border-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
                         onClick={() => {
                           const opts = [...(q.options || []), ''];
                           const pairs = [...(q.matchingPairs || []), ''];
@@ -880,7 +1161,7 @@ export default function QuizBuilder() {
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                       <label className="text-sm font-label font-semibold text-slate-400 uppercase tracking-wider sm:w-40 shrink-0">Correct Answer</label>
                       <select 
-                        className="flex-1 input cursor-pointer text-sm" 
+                        className="flex-1 input-sm cursor-pointer" 
                         value={q.correctAnswer} 
                         onChange={e => updateQuestion(activeQ, 'correctAnswer', e.target.value)}
                       >
@@ -893,7 +1174,7 @@ export default function QuizBuilder() {
                   <div>
                     <label className="block text-sm font-label font-semibold text-slate-400 mb-2 uppercase tracking-wider">Clinical Explanation (Optional)</label>
                     <textarea
-                      className="input h-24 resize-none text-sm"
+                      className="input-sm h-24 resize-none"
                       value={q.explanation}
                       onChange={e => updateQuestion(activeQ, 'explanation', e.target.value)}
                       placeholder="Explain the clinical rationale for the correct answer..."
@@ -904,13 +1185,27 @@ export default function QuizBuilder() {
                     <label className="block text-sm font-label font-semibold text-slate-400 mb-2 uppercase tracking-wider">Marks</label>
                     <input
                       type="number" min="0" step="1"
-                      className="input text-sm"
+                      className="input-sm"
                       value={q.points}
                       onChange={e => updateQuestion(activeQ, 'points', parseInt(e.target.value, 10) || 0)}
                       placeholder="1"
                     />
                     <p className="text-xs text-slate-500 mt-1">Marks awarded for a correct answer. Wrong answers score 0. Answering faster earns no extra marks. Default 1.</p>
                   </div>
+
+                  {quiz.timerMode === 'per_question' && (
+                    <div>
+                      <label className="block text-sm font-label font-semibold text-slate-400 mb-2 uppercase tracking-wider">Time (Secs)</label>
+                      <input
+                        type="number" min="1" max="3600"
+                        className="input-sm"
+                        value={q.timeLimit ?? ''}
+                        placeholder={String(quiz.timePerQuestion || 30)}
+                        onChange={e => updateQuestion(activeQ, 'timeLimit', e.target.value === '' ? null : parseInt(e.target.value, 10))}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Timer for this question only. Blank falls back to {quiz.timePerQuestion || 30}s.</p>
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -925,7 +1220,7 @@ export default function QuizBuilder() {
                 Questions ({questions.length})
               </h3>
               <span className="text-xs bg-brand-surface shadow-clay-sunken px-3 py-1 rounded-md text-primary font-bold tracking-widest uppercase">
-                {questions.length * (quiz.timePerQuestion || 30)} Secs
+                {formatSeconds(totalQuizSeconds)}
               </span>
             </div>
             
@@ -981,22 +1276,46 @@ export default function QuizBuilder() {
             
             {/* Right Panel Footer CTA */}
             <div className="p-6 bg-brand-surface border-t border-brand-elevated/40 space-y-3 z-10">
-              <button 
-                className="w-full py-3 clay-button clay-button-outline text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2"
-                onClick={() => handleSave(false)}
-                disabled={saving}
-              >
-                <span className="material-symbols-outlined text-sm">save</span>
-                Save Draft
-              </button>
-              <button 
-                className="w-full py-3 clay-button clay-button-primary text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2"
-                onClick={() => handleSave(true)}
-                disabled={saving}
-              >
-                <span className="material-symbols-outlined text-sm" style={{fontVariationSettings: "'FILL' 1"}}>send</span>
-                Publish Quiz
-              </button>
+              {isLiveEdit ? (
+                // Publishing a throwaway copy makes no sense; the only exit is back to the lobby.
+                <>
+                  <button
+                    className="w-full py-3 clay-button clay-button-primary text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+                    onClick={() => handleSave(false)}
+                    disabled={saving}
+                  >
+                    <span className="material-symbols-outlined text-sm">rocket_launch</span>
+                    {saving ? 'Saving...' : 'Save & Continue to Lobby'}
+                  </button>
+                  <button
+                    className="w-full py-3 clay-button clay-button-outline text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+                    onClick={() => navigate('/live')}
+                    disabled={saving}
+                  >
+                    <span className="material-symbols-outlined text-sm">close</span>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="w-full py-3 clay-button clay-button-outline text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+                    onClick={() => handleSave(false)}
+                    disabled={saving}
+                  >
+                    <span className="material-symbols-outlined text-sm">save</span>
+                    Save Draft
+                  </button>
+                  <button
+                    className="w-full py-3 clay-button clay-button-primary text-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+                    onClick={() => handleSave(true)}
+                    disabled={saving}
+                  >
+                    <span className="material-symbols-outlined text-sm" style={{fontVariationSettings: "'FILL' 1"}}>send</span>
+                    Publish Quiz
+                  </button>
+                </>
+              )}
             </div>
           </aside>
           

@@ -32,6 +32,54 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS last_played_date DATE;
 -- (no JSONB). DEFAULT '{}' so the existing hardcoded INSERT sites need no change. Idempotent.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences TEXT DEFAULT '{}';
 
+-- Student profile fields collected at registration (and backfilled by the profile-completion
+-- gate for accounts that predate them). Same ALTER treatment and same reason as the block above.
+--
+-- users.name is deliberately left alone: it is NOT NULL and read by the leaderboard, every
+-- report, the avatar header and the verification email. first_name/last_name are additive, and
+-- name continues to be written as "First Last", so every existing read keeps working.
+--
+-- All six are nullable with no default, which makes each ADD COLUMN metadata-only in Postgres —
+-- no table rewrite, no meaningful lock on a live database.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name            TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name             TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile_number         TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS university            TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS university_reg_number TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS class_section         TEXT;
+
+-- Institution allow-list, mirroring the UNIVERSITIES array in utils/profile.js — the same
+-- belt-and-braces treatment role already gets (a CHECK here plus allowedRoles in routes/auth.js).
+-- Adding a university means editing both.
+--
+-- DROP-then-ADD because Postgres has no ADD CONSTRAINT IF NOT EXISTS for a CHECK, and this file
+-- is applied in full on every boot. A bare ADD CONSTRAINT would fail on the second boot, and
+-- since init.js runs the whole file through one sql.unsafe() — a single implicit transaction
+-- whose error is only logged — that one failure would silently roll back every other statement
+-- here. Same idiom as the foreign-key rebuilds at the end of this file.
+--
+-- Passes for every pre-existing row: they are all NULL, and a CHECK only fails on explicit FALSE.
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_university_check;
+ALTER TABLE users ADD CONSTRAINT users_university_check
+  CHECK (university IS NULL OR university IN ('SRIHER', 'ACS'));
+
+-- A registration number is issued BY an institution, so it is unique WITHIN one, not globally:
+-- the same string can legitimately belong to a SRIHER student and a different ACS student, and
+-- a global index would lock the second one out of the platform permanently.
+--
+-- The predicate requires BOTH columns because NULLs compare as distinct in a multi-column unique
+-- index — without it, (NULL, 'ABC123') could be inserted twice and the constraint would be
+-- unenforced. The routes refuse a reg number with no university for the same reason.
+--
+-- Partial over non-null values is also what makes this safe to add to a live table: every
+-- existing row is NULL, so nothing collides at creation time and nothing needs backfilling.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_university_reg_number
+  ON users(university, university_reg_number)
+  WHERE university_reg_number IS NOT NULL AND university IS NOT NULL;
+
+-- Cohort lookups are always (university, class) — 'CSE A' at SRIHER is not 'CSE A' at ACS.
+CREATE INDEX IF NOT EXISTS idx_users_university_class ON users(university, class_section);
+
 -- Quizzes table
 CREATE TABLE IF NOT EXISTS quizzes (
   id TEXT PRIMARY KEY,
@@ -41,9 +89,13 @@ CREATE TABLE IF NOT EXISTS quizzes (
   difficulty TEXT DEFAULT 'medium' CHECK(difficulty IN ('easy', 'medium', 'hard')),
   unit INTEGER DEFAULT 1 CHECK(unit BETWEEN 1 AND 15),
   time_per_question INTEGER DEFAULT 30,
+  timer_mode TEXT DEFAULT 'fixed',  -- fixed | whole_quiz | per_question | per_type
+  total_time INTEGER,               -- whole_quiz mode: total seconds for the entire quiz
+  type_time_config TEXT,            -- per_type mode: JSON map of question type -> seconds
   created_by TEXT NOT NULL,
   is_published INTEGER DEFAULT 0,
   is_live INTEGER DEFAULT 0,
+  is_live_draft INTEGER DEFAULT 0,  -- hidden throwaway copy created for a single live game
   live_code TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (created_by) REFERENCES users(id)
@@ -66,6 +118,7 @@ CREATE TABLE IF NOT EXISTS questions (
   slider_step REAL DEFAULT 1, -- Slider: step increment
   slider_unit TEXT,          -- Slider: unit label (e.g. 'mmHg', 'bpm')
   matching_pairs TEXT,       -- Matching: JSON array of {left, right} pairs
+  time_limit INTEGER,        -- per_question timer mode: seconds for this question
   FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
 );
 
@@ -122,7 +175,7 @@ ALTER TABLE question_answers ADD COLUMN IF NOT EXISTS status TEXT;
 -- Live game sessions
 CREATE TABLE IF NOT EXISTS live_sessions (
   id TEXT PRIMARY KEY,
-  quiz_id TEXT NOT NULL,
+  quiz_id TEXT,
   host_id TEXT NOT NULL,
   join_code TEXT UNIQUE NOT NULL,
   status TEXT DEFAULT 'waiting' CHECK(status IN ('waiting', 'active', 'finished')),
@@ -130,7 +183,10 @@ CREATE TABLE IF NOT EXISTS live_sessions (
   started_at TIMESTAMP,
   ended_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (quiz_id) REFERENCES quizzes(id),
+  quiz_title TEXT,                  -- snapshot: survives deletion of a live-draft quiz
+  quiz_time_per_question INTEGER,   -- snapshot: survives deletion of a live-draft quiz
+  quiz_unit INTEGER,                -- snapshot: survives deletion of a live-draft quiz
+  FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE SET NULL,
   FOREIGN KEY (host_id) REFERENCES users(id)
 );
 
@@ -277,7 +333,7 @@ CREATE TABLE IF NOT EXISTS live_game_attempts (
 CREATE TABLE IF NOT EXISTS live_game_answers (
   id              TEXT PRIMARY KEY,
   attempt_id      TEXT NOT NULL,
-  question_id     TEXT NOT NULL,
+  question_id     TEXT,
   question_index  INTEGER DEFAULT 0,
   final_answer    TEXT,
   is_correct      INTEGER DEFAULT 0,
@@ -285,8 +341,9 @@ CREATE TABLE IF NOT EXISTS live_game_answers (
   response_ms     INTEGER DEFAULT 0,
   is_timeout      INTEGER DEFAULT 0,
   is_late         INTEGER DEFAULT 0,
+  question_snapshot TEXT,  -- JSON copy of the question, so reports survive quiz deletion
   FOREIGN KEY (attempt_id) REFERENCES live_game_attempts(id) ON DELETE CASCADE,
-  FOREIGN KEY (question_id) REFERENCES questions(id)
+  FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE SET NULL
 );
 
 -- Selection trail: each option click/change the student made before submitting.
@@ -313,4 +370,49 @@ ALTER TABLE live_answer_selections ADD COLUMN IF NOT EXISTS is_correct INTEGER D
 ALTER TABLE live_game_attempts DROP CONSTRAINT IF EXISTS live_game_attempts_user_id_fkey;
 ALTER TABLE live_game_attempts ADD CONSTRAINT live_game_attempts_user_id_fkey
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+
+-- ─── Timer Modes ───
+-- A quiz picks ONE timer mode. time_per_question stays the 'fixed' value and the
+-- universal fallback, so quizzes created before this migration keep their behaviour.
+ALTER TABLE quizzes   ADD COLUMN IF NOT EXISTS timer_mode TEXT DEFAULT 'fixed';
+ALTER TABLE quizzes   ADD COLUMN IF NOT EXISTS total_time INTEGER;
+ALTER TABLE quizzes   ADD COLUMN IF NOT EXISTS type_time_config TEXT;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS time_limit INTEGER;
+UPDATE quizzes SET timer_mode = 'fixed' WHERE timer_mode IS NULL;
+
+-- ─── Live-Only Quiz Drafts ───
+-- Hosting a live game clones the quiz into a hidden throwaway copy so last-minute
+-- edits never touch the original. The clone is deleted once the game finishes, so
+-- the analytics below must not depend on it still existing.
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_live_draft INTEGER DEFAULT 0;
+
+-- A live-draft clone deliberately sets unit = NULL so it can never be picked up by a unit-scoped
+-- query (see the comment on the clone INSERT in routes/quizzes.js). That leaves the unit
+-- unreachable at hosting time, which live analytics needs, so the clone records where it came
+-- from here instead. Only live drafts ever set it; it is never used for scoping.
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS source_unit INTEGER;
+
+-- Snapshots taken when the session/answers are written, used as the fallback source
+-- for reporting after the cloned quiz and its questions are gone.
+ALTER TABLE live_sessions      ADD COLUMN IF NOT EXISTS quiz_title TEXT;
+ALTER TABLE live_sessions      ADD COLUMN IF NOT EXISTS quiz_time_per_question INTEGER;
+-- The unit is snapshotted for the same reason as the title, but it is needed for a second one:
+-- filtering live analytics by unit. quizzes.unit is unreachable once the clone is deleted, so
+-- sessions that ran before this column existed stay NULL and are reported as "unit unknown"
+-- rather than being silently folded into some unit. There is nothing left to backfill from.
+ALTER TABLE live_sessions      ADD COLUMN IF NOT EXISTS quiz_unit INTEGER;
+ALTER TABLE live_game_answers  ADD COLUMN IF NOT EXISTS question_snapshot TEXT;
+
+-- Deleting the clone must null these references instead of being blocked by them.
+ALTER TABLE live_sessions ALTER COLUMN quiz_id DROP NOT NULL;
+ALTER TABLE live_sessions DROP CONSTRAINT IF EXISTS live_sessions_quiz_id_fkey;
+ALTER TABLE live_sessions ADD CONSTRAINT live_sessions_quiz_id_fkey
+  FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE SET NULL;
+
+ALTER TABLE live_game_answers ALTER COLUMN question_id DROP NOT NULL;
+ALTER TABLE live_game_answers DROP CONSTRAINT IF EXISTS live_game_answers_question_id_fkey;
+ALTER TABLE live_game_answers ADD CONSTRAINT live_game_answers_question_id_fkey
+  FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_quizzes_live_draft ON quizzes(is_live_draft);
 

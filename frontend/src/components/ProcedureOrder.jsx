@@ -238,6 +238,14 @@ export default function ProcedureOrder({
   const allCorrect = graded && slots.every((s, i) => (s?.text ?? '') === correct[i]);
   const needsReveal = graded && !allCorrect && !revealed;
 
+  // In live play the answer key arrives with `answer-result` the instant a student submits,
+  // which would otherwise paint every card green/red and give the whole order away. Grading
+  // *visuals* therefore wait for the reveal — the host's action, or all participants having
+  // answered. This can only ever hide grading that `graded` would have shown, never add it:
+  // a student who never submitted still sees the corrected order with neutral cards, as today.
+  // Solo keeps its own behaviour: the student's Reveal Order button drives it.
+  const gradeVisible = mode === 'live' ? (graded && (revealSignal || revealed)) : graded;
+
   const runReveal = useCallback(() => {
     if (!hasKey) return;
     // Consume each card once so duplicate step labels can't clone a card.
@@ -318,10 +326,12 @@ export default function ProcedureOrder({
     runReveal();
   }, [mode, revealSignal, revealed, hasKey, allCorrect, runReveal, onRevealComplete]);
 
-  // A correct arrangement has nothing to animate.
+  // A correct arrangement has nothing to animate — but in live play only once the reveal has
+  // been triggered, or setting `revealed` here would re-open the leak through `gradeVisible`.
   useEffect(() => {
-    if (graded && allCorrect && !revealed) setRevealed(true);
-  }, [graded, allCorrect, revealed]);
+    const revealAllowed = mode !== 'live' || revealSignal;
+    if (graded && allCorrect && revealAllowed && !revealed) setRevealed(true);
+  }, [mode, revealSignal, graded, allCorrect, revealed]);
 
   // Hide Submit the moment it is pressed — in live play the answer key does not arrive
   // until `answer-result`, so keying this off `graded` would flash the button back.
@@ -330,7 +340,7 @@ export default function ProcedureOrder({
   return (
     <div ref={wrapRef} className="w-full max-w-5xl mx-auto mt-4">
       <p className="text-center text-sm text-on-surface-variant mb-4 font-body">
-        {graded
+        {gradeVisible
           ? (allCorrect ? 'Correct order!' : (revealed ? 'Correct order shown below' : 'Reveal the correct order'))
           : 'Drag a card into another slot — or tap one card, then another, to swap them.'}
       </p>
@@ -350,14 +360,14 @@ export default function ProcedureOrder({
             const isDragging = dragIndex === i;
             const isLifted = lifted === i && !isDragging;
             const isOver = overIndex === i;
-            const isRight = graded && (item?.text ?? '') === correct[i];
+            const isRight = gradeVisible && (item?.text ?? '') === correct[i];
 
             // The container is the well; the card fills it edge to edge at the same size.
             let wellCls = 'border-outline-variant/25 bg-surface-container-lowest';
             if (isOver) wellCls = 'border-primary bg-primary/15';
 
             let cardCls = 'bg-surface-container-high border-outline-variant/40 text-on-surface';
-            if (graded) {
+            if (gradeVisible) {
               cardCls = isRight
                 ? 'bg-[#71d7cd]/15 border-[#71d7cd] text-on-surface'
                 : 'bg-error/15 border-error/70 text-on-surface';
@@ -418,7 +428,7 @@ export default function ProcedureOrder({
                     {item?.text}
                   </span>
 
-                  {graded && (
+                  {gradeVisible && (
                     <span
                       className={`material-symbols-outlined absolute top-1 right-1 ${isRight ? 'text-[#71d7cd]' : 'text-error'}`}
                       style={{ fontSize: 18 }}

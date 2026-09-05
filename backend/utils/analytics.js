@@ -158,6 +158,11 @@ function leaderboardScore({ accuracy: acc, speed, completion } = {}) {
 }
 
 module.exports = {
+  // Exported because callers that aggregate raw SQL rows need the SAME coercion sumField
+  // uses internally — postgres.js hands back numeric columns as strings, and a route doing
+  // its own `parseFloat(x) || 0` would eventually diverge from these formulas.
+  num,
+  round,
   sumField,
   accuracy,
   speedScore,

@@ -5,6 +5,7 @@ import confetti from 'canvas-confetti';
 import Avatar from '../components/Avatar';
 import ProcedureOrder from '../components/ProcedureOrder';
 import { PASS_PERCENT } from '../constants';
+import { resolveQuestionSeconds, resolveTotalSeconds, isWholeQuizTimer, formatSeconds } from '../utils/timing';
 
 const renderCorrectAnswer = (correctVal) => {
   if (!correctVal) return null;
@@ -124,6 +125,9 @@ export default function QuizPlayer() {
   // Use refs so callbacks always see the latest values
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
+  // whole_quiz timer mode: one deadline for the entire run instead of a timer that
+  // restarts on every question. Null in every other mode.
+  const wholeQuizDeadlineRef = useRef(null);
   const showAnswerRef = useRef(false);
   const answersRef = useRef([]);
   const streakRef = useRef(0);
@@ -201,6 +205,27 @@ export default function QuizPlayer() {
     }
   }
 
+  // whole_quiz mode: one countdown for the entire run. The deadline is fixed the first
+  // time the student reaches the playing phase and is never reset between questions, so
+  // time spent on question 1 genuinely comes out of the budget for question 10.
+  const wholeQuiz = isWholeQuizTimer(quiz);
+
+  useEffect(() => {
+    if (!wholeQuiz || phase !== 'playing') return;
+
+    if (wholeQuizDeadlineRef.current === null) {
+      wholeQuizDeadlineRef.current = Date.now() + resolveTotalSeconds(quiz, quiz?.questions) * 1000;
+    }
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((wholeQuizDeadlineRef.current - Date.now()) / 1000));
+      setTimeLeft(remaining);
+    };
+    tick();
+    const intervalId = setInterval(tick, 250);
+    return () => clearInterval(intervalId);
+  }, [wholeQuiz, phase, quiz]);
+
   useEffect(() => {
     if (phase === 'playing' && timeLeft === 0 && !showAnswer) {
       if (!answeredQuestionsRef.current.has(currentQRef.current)) {
@@ -211,14 +236,18 @@ export default function QuizPlayer() {
         // type records its staged selection as UNCOMMITTED — 0 marks, identical to the old
         // handleSubmit(null) timeout, but now labelled Selected,C / Selected,NC (or Not answered
         // when nothing was staged). committed:false is what gates scoring off on the server.
-        if (q && q.type === 'captcha' && staged != null) {
-          handleSubmit(staged);                          // committed defaults true — unchanged
-        } else {
-          handleSubmit(staged, { committed: false });
-        }
+        const submission = (q && q.type === 'captcha' && staged != null)
+          ? handleSubmit(staged)                         // committed defaults true — unchanged
+          : handleSubmit(staged, { committed: false });
+
+        // A spent whole-quiz budget ends the run outright — there is no next question to
+        // move on to. Wait for the answer above to be recorded before grading.
+        if (wholeQuiz) submission.finally(() => finishQuiz());
+      } else if (wholeQuiz) {
+        finishQuiz();
       }
     }
-  }, [timeLeft, phase, showAnswer, captchaBox, quiz]);
+  }, [timeLeft, phase, showAnswer, captchaBox, quiz, wholeQuiz]);
 
   function initQuestion(index) {
     if (timerRef.current) {
@@ -237,7 +266,11 @@ export default function QuizPlayer() {
     procedureOrderRef.current = null;
     matchingSelectionsRef.current = {};
     placedLettersRef.current = [];
-    setTimeLeft(quiz?.time_per_question || 30);
+    // whole_quiz mode runs a single countdown for the whole run, so the remaining time
+    // must survive the question change untouched.
+    if (!isWholeQuizTimer(quiz)) {
+      setTimeLeft(resolveQuestionSeconds(quiz, quiz?.questions?.[index]));
+    }
     startTimeRef.current = Date.now();
 
     if (!quiz) return;
@@ -280,6 +313,9 @@ export default function QuizPlayer() {
       setCaptchaPan({ x: 0, y: 0 });
     }
 
+    // whole_quiz mode is driven by its own deadline effect, not this per-question tick.
+    if (isWholeQuizTimer(quiz)) return;
+
     setTimeout(() => {
       timerRef.current = setInterval(() => {
         setTimeLeft(prev => {
@@ -308,7 +344,7 @@ export default function QuizPlayer() {
 
     const q = quiz.questions[qIndex];
     const timeTaken = Math.round((Date.now() - startTimeRef.current) / 1000);
-    const timeRemaining = Math.max(0, quiz.time_per_question - timeTaken);
+    const timeRemaining = Math.max(0, resolveQuestionSeconds(quiz, q) - timeTaken);
 
     setSelectedAnswer(answer);
 
@@ -474,7 +510,11 @@ export default function QuizPlayer() {
             </div>
             <div className="bg-surface-container border border-outline-variant/30 px-6 py-3 rounded-xl flex items-center gap-3">
               <span className="material-symbols-outlined text-[#FFD700]">timer</span>
-              <span className="font-headline font-bold">{quiz?.time_per_question}s per Q</span>
+              <span className="font-headline font-bold">
+                {wholeQuiz
+                  ? `${formatSeconds(resolveTotalSeconds(quiz, quiz?.questions))} total`
+                  : `${quiz?.time_per_question}s per Q`}
+              </span>
             </div>
           </div>
 
@@ -797,7 +837,9 @@ export default function QuizPlayer() {
 
         {/* Oxygen Depletion Bar */}
         {(() => {
-          const totalTime = quiz?.time_per_question || 30;
+          const totalTime = wholeQuiz
+            ? resolveTotalSeconds(quiz, quiz?.questions)
+            : resolveQuestionSeconds(quiz, quiz?.questions?.[currentQ]);
           const percentage = Math.min(100, Math.max(0, (timeLeft / totalTime) * 100));
           const isCritical = timeLeft <= 5;
           const isWarning = timeLeft <= 10 && timeLeft > 5;

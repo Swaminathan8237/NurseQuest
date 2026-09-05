@@ -6,6 +6,8 @@ import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import StreakFire from '../components/StreakFire';
 import TelegramUndoToastContainer from '../components/TelegramUndoToast';
+import UserProfileModal from '../components/admin/UserProfileModal';
+import ClassesManager from './admin/ClassesManager';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement,
   PointElement, LineElement, Tooltip, Legend
@@ -144,6 +146,7 @@ export default function AdminDashboard() {
   const [adminNotes, setAdminNotes] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('none');
   const [deleteConfirmModal, setDeleteConfirmModal] = useState(null); // in-app confirmation modal
+  const [profileModalUser, setProfileModalUser] = useState(null); // roster row being edited
 
   // Unit Access Control state
   const [unitAccessList, setUnitAccessList] = useState([]);
@@ -660,6 +663,7 @@ export default function AdminDashboard() {
           {[
             { id: 'overview', label: t('Overview & Stats'), icon: 'grid_view' },
             { id: 'users', label: t('Students & Teachers'), icon: 'group' },
+            { id: 'classes', label: t('Classes'), icon: 'school' },
             { id: 'analytics', label: t('Student Analytics'), icon: 'monitoring' },
             { id: 'requests', label: `${t('Quiz Requests')} (${pendingCount})`, icon: 'task' },
             { id: 'units', label: t('Units'), icon: 'menu_book' }
@@ -869,6 +873,7 @@ export default function AdminDashboard() {
                     <tr className="border-b border-white/5 bg-surface-container-high/40 font-headline font-bold text-xs uppercase tracking-wider text-[var(--text-muted)]">
                       <th className="p-4 md:p-5">{t('Name / Email')}</th>
                       <th className="p-4 md:p-5">{t('Role')}</th>
+                      <th className="p-4 md:p-5">{t('University / Class')}</th>
                       <th className="p-4 md:p-5 text-center">{t('XP Progress')}</th>
                       <th className="p-4 md:p-5 text-center">{t('Attempts')}</th>
                       <th className="p-4 md:p-5 text-center">{t('Quizzes Created')}</th>
@@ -878,7 +883,7 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-white/5 text-sm font-medium">
                     {filteredUsers.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="p-10 text-center text-[var(--text-muted)] font-semibold">
+                        <td colSpan="7" className="p-10 text-center text-[var(--text-muted)] font-semibold">
                           {t('No users found matching filters.')}
                         </td>
                       </tr>
@@ -893,19 +898,44 @@ export default function AdminDashboard() {
                               <div>
                                 <p className="font-bold text-on-surface">{u.name}</p>
                                 <p className="text-xs text-[var(--text-muted)] mt-0.5">{u.email}</p>
+                                {u.mobile_number && (
+                                  <p className="text-xs text-[var(--text-muted)] mt-0.5 font-mono">{u.mobile_number}</p>
+                                )}
                               </div>
                             </div>
                           </td>
                           <td className="p-4 md:p-5">
                             <select
                               value={u.role}
-                              onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                              onChange={(e) => handleUpdateRole(u.id, e.target.value, u.name)}
                               className="px-3 py-1.5 bg-surface-container-high border border-white/10 rounded-lg text-xs font-bold focus:outline-none focus:border-secondary transition-all"
                             >
                               <option value="student">{t('Student')}</option>
                               <option value="teacher">{t('Teacher')}</option>
                               <option value="admin">{t('Administrator')}</option>
                             </select>
+                          </td>
+                          {/* University, class and registration number. The "Not set" chip is
+                              deliberately loud: right after these fields ship every student is
+                              unset, and this column is how the backfill is tracked. */}
+                          <td className="p-4 md:p-5">
+                            {u.role !== 'student' ? (
+                              <span className="text-xs text-[var(--text-muted)]">{t('N/A')}</span>
+                            ) : (u.university || u.class_section) ? (
+                              <div className="text-xs leading-relaxed">
+                                <p className="font-bold text-on-surface">
+                                  {u.university || '—'}
+                                  {u.class_section ? ` · ${u.class_section}` : ''}
+                                </p>
+                                <p className="text-[var(--text-muted)] font-mono mt-0.5">
+                                  {u.university_reg_number || t('no reg. number')}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="px-2 py-1 rounded-md bg-warning/10 border border-warning/30 text-warning text-[11px] font-bold uppercase tracking-wider">
+                                {t('Not set')}
+                              </span>
+                            )}
                           </td>
                           <td className="p-4 md:p-5 text-center font-mono text-xs text-[var(--text-secondary)]">
                             {u.role === 'student' ? `${u.xp} XP (${t('Lvl')} ${u.level})` : t('N/A')}
@@ -918,6 +948,13 @@ export default function AdminDashboard() {
                           </td>
                           <td className="p-4 md:p-5 text-right">
                             <div className="flex items-center justify-end gap-2">
+                              <button
+                                className="p-2 rounded-lg bg-secondary/10 hover:bg-secondary/20 border border-secondary/30 text-secondary hover:scale-105 active:scale-95 transition-all"
+                                onClick={() => setProfileModalUser(u)}
+                                title={t('Edit Profile Details')}
+                              >
+                                <span className="material-symbols-outlined text-lg">{t('badge')}</span>
+                              </button>
                               {u.role === 'student' && (
                                 <button
                                   className="p-2 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary hover:scale-105 active:scale-95 transition-all"
@@ -946,6 +983,9 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* Classes & Sections Tab — its own component; this file is long enough already. */}
+        {activeTab === 'classes' && <ClassesManager />}
 
         {/* Student Analytics Tab */}
         {activeTab === 'analytics' && (
@@ -2214,6 +2254,22 @@ export default function AdminDashboard() {
       )}
 
       {/* Universal In-App Confirmation Alert Modal */}
+      {/* Profile editor. The PATCH response carries only the identity columns, so it is MERGED
+          into the roster row — replacing it would drop xp, level, quizzes_taken and avatar_config
+          and blank half the table. Re-sorted because the display name may have changed. */}
+      {profileModalUser && (
+        <UserProfileModal
+          user={profileModalUser}
+          onClose={() => setProfileModalUser(null)}
+          onSaved={(updated) => {
+            setUsers(prev => sortUsersStably(
+              prev.map(u => (u.id === updated.id ? { ...u, ...updated } : u))
+            ));
+            setProfileModalUser(null);
+          }}
+        />
+      )}
+
       {deleteConfirmModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div 

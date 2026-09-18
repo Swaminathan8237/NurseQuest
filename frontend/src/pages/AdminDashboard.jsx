@@ -8,6 +8,7 @@ import StreakFire from '../components/StreakFire';
 import TelegramUndoToastContainer from '../components/TelegramUndoToast';
 import UserProfileModal from '../components/admin/UserProfileModal';
 import ClassesManager from './admin/ClassesManager';
+import ClassAnalytics from './admin/ClassAnalytics';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement,
   PointElement, LineElement, Tooltip, Legend
@@ -172,7 +173,8 @@ export default function AdminDashboard() {
   // Performance report (accuracy, knowledge score, badges, charts)
   const [report, setReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
-  const [analyticsMode, setAnalyticsMode] = useState('units'); // 'units' | 'live'
+  const [analyticsMode, setAnalyticsMode] = useState('units'); // 'units' | 'live' | 'all'
+  const [analyticsSubView, setAnalyticsSubView] = useState('student'); // 'student' | 'class'
   const [liveReport, setLiveReport] = useState(null);
   const [liveGames, setLiveGames] = useState([]);
   const [liveGamesLoading, setLiveGamesLoading] = useState(false);
@@ -265,7 +267,7 @@ export default function AdminDashboard() {
     setAttemptQuestions([]);
     setLiveGameDetail(null);
 
-    if (mode === 'live' && !liveReport?.overall) {
+    if ((mode === 'live' || mode === 'all') && !liveReport?.overall) {
       setReportLoading(true);
       setLiveGamesLoading(true);
       const [reportRes, gamesRes] = await Promise.allSettled([
@@ -755,6 +757,64 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Live Game Stats Row (B5e) */}
+            {stats.liveAttempts && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-2">
+                <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 stat-card-live">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--text-muted)]">{t('Live Game Attempts')}</p>
+                      <p className="text-3xl font-bold font-headline mt-2 animated-stat-value" style={{color:'#10B981'}}>
+                        {stats.liveAttempts.count}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-[#10B981]/10 rounded-lg text-[#10B981]">
+                      <span className="material-symbols-outlined">sports_esports</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-xs font-semibold text-[var(--text-secondary)]">
+                    🎯 {t('Avg Score')}: {stats.liveAttempts.avgScore}%
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 stat-card-live">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--text-muted)]">{t('Live Sessions')}</p>
+                      <p className="text-3xl font-bold font-headline mt-2 animated-stat-value" style={{color:'#10B981'}}>
+                        {stats.liveSessions.total}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-[#10B981]/10 rounded-lg text-[#10B981]">
+                      <span className="material-symbols-outlined">videocam</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-4 text-xs font-semibold text-[var(--text-secondary)]">
+                    <span>🟢 {stats.liveSessions.active} {t('Active Now')}</span>
+                    <span>👥 {t('Avg')}: {stats.liveSessions.avgParticipants} {t('players')}</span>
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-high/40 rounded-xl p-5 border border-white/5 stat-card-combined">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--text-muted)]">{t('Combined Engagement')}</p>
+                      <p className="text-3xl font-bold font-headline mt-2 animated-stat-value" style={{color:'#3B82F6'}}>
+                        {stats.combined.totalAttempts}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-[#3B82F6]/10 rounded-lg text-[#3B82F6]">
+                      <span className="material-symbols-outlined">leaderboard</span>
+                    </div>
+                  </div>
+                  <div className="stat-split-indicator">
+                    <span><span className="stat-split-dot" style={{background:'#7C3AED'}} />Solo: {stats.attempts.count}</span>
+                    <span><span className="stat-split-dot" style={{background:'#10B981'}} />Live: {stats.liveAttempts.count}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Quiz Requests Summary */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="bg-surface-container-high/30 border border-white/5 rounded-xl p-6 lg:col-span-2 space-y-6">
@@ -990,7 +1050,42 @@ export default function AdminDashboard() {
         {/* Student Analytics Tab */}
         {activeTab === 'analytics' && (
           <div className="space-y-6 animate-fadeIn">
-            {!selectedStudent ? (
+            {/* Sub-view toggle: Student | Class (only when no student selected) */}
+            {!selectedStudent && (
+              <div className="flex items-center gap-3 mb-2">
+                <div className="inline-flex rounded-xl bg-surface-container-high/60 border border-white/10 p-1 gap-1">
+                  <button
+                    onClick={() => setAnalyticsSubView('student')}
+                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                      analyticsSubView === 'student'
+                        ? 'bg-[#7C3AED] text-white shadow-lg'
+                        : 'text-[var(--text-muted)] hover:text-on-surface'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">person</span>
+                    {t('Student')}
+                  </button>
+                  <button
+                    onClick={() => setAnalyticsSubView('class')}
+                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                      analyticsSubView === 'class'
+                        ? 'bg-[#3B82F6] text-white shadow-lg'
+                        : 'text-[var(--text-muted)] hover:text-on-surface'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">school</span>
+                    {t('Class')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Class Analytics sub-view */}
+            {!selectedStudent && analyticsSubView === 'class' && (
+              <ClassAnalytics />
+            )}
+
+            {!selectedStudent && analyticsSubView === 'student' ? (
               /* ---- Student picker ---- */
               <>
                 <div className="relative w-full md:max-w-md">
@@ -1039,7 +1134,7 @@ export default function AdminDashboard() {
                   )}
                 </div>
               </>
-            ) : (
+            ) : selectedStudent ? (
               /* ---- Selected student drill-down ---- */
               <>
                 <button
@@ -1085,7 +1180,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Units | Live toggle */}
+                {/* Units | Live | All toggle */}
                 <div className="flex justify-center">
                   <div className="inline-flex rounded-xl bg-surface-container-high/60 border border-white/10 p-1 gap-1">
                     <button
@@ -1109,6 +1204,17 @@ export default function AdminDashboard() {
                     >
                       <span className="material-symbols-outlined text-lg">sports_esports</span>
                       {t('Live')}
+                    </button>
+                    <button
+                      onClick={() => switchAnalyticsMode('all')}
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                        analyticsMode === 'all'
+                          ? 'bg-[#3B82F6] text-white shadow-lg'
+                          : 'text-[var(--text-muted)] hover:text-on-surface'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-lg">apps</span>
+                      {t('All')}
                     </button>
                   </div>
                 </div>
@@ -1317,18 +1423,26 @@ export default function AdminDashboard() {
                 })()}
 
                 {/* Units */}
-                {analyticsMode === 'units' && (unitsLoading ? (
-                  <div className="flex justify-center py-16">
-                    <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-                  </div>
-                ) : studentUnits.length === 0 ? (
-                  <div className="text-center py-16 text-[var(--text-muted)]">
-                    <span className="material-symbols-outlined text-4xl mb-2 block">{t('quiz')}</span>
-                    {t("This student hasn't attempted any units yet.")}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {studentUnits.map(u => {
+                {(analyticsMode === 'units' || analyticsMode === 'all') && (
+                  <>
+                    {analyticsMode === 'all' && (
+                      <div className="flex items-center gap-2 pt-2 pb-1 text-on-surface">
+                        <span className="material-symbols-outlined text-primary text-xl">menu_book</span>
+                        <h3 className="text-base font-bold">{t('Unit Quizzes')}</h3>
+                      </div>
+                    )}
+                    {unitsLoading ? (
+                      <div className="flex justify-center py-16">
+                        <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                      </div>
+                    ) : studentUnits.length === 0 ? (
+                      <div className="text-center py-16 text-[var(--text-muted)]">
+                        <span className="material-symbols-outlined text-4xl mb-2 block">{t('quiz')}</span>
+                        {t("This student hasn't attempted any units yet.")}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {studentUnits.map(u => {
                       const color = getUnitColor(u.unit);
                       const icon = getUnitIcon(u.unit);
                       const isOpen = expandedUnit === u.unit;
@@ -1521,10 +1635,20 @@ export default function AdminDashboard() {
                       );
                     })}
                   </div>
-                ))}
+                )}
+              </>
+            )}
 
-                {/* Live Sessions */}
-                {analyticsMode === 'live' && (liveGamesLoading ? (
+            {/* Live Sessions */}
+            {(analyticsMode === 'live' || analyticsMode === 'all') && (
+              <>
+                {analyticsMode === 'all' && (
+                  <div className="flex items-center gap-2 pt-6 pb-1 text-on-surface">
+                    <span className="material-symbols-outlined text-[#10B981] text-xl">sports_esports</span>
+                    <h3 className="text-base font-bold">{t('Live Game Sessions')}</h3>
+                  </div>
+                )}
+                {liveGamesLoading ? (
                   <div className="flex justify-center py-16">
                     <div className="w-10 h-10 border-4 border-[#10B981]/30 border-t-[#10B981] rounded-full animate-spin"></div>
                   </div>
@@ -1730,9 +1854,11 @@ export default function AdminDashboard() {
                       );
                     })}
                   </div>
-                ))}
+                )}
               </>
             )}
+              </>
+            ) : null}
           </div>
         )}
 

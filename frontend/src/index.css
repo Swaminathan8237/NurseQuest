@@ -1,13 +1,16 @@
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ══════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    SkillQuest Design System
    Premium dark-mode design with glassmorphism
-   ══════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* ─── Reset ─── */
+/* â”€â”€â”€ Reset â”€â”€â”€ */
 *,
 *::before,
 *::after {
@@ -16,11 +19,11 @@
   box-sizing: border-box;
 }
 
-/* ══════════════════════════════════════════════════════
-   Design Tokens — "Playful & Vibrant"
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   Design Tokens â€” "Playful & Vibrant"
    Signature: thick ink outlines + hard offset shadows.
    LIGHT is the default (:root); DARK is an override.
-   ══════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 :root {
   /* Brand palette (shared across themes) */
   --primary: #7C3AED;
@@ -48,7 +51,7 @@
   --accent-sky-shadow: #2B7CC4;
   --accent-violet: #7C3AED;
   --accent-violet-shadow: #4A1D96;
-  /* Text-safe versions of the accents above. The accent colours are tuned as FILLS —
+  /* Text-safe versions of the accents above. The accent colours are tuned as FILLS â€”
      as small text on a card they land at 1.8-2.6:1. These are the same hues darkened
      to clear 4.5:1 on a light surface, for pass/fail percentages and XP figures.
      The dark theme overrides them back to the bright originals, which already pass
@@ -72,7 +75,7 @@
   --info: #4DABF7;
   --info-light: rgba(77, 171, 247, 0.14);
 
-  /* Structure — LIGHT (default) */
+  /* Structure â€” LIGHT (default) */
   --ink: #1A1626;
   --bg-base: #FFF7EC;
   --bg-surface: #FFFFFF;
@@ -82,7 +85,7 @@
   --bg-input: #FFFFFF;
 
   /* The panel the dashboard nurse stands on. It has to stay light whatever the
-     theme, because she is dark line art composited with mix-blend-multiply —
+     theme, because she is dark line art composited with mix-blend-multiply â€”
      multiply against a dark backdrop renders her solid black. On white cards it
      is invisible; the dark override below is what stops it reading as a pasted
      white sticker. */
@@ -92,14 +95,14 @@
 
   /* Practice-streak calendar. --streak-band is the pale pill drawn behind a run of
      consecutive practised days; --streak-band-text is the numeral sitting on it.
-     The band is deliberately quiet against the card (~1.28:1) — it is a grouping
-     device, not a data point — while the numeral on it clears AA at 4.8:1. */
+     The band is deliberately quiet against the card (~1.28:1) â€” it is a grouping
+     device, not a data point â€” while the numeral on it clears AA at 4.8:1. */
   --streak-band: #FFDCCF;
   --streak-band-text: #B4322D;
 
   --text-primary: #1A1626;
   --text-secondary: #5A5470;
-  /* Was #8B84A3, which is 3.5:1 on white — under AA for the 10-12px eyebrows and
+  /* Was #8B84A3, which is 3.5:1 on white â€” under AA for the 10-12px eyebrows and
      axis labels this token is mostly used for. #6F6889 is 5.2:1 and still reads a
      clear step lighter than --text-secondary (7.2:1). */
   --text-muted: #6F6889;
@@ -169,7 +172,7 @@
   --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
 }
 
-/* ─── Dark Theme override (driven by .dark class or [data-theme="dark"] on <html>) ─── */
+/* â”€â”€â”€ Dark Theme override (driven by .dark class or [data-theme="dark"] on <html>) â”€â”€â”€ */
 html.dark,
 html[data-theme="dark"] {
   --primary: #8B5CF6;
@@ -178,7 +181,7 @@ html[data-theme="dark"] {
   --primary-on-surface: #A78BFA;
 
   /* On the dark surface the bright accents already clear AA, so the text-safe
-     variants revert to them — darkened greens/golds would be the unreadable ones here. */
+     variants revert to them â€” darkened greens/golds would be the unreadable ones here. */
   --accent-green-text: #32D583;
   --accent-gold-text: #FFD43B;
   --accent-coral-text: #FF8A8A;
@@ -191,7 +194,7 @@ html[data-theme="dark"] {
   --bg-hover: #372E5C;
   --bg-input: #1B1730;
 
-  /* Still light — multiply demands it — but dropped from 14.9:1 against the card
+  /* Still light â€” multiply demands it â€” but dropped from 14.9:1 against the card
      to roughly 5:1, and the wash keeps its violet without bleaching back to
      white. Paired with the mask on the panel itself, it reads as a lit alcove
      rather than a white rectangle. */
@@ -232,7 +235,7 @@ html[data-theme="dark"] {
 /* Back-compat: some components still target body.light-theme; light is default so this is a no-op anchor */
 body.light-theme { color-scheme: light; }
 
-/* ─── Base Styles (Curvy Gamified Fredoka Font System) ─── */
+/* â”€â”€â”€ Base Styles (Curvy Gamified Fredoka Font System) â”€â”€â”€ */
 html {
   font-size: 16px;
   scroll-behavior: smooth;
@@ -283,7 +286,7 @@ body::before {
   min-height: 100vh;
 }
 
-/* ─── Typography ─── */
+/* â”€â”€â”€ Typography â”€â”€â”€ */
 h1,
 h2,
 h3,
@@ -323,7 +326,7 @@ h4 {
   background-clip: text;
 }
 
-/* ─── Links ─── */
+/* â”€â”€â”€ Links â”€â”€â”€ */
 a {
   color: var(--primary-light);
   text-decoration: none;
@@ -334,7 +337,7 @@ a:hover {
   color: var(--primary);
 }
 
-/* ─── Buttons (Playful: ink outline + hard shadow, tactile press) ─── */
+/* â”€â”€â”€ Buttons (Playful: ink outline + hard shadow, tactile press) â”€â”€â”€ */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -439,7 +442,7 @@ a:hover {
   border-radius: var(--radius-md);
 }
 
-/* ─── Cards (Playful: ink outline + hard shadow) ─── */
+/* â”€â”€â”€ Cards (Playful: ink outline + hard shadow) â”€â”€â”€ */
 .card {
   background: var(--bg-card);
   border: var(--border-ink);
@@ -474,7 +477,7 @@ a:hover {
   opacity: 0.3;
 }
 
-/* ─── Form elements ─── */
+/* â”€â”€â”€ Form elements â”€â”€â”€ */
 .input-group {
   display: flex;
   flex-direction: column;
@@ -488,7 +491,7 @@ a:hover {
   color: var(--text-primary);
 }
 
-/* ─── Field system ───────────────────────────────────────────────────────────
+/* â”€â”€â”€ Field system â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    These live in @layer components so Tailwind hoists them above @tailwind
    utilities. Without the layer they sit after it at equal (0,1,0) specificity
    and silently beat every utility written on a field (w-24, py-1, text-sm,
@@ -499,7 +502,7 @@ a:hover {
      .input-sm        small field      (~38px tall)
      .field-row       bordered row whose child is .input-borderless; the ROW is
                       the field, so repeated list items have one height source.
-   ─────────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @layer components {
   .input {
     width: 100%;
@@ -605,7 +608,7 @@ a:hover {
   }
 }
 
-/* ─── Glass panel ─── */
+/* â”€â”€â”€ Glass panel â”€â”€â”€ */
 .glass {
   background: rgba(26, 31, 53, 0.6);
   backdrop-filter: blur(24px);
@@ -614,7 +617,7 @@ a:hover {
   border-radius: var(--radius-xl);
 }
 
-/* ─── Badge (Playful: ink outline chip) ─── */
+/* â”€â”€â”€ Badge (Playful: ink outline chip) â”€â”€â”€ */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -628,7 +631,7 @@ a:hover {
   letter-spacing: 0.02em;
   /* --text-primary, not --ink: both are #1A1626 in light (so light is unchanged),
      but in dark --ink stays near-black while --bg-surface goes dark too, which
-     rendered badge labels at 1.2:1 — effectively invisible. The coloured variants
+     rendered badge labels at 1.2:1 â€” effectively invisible. The coloured variants
      below set their own fg on their own fill, so they are unaffected. */
   color: var(--text-primary);
   background: var(--bg-surface);
@@ -664,7 +667,7 @@ a:hover {
   border-color: var(--accent-sky-shadow);
 }
 
-/* ─── Progress bar (Playful: ink outline track, chunky fill) ─── */
+/* â”€â”€â”€ Progress bar (Playful: ink outline track, chunky fill) â”€â”€â”€ */
 .progress-bar {
   width: 100%;
   height: 14px;
@@ -693,7 +696,7 @@ a:hover {
   animation: progressShine 2s infinite;
 }
 
-/* ─── Scrollbar ─── */
+/* â”€â”€â”€ Scrollbar â”€â”€â”€ */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -712,7 +715,7 @@ a:hover {
   background: var(--text-muted);
 }
 
-/* ─── Animations ─── */
+/* â”€â”€â”€ Animations â”€â”€â”€ */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -948,7 +951,7 @@ a:hover {
   }
 }
 
-/* ─── Utility classes ─── */
+/* â”€â”€â”€ Utility classes â”€â”€â”€ */
 .animate-fadeIn {
   animation: fadeIn 0.5s ease-out;
 }
@@ -1006,7 +1009,7 @@ a:hover {
   animation-fill-mode: backwards;
 }
 
-/* ─── Loading spinner ─── */
+/* â”€â”€â”€ Loading spinner â”€â”€â”€ */
 .spinner {
   width: 40px;
   height: 40px;
@@ -1025,7 +1028,7 @@ a:hover {
   gap: var(--space-md);
 }
 
-/* ─── Responsive ─── */
+/* â”€â”€â”€ Responsive â”€â”€â”€ */
 @media (max-width: 768px) {
   h1 {
     font-size: 1.8rem;
@@ -1059,7 +1062,7 @@ a:hover {
   }
 }
 
-/* ─── Premium Animations ─── */
+/* â”€â”€â”€ Premium Animations â”€â”€â”€ */
 @keyframes shimmer {
   0% {
     background-position: -200% center;
@@ -1194,7 +1197,7 @@ a:hover {
   }
 }
 
-/* ─── Premium Utility Classes ─── */
+/* â”€â”€â”€ Premium Utility Classes â”€â”€â”€ */
 .animate-slideUp {
   animation: slideUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -1246,7 +1249,7 @@ a:hover {
   animation-fill-mode: backwards;
 }
 
-/* ─── Quiz Option Hover Effects ─── */
+/* â”€â”€â”€ Quiz Option Hover Effects â”€â”€â”€ */
 .quiz-option-btn {
   position: relative;
   overflow: hidden;
@@ -1270,7 +1273,7 @@ a:hover {
   height: 300%;
 }
 
-/* ─── Glass Card Effect ─── */
+/* â”€â”€â”€ Glass Card Effect â”€â”€â”€ */
 /* Repurposed to playful solid surface (glass name kept for back-compat) */
 .glass-card {
   background: var(--bg-card);
@@ -1285,7 +1288,7 @@ a:hover {
   transform: translate(-1px, -1px);
 }
 
-/* ─── Gradient Border Card ─── */
+/* â”€â”€â”€ Gradient Border Card â”€â”€â”€ */
 .gradient-border {
   position: relative;
   border: none !important;
@@ -1310,7 +1313,7 @@ a:hover {
   opacity: 1;
 }
 
-/* ─── Glow Button Effect ─── */
+/* â”€â”€â”€ Glow Button Effect â”€â”€â”€ */
 .btn-glow {
   position: relative;
 }
@@ -1331,21 +1334,20 @@ a:hover {
   opacity: 0.5;
 }
 
-/* ─── Score Number Animation ─── */
+/* â”€â”€â”€ Score Number Animation â”€â”€â”€ */
 .score-number {
   display: inline-block;
   animation: scoreReveal 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-/* ─── Navbar (Playful solid bar, glass name kept for back-compat) ─── */
+/* â”€â”€â”€ Navbar (Playful solid bar, glass name kept for back-compat) â”€â”€â”€ */
 .navbar-glass {
   background: var(--bg-surface);
   border-bottom: var(--border-ink);
   box-shadow: 0 4px 0 var(--border-ink-color);
 }
 
-
-/* ─── Doctor Recommendations Orbit ─── */
+/* â”€â”€â”€ Doctor Recommendations Orbit â”€â”€â”€ */
 .orbit-container {
   position: relative;
   width: 480px;
@@ -1450,7 +1452,7 @@ a:hover {
   box-shadow: 0 5px 15px rgba(0, 229, 255, 0.2);
 }
 
-/* ─── Quiz Showcase ─── */
+/* â”€â”€â”€ Quiz Showcase â”€â”€â”€ */
 .quiz-preview-device {
   width: 100%;
   max-width: 420px;
@@ -1586,7 +1588,7 @@ a:hover {
   pointer-events: none;
 }
 
-/* ─── Contact Form Floating Labels ─── */
+/* â”€â”€â”€ Contact Form Floating Labels â”€â”€â”€ */
 .contact-input-wrapper {
   position: relative;
   width: 100%;
@@ -1671,7 +1673,7 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
   pointer-events: none;
 }
 
-/* ─── Contact Form Floating Labels ─── */
+/* â”€â”€â”€ Contact Form Floating Labels â”€â”€â”€ */
 .contact-input-wrapper {
   position: relative;
   width: 100%;
@@ -1748,11 +1750,11 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
   background: rgba(0, 229, 255, 0.45);
 }
 
-/* ══════════════════════════════════════════════════════
-   Phase 1: Animation Foundation — Spring Curves & Reveals
-   ══════════════════════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   Phase 1: Animation Foundation â€” Spring Curves & Reveals
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* ─── Accessibility: Reduced Motion ─── */
+/* â”€â”€â”€ Accessibility: Reduced Motion â”€â”€â”€ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1764,7 +1766,7 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
   }
 }
 
-/* ─── Scroll Reveal System ─── */
+/* â”€â”€â”€ Scroll Reveal System â”€â”€â”€ */
 .reveal {
   opacity: 0;
   transform: translateY(30px);
@@ -1815,7 +1817,7 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
   transform: translateX(0);
 }
 
-/* Stagger delays — apply to children of a reveal container */
+/* Stagger delays â€” apply to children of a reveal container */
 .reveal-stagger-1 { transition-delay: 80ms; }
 .reveal-stagger-2 { transition-delay: 160ms; }
 .reveal-stagger-3 { transition-delay: 240ms; }
@@ -1825,7 +1827,7 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
 .reveal-stagger-7 { transition-delay: 560ms; }
 .reveal-stagger-8 { transition-delay: 640ms; }
 
-/* ─── New Keyframe Animations ─── */
+/* â”€â”€â”€ New Keyframe Animations â”€â”€â”€ */
 @keyframes elasticPop {
   0% { transform: scale(0); opacity: 0; }
   40% { transform: scale(1.15); opacity: 1; }
@@ -1936,7 +1938,7 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
   30%, 70% { transform: translateX(4px); }
 }
 
-/* ─── Phase 1 Utility Classes ─── */
+/* â”€â”€â”€ Phase 1 Utility Classes â”€â”€â”€ */
 .animate-elasticPop {
   animation: elasticPop 0.6s var(--ease-spring-bouncy) both;
 }
@@ -1987,7 +1989,7 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
   animation: borderGlow 2s ease-in-out infinite;
 }
 
-/* ─── Enhanced Interactive States ─── */
+/* â”€â”€â”€ Enhanced Interactive States â”€â”€â”€ */
 .interactive-lift {
   transition: transform 0.3s var(--ease-spring-soft),
               box-shadow 0.3s var(--ease-spring-soft);
@@ -2029,7 +2031,7 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
   box-shadow: 3px 3px 0 var(--primary) !important;
 }
 
-/* ─── Orchestrated Entrance Helpers ─── */
+/* â”€â”€â”€ Orchestrated Entrance Helpers â”€â”€â”€ */
 .entrance-hero {
   opacity: 0;
   transform: translateY(40px);
@@ -2071,9 +2073,9 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
   pointer-events: none;
 }
 
-/* ══════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    Google Flow & Google Whisk AI Motion Keyframes
-   ══════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 @keyframes whiskFloat {
   0%, 100% {
@@ -2119,9 +2121,9 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
   animation: pulseGlowCyan 3s ease-in-out infinite;
 }
 
-/* ══════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    3D Conquer Levels Button (From Uiverse.io by kosedagyazilim)
-   ══════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .btn-conquer {
   position: relative;
   display: inline-flex;
@@ -2152,4 +2154,553 @@ textarea.contact-input:not(:placeholder-shown)~.contact-label {
 .btn-conquer:active {
   transform: translateY(3px);
   box-shadow: 0px 2px 0px var(--primary-dark), var(--shadow-hard-sm);
+}
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   Analytics Filter Bar & Class Analytics
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+
+.analytics-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  flex-wrap: wrap;
+  position: relative;
+  overflow: visible;
+}
+
+.analytics-filter-bar::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 13px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(59, 130, 246, 0.15), rgba(16, 185, 129, 0.3));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: filterBarGlow 4s ease-in-out infinite;
+}
+
+@keyframes filterBarGlow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.9; }
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+}
+
+.pill-group {
+  display: flex;
+  gap: 4px;
+}
+
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.filter-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.filter-pill.active {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.5);
+  color: #A78BFA;
+  box-shadow: 0 0 10px rgba(124, 58, 237, 0.2);
+}
+
+/* Bulletproof select & option styling across all themes */
+select, .filter-select {
+  color-scheme: dark !important;
+}
+
+select option, .filter-select option {
+  background-color: #19152b !important;
+  color: #f1f0f5 !important;
+  padding: 8px 12px;
+}
+
+.filter-select {
+  padding: 5px 26px 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: all 0.2s ease;
+}
+
+.filter-select:focus {
+  border-color: rgba(124, 58, 237, 0.5);
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.2);
+  outline: none;
+}
+
+/* Custom FilterDropdown Component Styles */
+.filter-select-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 84px;
+  max-width: 170px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.filter-select-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(167, 139, 250, 0.4);
+  color: #ffffff;
+}
+
+.filter-select-btn.active {
+  border-color: rgba(124, 58, 237, 0.6);
+  background: rgba(124, 58, 237, 0.16);
+  color: #c4b5fd;
+  box-shadow: 0 0 10px rgba(124, 58, 237, 0.22);
+}
+
+.filter-select-btn.open {
+  border-color: rgba(124, 58, 237, 0.8);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.25);
+}
+
+.filter-select-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-select-chevron {
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.filter-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 140px;
+  max-width: 250px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #19152b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  padding: 4px;
+  z-index: 100;
+  backdrop-filter: blur(16px);
+  animation: filterDropdownFade 0.15s ease-out;
+}
+
+.filter-dropdown-menu::-webkit-scrollbar {
+  width: 5px;
+}
+.filter-dropdown-menu::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+.filter-dropdown-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+}
+.filter-dropdown-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+@keyframes filterDropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.filter-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.filter-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.filter-dropdown-item.selected {
+  background: rgba(124, 58, 237, 0.22);
+  color: #c4b5fd;
+  font-weight: 600;
+}
+
+.filter-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.08);
+  color: #EF4444;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* â”€â”€ Class Analytics Table â”€â”€ */
+
+.class-analytics-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.class-analytics-table thead th {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.class-analytics-table tbody tr {
+  transition: background 0.2s ease;
+  cursor: pointer;
+}
+
+.class-analytics-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.class-analytics-table tbody td {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  vertical-align: middle;
+}
+
+.class-expanded-row {
+  animation: expandIn 0.3s ease-out;
+}
+
+@keyframes expandIn {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 600px; }
+}
+
+/* â”€â”€ Accuracy mini-bar (inline) â”€â”€ */
+
+.accuracy-bar-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.accuracy-bar-track {
+  width: 80px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.accuracy-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+/* â”€â”€ Participation split bar â”€â”€ */
+
+.split-bar {
+  display: flex;
+  width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.split-bar-solo { background: #7C3AED; }
+.split-bar-live { background: #10B981; }
+.split-bar-both { background: #3B82F6; }
+
+/* â”€â”€ Stat card enhancements for overview â”€â”€ */
+
+.stat-card-live {
+  border-top: 3px solid #10B981 !important;
+}
+
+.stat-card-live .stat-card-icon {
+  color: #10B981 !important;
+}
+
+.stat-card-combined {
+  border-top: 3px solid #3B82F6 !important;
+}
+
+.stat-split-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.stat-split-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+
+/* â”€â”€ Knowledge level badges â”€â”€ */
+
+.knowledge-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* â”€â”€ Dormant student warning â”€â”€ */
+
+.dormant-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #F59E0B;
+}
+
+.dormant-indicator::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #F59E0B;
+  animation: glowPulseAmber 2s ease-in-out infinite;
+}
+
+/* â”€â”€ Animated counter (CSS fallback for React Bits Counter) â”€â”€ */
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animated-stat-value {
+  animation: countUp 0.5s ease-out both;
+}
+
+/* ── Live stat cards (overview tab) ── */
+
+.stat-card-live {
+  position: relative;
+  overflow: hidden;
+}
+.stat-card-live::after {
+  content: '';
+  position: absolute;
+  top: -40%; right: -20%;
+  width: 140px; height: 140px;
+  background: radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.stat-card-combined {
+  position: relative;
+  overflow: hidden;
+}
+.stat-card-combined::after {
+  content: '';
+  position: absolute;
+  top: -40%; right: -20%;
+  width: 140px; height: 140px;
+  background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.stat-split-indicator {
+  margin-top: 16px;
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, rgba(255,255,255,0.5));
+}
+
+.stat-split-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+
+@layer base {
+  .theme {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', sans-serif;
+  }
+  :root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+  }
+  .dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+  }
+  * {
+    border-color: var(--border);
+    outline-color: var(--ring);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+  html {
+    font-family: var(--font-sans);
+  }
 }

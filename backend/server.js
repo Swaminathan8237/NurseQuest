@@ -31,7 +31,7 @@ app.set('trust proxy', 1);
 // and the same code runs everywhere. Socket.IO enforces this list server-side, so the custom
 // domain MUST be present here or real-time connections from it are rejected.
 const allowedOrigins = [
-  'http://localhost:5173', 'http://localhost:3000', 'http://localhost:5050',
+  'http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://localhost:5050',
   ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean) : []),
 ];
 

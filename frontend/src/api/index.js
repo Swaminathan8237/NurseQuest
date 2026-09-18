@@ -205,6 +205,28 @@ export const adminAPI = {
   undoPendingDeletion: (id) => request(`/admin/pending-deletions/${id}/undo`, { method: 'POST' }),
   commitPendingDeletion: (id) => request(`/admin/pending-deletions/${id}/commit`, { method: 'POST' }),
   getPendingDeletions: () => request('/admin/pending-deletions'),
+  // B1: Combined student summary across solo + live
+  getStudentSummary: (id, expectedMinutes, filters = {}) => {
+    const params = new URLSearchParams();
+    if (expectedMinutes) params.set('expectedMinutes', expectedMinutes);
+    Object.entries(filters).forEach(([k, v]) => { if (v != null && v !== '') params.set(k, v); });
+    const qs = params.toString();
+    return request(`/admin/students/${id}/summary${qs ? `?${qs}` : ''}`);
+  },
+  // B2: Class-level analytics
+  getClassAnalytics: (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => { if (v != null && v !== '') params.set(k, v); });
+    const qs = params.toString();
+    return request(`/admin/analytics/class${qs ? `?${qs}` : ''}`);
+  },
+  // B3: Students weakest on a question type
+  getQuestionTypeStudents: (type, filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => { if (v != null && v !== '') params.set(k, v); });
+    const qs = params.toString();
+    return request(`/admin/analytics/question-type/${type}${qs ? `?${qs}` : ''}`);
+  },
 };
 
 export default { authAPI, quizAPI, scoreAPI, userAPI, adminAPI };

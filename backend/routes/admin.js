@@ -781,11 +781,55 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
       }
     }
 
+    // Live game attempt stats (B4 — sibling to attemptStats, not a replacement)
+    let liveAttemptStats = { count: 0, avgScore: 0 };
+    let liveSessionStats = { total: 0, active: 0, avgParticipants: 0 };
+    try {
+      const liveAttempts = await sql`
+        SELECT
+          COUNT(*)::int AS count,
+          COALESCE(AVG(
+            CASE WHEN total_questions > 0
+              THEN correct_count * 100.0 / total_questions
+              ELSE 0 END
+          ), 0) AS avg_score
+        FROM live_game_attempts
+      `;
+      liveAttemptStats = {
+        count: parseInt(liveAttempts[0].count || 0, 10),
+        avgScore: parseFloat(parseFloat(liveAttempts[0].avg_score || 0).toFixed(1)),
+      };
+
+      const liveSess = await sql`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(CASE WHEN status = 'active' OR status = 'lobby' THEN 1 END)::int AS active,
+          COALESCE(AVG(participant_count), 0) AS avg_participants
+        FROM live_sessions
+      `;
+      liveSessionStats = {
+        total: parseInt(liveSess[0].total || 0, 10),
+        active: parseInt(liveSess[0].active || 0, 10),
+        avgParticipants: parseFloat(parseFloat(liveSess[0].avg_participants || 0).toFixed(1)),
+      };
+    } catch (liveErr) {
+      // Live tables may not exist on very old installations — degrade silently
+      console.warn('Live stats query skipped:', liveErr.message);
+    }
+
+    const combinedStats = {
+      totalAttempts: attemptStats.count + liveAttemptStats.count,
+      totalStudents: userStats.student,
+    };
+
     res.json({
       users: userStats,
       quizzes: quizStats,
       requests: requestStats,
       attempts: attemptStats,
+      liveAttempts: liveAttemptStats,
+      liveSessions: liveSessionStats,
+      combined: combinedStats,
       tables: tablesMeta
     });
   } catch (err) {
@@ -2347,6 +2391,384 @@ router.get('/students/:id/summary', authenticateToken, requireAdmin, async (req,
     });
   } catch (err) {
     console.error('Admin get student summary error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ==========================================================================
+   5b. CLASS-LEVEL ANALYTICS (Admin Only)
+   GET /admin/analytics/class
+   
+   Aggregates across a cohort (university + class) rather than a single student.
+   Returns totals, per-unit breakdown, accuracy bands, question-type performance,
+   participation splits, and a dormant list.
+   ========================================================================== */
+
+router.get('/analytics/class', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const sql = getDB();
+    const f = readFilters(req, res, { defaultMode: 'all' });
+    if (!f) return;
+
+    const wantSolo = f.mode === 'all' || f.mode === 'solo';
+    const wantLive = f.mode === 'all' || f.mode === 'live';
+    const cohort = cohortClause(sql, 'u', f);
+
+    // ---- 1. Class list with student counts ----
+    const classes = await sql`
+      SELECT u.university, u.class_section,
+        COUNT(*)::int AS student_count
+      FROM users u
+      WHERE u.role = 'student'
+        ${cohort}
+      GROUP BY u.university, u.class_section
+      ORDER BY u.university NULLS LAST, u.class_section NULLS LAST
+    `;
+
+    // ---- 2. Per-class accuracy + knowledge score (solo) ----
+    let soloByClass = [];
+    if (wantSolo) {
+      const soloDate = dateClause(sql, 'qa.completed_at', f);
+      const soloUnit = unitClause(sql, 'q.unit', f);
+      soloByClass = await sql`
+        SELECT u.university, u.class_section,
+          COUNT(DISTINCT u.id)::int AS students_active,
+          COUNT(DISTINCT qa.id)::int AS attempts,
+          COALESCE(SUM(qans.is_correct), 0)::int AS correct,
+          COUNT(qans.id)::int AS answered
+        FROM users u
+        JOIN quiz_attempts qa ON qa.user_id = u.id
+        JOIN quizzes q ON q.id = qa.quiz_id AND q.unit IS NOT NULL
+        LEFT JOIN question_answers qans ON qans.attempt_id = qa.id
+        WHERE u.role = 'student'
+          ${cohort}
+          ${soloDate}
+          ${soloUnit}
+        GROUP BY u.university, u.class_section
+      `;
+    }
+
+    // ---- 3. Per-class accuracy (live) ----
+    let liveByClass = [];
+    if (wantLive) {
+      const liveDate = dateClause(sql, 'lga.completed_at', f);
+      const liveUnit = unitClause(sql, 'ls.quiz_unit', f);
+      liveByClass = await sql`
+        SELECT u.university, u.class_section,
+          COUNT(DISTINCT u.id)::int AS students_active,
+          COUNT(DISTINCT lga.id)::int AS attempts,
+          COALESCE(SUM(lga.correct_count), 0)::int AS correct,
+          COALESCE(SUM(lga.total_questions), 0)::int AS answered
+        FROM users u
+        JOIN live_game_attempts lga ON lga.user_id = u.id
+        JOIN live_sessions ls ON ls.id = lga.session_id
+        WHERE u.role = 'student'
+          ${cohort}
+          ${liveDate}
+          ${liveUnit}
+        GROUP BY u.university, u.class_section
+      `;
+    }
+
+    // ---- 4. Participation split (who played what) ----
+    const soloDate2 = dateClause(sql, 'qa.completed_at', f);
+    const liveDate2 = dateClause(sql, 'lga.completed_at', f);
+    const participation = await sql`
+      SELECT u.university, u.class_section,
+        COUNT(DISTINCT u.id)::int AS total,
+        COUNT(DISTINCT CASE WHEN solo.user_id IS NOT NULL AND live.user_id IS NOT NULL THEN u.id END)::int AS played_both,
+        COUNT(DISTINCT CASE WHEN solo.user_id IS NOT NULL AND live.user_id IS NULL THEN u.id END)::int AS solo_only,
+        COUNT(DISTINCT CASE WHEN solo.user_id IS NULL AND live.user_id IS NOT NULL THEN u.id END)::int AS live_only,
+        COUNT(DISTINCT CASE WHEN solo.user_id IS NULL AND live.user_id IS NULL THEN u.id END)::int AS played_neither
+      FROM users u
+      LEFT JOIN LATERAL (
+        SELECT qa.user_id FROM quiz_attempts qa
+        JOIN quizzes q ON q.id = qa.quiz_id AND q.unit IS NOT NULL
+        WHERE qa.user_id = u.id ${soloDate2}
+        LIMIT 1
+      ) solo ON true
+      LEFT JOIN LATERAL (
+        SELECT lga.user_id FROM live_game_attempts lga
+        WHERE lga.user_id = u.id ${liveDate2}
+        LIMIT 1
+      ) live ON true
+      WHERE u.role = 'student'
+        ${cohort}
+      GROUP BY u.university, u.class_section
+    `;
+
+    // ---- 5. Question-type accuracy (global across filtered cohort) ----
+    let byQuestionType = [];
+    if (wantSolo) {
+      const soloDate3 = dateClause(sql, 'qa.completed_at', f);
+      byQuestionType = await sql`
+        SELECT COALESCE(q2.type, 'mcq') AS qtype,
+          COUNT(qans.id)::int AS answered,
+          COALESCE(SUM(qans.is_correct), 0)::int AS correct
+        FROM question_answers qans
+        JOIN quiz_attempts qa ON qa.id = qans.attempt_id
+        JOIN quizzes qz ON qz.id = qa.quiz_id AND qz.unit IS NOT NULL
+        JOIN questions q2 ON q2.id = qans.question_id
+        JOIN users u ON u.id = qa.user_id AND u.role = 'student'
+        WHERE 1=1
+          ${cohort}
+          ${soloDate3}
+        GROUP BY COALESCE(q2.type, 'mcq')
+        ORDER BY COALESCE(SUM(qans.is_correct), 0)::float / NULLIF(COUNT(qans.id), 0) ASC
+      `;
+    }
+
+    // ---- 6. Dormant students (no activity in 14 days) ----
+    const dormant = await sql`
+      SELECT u.id, u.name, u.email, u.university, u.class_section,
+        u.avatar_config, u.last_played_date
+      FROM users u
+      WHERE u.role = 'student'
+        AND (u.last_played_date IS NULL OR u.last_played_date < CURRENT_DATE - 14)
+        ${cohort}
+      ORDER BY u.last_played_date ASC NULLS FIRST
+      LIMIT 50
+    `;
+
+    // ---- 7. Accuracy bands per class ----
+    // Compute per-student accuracy, then bucket into bands
+    let studentAccuracies = [];
+    if (wantSolo) {
+      const soloDate4 = dateClause(sql, 'qa.completed_at', f);
+      studentAccuracies = await sql`
+        SELECT u.id, u.university, u.class_section,
+          COALESCE(SUM(qans.is_correct) * 100.0 / NULLIF(COUNT(qans.id), 0), 0)::float8 AS accuracy
+        FROM users u
+        JOIN quiz_attempts qa ON qa.user_id = u.id
+        JOIN quizzes q ON q.id = qa.quiz_id AND q.unit IS NOT NULL
+        LEFT JOIN question_answers qans ON qans.attempt_id = qa.id
+        WHERE u.role = 'student'
+          ${cohort}
+          ${soloDate4}
+        GROUP BY u.id, u.university, u.class_section
+      `;
+    }
+
+    // Merge solo and live data per class
+    const classMap = new Map();
+    for (const c of classes) {
+      const key = `${c.university || ''}::${c.class_section || ''}`;
+      classMap.set(key, {
+        university: c.university,
+        classSection: c.class_section,
+        studentCount: analytics.num(c.student_count),
+        solo: { studentsActive: 0, attempts: 0, correct: 0, answered: 0 },
+        live: { studentsActive: 0, attempts: 0, correct: 0, answered: 0 },
+        participation: { total: 0, playedBoth: 0, soloOnly: 0, liveOnly: 0, playedNeither: 0 },
+        accuracyBands: { excellent: 0, good: 0, moderate: 0, poor: 0, veryPoor: 0 },
+      });
+    }
+
+    for (const r of soloByClass) {
+      const key = `${r.university || ''}::${r.class_section || ''}`;
+      const entry = classMap.get(key);
+      if (entry) {
+        entry.solo = {
+          studentsActive: analytics.num(r.students_active),
+          attempts: analytics.num(r.attempts),
+          correct: analytics.num(r.correct),
+          answered: analytics.num(r.answered),
+        };
+      }
+    }
+
+    for (const r of liveByClass) {
+      const key = `${r.university || ''}::${r.class_section || ''}`;
+      const entry = classMap.get(key);
+      if (entry) {
+        entry.live = {
+          studentsActive: analytics.num(r.students_active),
+          attempts: analytics.num(r.attempts),
+          correct: analytics.num(r.correct),
+          answered: analytics.num(r.answered),
+        };
+      }
+    }
+
+    for (const r of participation) {
+      const key = `${r.university || ''}::${r.class_section || ''}`;
+      const entry = classMap.get(key);
+      if (entry) {
+        entry.participation = {
+          total: analytics.num(r.total),
+          playedBoth: analytics.num(r.played_both),
+          soloOnly: analytics.num(r.solo_only),
+          liveOnly: analytics.num(r.live_only),
+          playedNeither: analytics.num(r.played_neither),
+        };
+      }
+    }
+
+    // Bucket student accuracies into bands
+    for (const s of studentAccuracies) {
+      const key = `${s.university || ''}::${s.class_section || ''}`;
+      const entry = classMap.get(key);
+      if (!entry) continue;
+      const acc = analytics.num(s.accuracy);
+      if (acc >= 90) entry.accuracyBands.excellent++;
+      else if (acc >= 75) entry.accuracyBands.good++;
+      else if (acc >= 60) entry.accuracyBands.moderate++;
+      else if (acc >= 50) entry.accuracyBands.poor++;
+      else entry.accuracyBands.veryPoor++;
+    }
+
+    // Derive final metrics per class
+    const classResults = Array.from(classMap.values()).map(c => {
+      const totalCorrect = c.solo.correct + c.live.correct;
+      const totalAnswered = c.solo.answered + c.live.answered;
+      const avgAccuracy = analytics.accuracy(totalCorrect, totalAnswered);
+      const ks = analytics.knowledgeScore({
+        accuracy: avgAccuracy,
+        firstAttemptAccuracy: avgAccuracy, // approximation for class-level
+        speed: 70, // not measurable at class level without per-student aggregation
+        retention: null
+      });
+      return {
+        ...c,
+        avgAccuracy,
+        knowledgeScore: ks.score,
+        knowledgeLevel: analytics.classify(ks.score),
+      };
+    });
+
+    res.json({
+      classes: classResults,
+      byQuestionType: byQuestionType.map(r => ({
+        type: r.qtype,
+        answered: analytics.num(r.answered),
+        correct: analytics.num(r.correct),
+        accuracy: analytics.accuracy(r.correct, r.answered),
+      })),
+      dormant: dormant.map(s => ({
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        university: s.university,
+        classSection: s.class_section,
+        avatarConfig: safeParseJSON(s.avatar_config, {}),
+        lastPlayedDate: s.last_played_date,
+      })),
+      meta: {
+        filters: echoFilters(f),
+        ...buildMeta(f, { mode: f.mode }),
+      }
+    });
+  } catch (err) {
+    console.error('Admin class analytics error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/* ==========================================================================
+   5c. QUESTION-TYPE WEAK STUDENTS (Admin Only)
+   GET /admin/analytics/question-type/:type
+   
+   Returns students weakest on a specific question type, ascending by accuracy.
+   Useful for targeted intervention — "who struggles with image questions?"
+   ========================================================================== */
+
+router.get('/analytics/question-type/:type', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { type } = req.params;
+    if (!QUESTION_TYPES.includes(type)) {
+      return res.status(400).json({ error: `type must be one of: ${QUESTION_TYPES.join(', ')}` });
+    }
+
+    const sql = getDB();
+    const f = readFilters(req, res, { defaultMode: 'all' });
+    if (!f) return;
+    const cohort = cohortClause(sql, 'u', f);
+
+    const wantSolo = f.mode === 'all' || f.mode === 'solo';
+    const wantLive = f.mode === 'all' || f.mode === 'live';
+
+    // Solo: accuracy on this question type per student
+    let soloRows = [];
+    if (wantSolo) {
+      const soloDate = dateClause(sql, 'qa.completed_at', f);
+      soloRows = await sql`
+        SELECT u.id, u.name, u.email, u.university, u.class_section,
+          u.avatar_config,
+          COUNT(qans.id)::int AS answered,
+          COALESCE(SUM(qans.is_correct), 0)::int AS correct
+        FROM users u
+        JOIN quiz_attempts qa ON qa.user_id = u.id
+        JOIN quizzes q ON q.id = qa.quiz_id AND q.unit IS NOT NULL
+        JOIN question_answers qans ON qans.attempt_id = qa.id
+        JOIN questions q2 ON q2.id = qans.question_id AND COALESCE(q2.type, 'mcq') = ${type}
+        WHERE u.role = 'student'
+          ${cohort}
+          ${soloDate}
+        GROUP BY u.id, u.name, u.email, u.university, u.class_section, u.avatar_config
+      `;
+    }
+
+    // Live: accuracy on this question type per student (via snapshot)
+    let liveRows = [];
+    if (wantLive) {
+      const liveDate = dateClause(sql, 'lga.completed_at', f);
+      liveRows = await sql`
+        SELECT u.id, u.name, u.email, u.university, u.class_section,
+          u.avatar_config,
+          COUNT(lgans.id)::int AS answered,
+          COALESCE(SUM(lgans.is_correct), 0)::int AS correct
+        FROM users u
+        JOIN live_game_attempts lga ON lga.user_id = u.id
+        JOIN live_game_answers lgans ON lgans.attempt_id = lga.id
+        LEFT JOIN questions q2 ON q2.id = lgans.question_id
+        LEFT JOIN LATERAL (SELECT NULLIF(lgans.question_snapshot, '')::jsonb AS data) snap ON true
+        WHERE u.role = 'student'
+          AND COALESCE(q2.type, snap.data->>'type', 'mcq') = ${type}
+          ${cohort}
+          ${liveDate}
+        GROUP BY u.id, u.name, u.email, u.university, u.class_section, u.avatar_config
+      `;
+    }
+
+    // Merge solo + live per student
+    const studentMap = new Map();
+    const ensure = (r) => {
+      if (!studentMap.has(r.id)) {
+        studentMap.set(r.id, {
+          id: r.id, name: r.name, email: r.email,
+          university: r.university, classSection: r.class_section,
+          avatarConfig: safeParseJSON(r.avatar_config, {}),
+          answered: 0, correct: 0,
+        });
+      }
+      return studentMap.get(r.id);
+    };
+    for (const r of soloRows) {
+      const s = ensure(r);
+      s.answered += analytics.num(r.answered);
+      s.correct += analytics.num(r.correct);
+    }
+    for (const r of liveRows) {
+      const s = ensure(r);
+      s.answered += analytics.num(r.answered);
+      s.correct += analytics.num(r.correct);
+    }
+
+    const students = Array.from(studentMap.values())
+      .map(s => ({ ...s, accuracy: analytics.accuracy(s.correct, s.answered) }))
+      .filter(s => s.answered > 0)
+      .sort((a, b) => a.accuracy - b.accuracy); // weakest first
+
+    res.json({
+      type,
+      students,
+      meta: {
+        filters: echoFilters(f),
+        ...buildMeta(f, { mode: f.mode }),
+      }
+    });
+  } catch (err) {
+    console.error('Admin question-type analytics error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

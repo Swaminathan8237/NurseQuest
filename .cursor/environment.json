@@ -1,0 +1,22 @@
+{
+  "name": "SkillQuest / NurseQuest",
+  "user": "ubuntu",
+  "install": "bash .cursor/setup/install.sh",
+  "start": "bash .cursor/setup/start.sh",
+  "terminals": [
+    {
+      "name": "backend",
+      "command": "cd backend && node server.js",
+      "description": "Express + Socket.IO API on http://localhost:3001 (initializes the DB schema and seeds sample data on first boot)."
+    },
+    {
+      "name": "frontend",
+      "command": "cd frontend && npm run dev",
+      "description": "Vite dev server for the React SPA on http://localhost:5174 (proxies /api and /socket.io to the backend)."
+    }
+  ],
+  "ports": [
+    { "name": "backend-api", "port": 3001 },
+    { "name": "frontend", "port": 5174 }
+  ]
+}
